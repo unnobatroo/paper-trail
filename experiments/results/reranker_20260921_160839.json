@@ -1,0 +1,21 @@
+{
+  "experiment": "reranker",
+  "at": "2026-09-21T16:08:39+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "model": "BAAI/bge-reranker-v2-m3",
+  "split": "all",
+  "metrics": {
+    "recall@1": 0.1074,
+    "precision@1": 0.625,
+    "recall@3": 0.2526,
+    "precision@3": 0.5,
+    "recall@5": 0.3312,
+    "precision@5": 0.425,
+    "mrr": 0.7405,
+    "ndcg@10": 0.4993,
+    "runtime_s": 26.6
+  },
+  "n_passages": 91
+}

@@ -1,0 +1,21 @@
+{
+  "experiment": "retrieval",
+  "at": "2026-09-21T16:07:52+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "model": "intfloat/multilingual-e5-large-instruct",
+  "metrics": {
+    "recall@1": 0.0573,
+    "precision@1": 0.25,
+    "recall@3": 0.2111,
+    "precision@3": 0.4583,
+    "recall@5": 0.324,
+    "precision@5": 0.4,
+    "mrr": 0.5642,
+    "ndcg@10": 0.4647,
+    "runtime_s": 17.0
+  },
+  "n_passages": 91,
+  "n_queries": 8
+}

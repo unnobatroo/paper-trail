@@ -1,0 +1,21 @@
+{
+  "experiment": "retrieval",
+  "at": "2026-09-21T16:07:08+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "metrics": {
+    "recall@1": 0.0963,
+    "precision@1": 0.625,
+    "recall@3": 0.1876,
+    "precision@3": 0.5,
+    "recall@5": 0.2258,
+    "precision@5": 0.4,
+    "mrr": 0.7307,
+    "ndcg@10": 0.3866,
+    "runtime_s": 9.8
+  },
+  "n_passages": 91,
+  "n_queries": 8
+}

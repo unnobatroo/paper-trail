@@ -1,0 +1,534 @@
+{
+  "experiment": "diagnose_retrieval",
+  "at": "2026-09-21T17:05:03+00:00",
+  "device": "mps",
+  "gpu": null,
+  "seed": 17,
+  "k": 10,
+  "n_gold": 78,
+  "n_missed": 56,
+  "recall_ceiling": 0.282,
+  "categories": {
+    "just_missed": 10,
+    "weak_rank": 10,
+    "low_semantic_sim": 19,
+    "beyond_60kb": 15,
+    "straddles_60kb": 2
+  },
+  "detail": {
+    "just_missed": [
+      {
+        "passage_id": "rev8_utcafasitas#1",
+        "commitment_id": "C1",
+        "rank": 15,
+        "sim": 0.5738,
+        "ce_pretrained": 0.8286,
+        "note": "community event invite about the planting",
+        "text": "re utca és a Lippa utca fásításáról Időpont. 2026. május 27. 18:00 Helyszín: Molnár Ferenc tér Esőhelyszín: Lehetőségek Tere Lakossági Fórum a Visi Imre utca fásításáról Időpont: 2026. május 28. 18:00"
+      },
+      {
+        "passage_id": "rev8_utcafasitas#2",
+        "commitment_id": "C1",
+        "rank": 19,
+        "sim": 0.5562,
+        "ce_pretrained": 0.5431,
+        "note": "street-tree programme, ~100 trees, per-street plans",
+        "text": "szabad járdafelület szélesebb lesz, így kényelmesebbé és biztonságosabbá válik a gyalogos közlekedés azon a szakaszon, ahol jelenleg a parkoló autók ezt nehezítik. A kerékpártámaszok új elhelyezést ka"
+      },
+      {
+        "passage_id": "rev8_utcafasitas#4",
+        "commitment_id": "C1",
+        "rank": 12,
+        "sim": 0.6063,
+        "ce_pretrained": 0.5227,
+        "note": "street-tree programme, ~100 trees, per-street plans",
+        "text": "A terv 9 fát tartalmaz, így a Bérkocsis utcában lévő 52 parkolóhely 5 parkolóhellyel csökken. Auróra utca – Népszínház utca és Déri Miksa utca közötti szakasz Az érintett szakaszon 15 fa telepítését t"
+      },
+      {
+        "passage_id": "rev8_vigabbutca#0",
+        "commitment_id": "C1",
+        "rank": 13,
+        "sim": 0.5891,
+        "ce_pretrained": 0.1978,
+        "note": "greener, calmer street pilot",
+        "text": "A 2022-es részvételi költségvetés egyik nyertes projektje a Vígabb utca lett. A 2023 őszén a Víg utca átalakult a Déri Miksa utca és a Vásár utca között. Megszűnt a parkolás a Rákóczi téri csarnok mög"
+      },
+      {
+        "passage_id": "rev8_magdolna-kert#3",
+        "commitment_id": "C3",
+        "rank": 11,
+        "sim": 0.4956,
+        "ce_pretrained": 0.0389,
+        "note": "Magdolna kert community garden in preparation",
+        "text": ", minél kevesebb erőforrást használjon, támogassa a helyi élővilágot, és kellemes környezetet teremtsen az emberek számára is. A folyamat során Lőrinczi István, a Permagang alapítója mutatta be a perm"
+      },
+      {
+        "passage_id": "rev8_deri-miksa#0",
+        "commitment_id": "C4",
+        "rank": 11,
+        "sim": 0.514,
+        "ce_pretrained": 0.1548,
+        "note": "Déri Miksa green promenade, completed 2022",
+        "text": "A Józsefvárosi Önkormányzat arra gondolt, hogy a Csarnok negyednek kell egy zöld sétány! A Déri Miksa utca Nagy Fuvaros és Fecske utca közötti szakasza pedig erre tökéletesen megfelelt. A 2020 nyarán "
+      },
+      {
+        "passage_id": "rev8_losonci-ter#0",
+        "commitment_id": "C4",
+        "rank": 14,
+        "sim": 0.5041,
+        "ce_pretrained": 0.4983,
+        "note": "Losonci tér renovated 2023: meeting spots, trees, fitness",
+        "text": "50 évvel ezelőtt a mai Losonci téri lakótelep helyén még girbegurba utcák és egy-két emeletes, gangos bérházak álltak. Azóta a panelházak közötti közterületeken viszont nem sok minden változott, ezért"
+      },
+      {
+        "passage_id": "rev8_vigabbutca#4",
+        "commitment_id": "C4",
+        "rank": 12,
+        "sim": 0.5082,
+        "ce_pretrained": 0.0307,
+        "note": "pedestrian-priority pilot and evaluation",
+        "text": "y kellemesebb és hűvösebb utcában sétálhassanak a józsefvárosiak, valamint ahhoz is, hogy az áthaladó gépjárművek figyelmesebben és lassabban közlekedjenek. Ahol szükséges, a JGK munkatársai elvégzik "
+      },
+      {
+        "passage_id": "rev8_jazminter#0",
+        "commitment_id": "C4",
+        "rank": 17,
+        "sim": 0.4887,
+        "ce_pretrained": 0.1732,
+        "note": "Jázmin tér community-planned square with movement zones",
+        "text": "Mi az a Jázmin tér? Mi így neveztük el a Jázmin, Füvészkert és Tömő utca között található teret, ahol van egy játszótér is. A tér nagyon jó lehetőségeket rejt magában, mégis nagyon kevesen használják."
+      },
+      {
+        "passage_id": "rev8_nagy-fuvaros-utca-zolditese#1",
+        "commitment_id": "C7",
+        "rank": 13,
+        "sim": 0.4175,
+        "ce_pretrained": 0.1451,
+        "note": "permeable beds let rain reach tree roots",
+        "text": "rtani és a talajt átszelő gyökérhálózat biztosítja, hogy elkerüljük a talaj tömörödését. Így a levegő, a csapadék és a tápanyag is könnyen leszivárog a gyökerekhez. © 2026 Rév8 Zrt. | Minden jog fennt"
+      }
+    ],
+    "weak_rank": [
+      {
+        "passage_id": "rev8_utcafasitas#3",
+        "commitment_id": "C1",
+        "rank": 29,
+        "sim": 0.5122,
+        "ce_pretrained": 0.6218,
+        "note": "street-tree programme, ~100 trees, per-street plans",
+        "text": "redményeként a jelenlegi 58 parkolóhely közül 50 parkolóhely továbbra is biztosított marad. Víg utca – Bérkocsis utca és Vásár utca közötti szakasz Az előzetes vizsgálatok alapján, a közművek elhelyez"
+      },
+      {
+        "passage_id": "rev8_danko-utca#0",
+        "commitment_id": "C1",
+        "rank": 44,
+        "sim": 0.4381,
+        "ce_pretrained": 0.0444,
+        "note": "tree-lined traffic-calmed route; also states 2.5bn Ft grant",
+        "text": "A Dankó utca összeköti a Magdolna negyed két központi terét, a Mátyás teret és a Kálvária teret, amelyeknek kiemelt jelentősége van a kerületi zöldfelületek, parkok hálózatban is, továbbá a közösségi "
+      },
+      {
+        "passage_id": "rev8_danko-utca#1",
+        "commitment_id": "C1",
+        "rank": 21,
+        "sim": 0.5358,
+        "ce_pretrained": 0.47,
+        "note": "public consultation on the plans",
+        "text": "marabb aláírásra kerüljön a támogatási szerződés. A Dankó utca terveit 2024. január 21-ig véleményezhették az érdeklődők online. A tervbemutató eseményen pedig személyesen is megoszthatták meglátásaik"
+      },
+      {
+        "passage_id": "rev8_vigabbutca#4",
+        "commitment_id": "C1",
+        "rank": 38,
+        "sim": 0.4593,
+        "ce_pretrained": 0.1404,
+        "note": "greener, calmer street pilot",
+        "text": "y kellemesebb és hűvösebb utcában sétálhassanak a józsefvárosiak, valamint ahhoz is, hogy az áthaladó gépjárművek figyelmesebben és lassabban közlekedjenek. Ahol szükséges, a JGK munkatársai elvégzik "
+      },
+      {
+        "passage_id": "reszvetel_2023#1",
+        "commitment_id": "C1",
+        "rank": 39,
+        "sim": 0.4583,
+        "ce_pretrained": 0.6617,
+        "note": "József utca garden/green strip proposals",
+        "text": "get és kutyabarát zöldsáv kialakítása A József utca – Német utca találkozásánál újonnan kialakított kert akkor szolgálná [...] Becsült költség: 10 millió forint Kapott szavazatok: 219 Pillanat... A Gu"
+      },
+      {
+        "passage_id": "reszvetel_2024#8",
+        "commitment_id": "C1",
+        "rank": 37,
+        "sim": 0.4658,
+        "ce_pretrained": 0.3487,
+        "note": "park green-surface fix",
+        "text": "ok parkjának zöldfelülete a nagy átmenő forgalom miatt nagyon rossz [...] Becsült költség: 3 millió Ft Kapott szavazatok: 125 Pillanat... help Teljes kerület ötletei A menstruációs szegénység enyhítés"
+      },
+      {
+        "passage_id": "rev8_magdolna-kert#0",
+        "commitment_id": "C4",
+        "rank": 35,
+        "sim": 0.4353,
+        "ce_pretrained": 0.0549,
+        "note": "open community space as well as a garden",
+        "text": "Jó híreink vannak: egyre közelebb vagyunk a Magdolna kert megvalósításához! A Magdolna utca 28. szám alatti telken – a Dankó udvar szomszédjában – a Józsefvárosi Részvételi Költségvetés egyik nyertes "
+      },
+      {
+        "passage_id": "rev8_vigabbutca#0",
+        "commitment_id": "C4",
+        "rank": 46,
+        "sim": 0.4009,
+        "ce_pretrained": 0.1217,
+        "note": "pedestrian-priority pilot and evaluation",
+        "text": "A 2022-es részvételi költségvetés egyik nyertes projektje a Vígabb utca lett. A 2023 őszén a Víg utca átalakult a Déri Miksa utca és a Vásár utca között. Megszűnt a parkolás a Rákóczi téri csarnok mög"
+      },
+      {
+        "passage_id": "rev8_vigabbutca#6",
+        "commitment_id": "C4",
+        "rank": 22,
+        "sim": 0.4667,
+        "ce_pretrained": 0.0259,
+        "note": "pedestrian-priority pilot and evaluation",
+        "text": "s zónaként működött az áruszállítási biztosításával. 2023 decembertől újra van átmenő gépjárműforgalom, azonban parkolásra nincsen lehetőség. Az utcára aszfaltminta került, amit 2023 szeptemberében kö"
+      },
+      {
+        "passage_id": "rev8_jazminter#3",
+        "commitment_id": "C4",
+        "rank": 29,
+        "sim": 0.4419,
+        "ce_pretrained": 0.0155,
+        "note": "Jázmin tér community-planned square with movement zones",
+        "text": "ongasztalt fogunk kihelyezni erre a részre. A tér Tömő utcai oldalán lévő merőleges parkolók helyett párhuzamos parkolást alakítunk ki. Az így felszabadult helyen pedig további növényeket és fákat tel"
+      }
+    ],
+    "low_semantic_sim": [
+      {
+        "passage_id": "rev8_nagy-fuvaros-utca-zolditese#1",
+        "commitment_id": "C1",
+        "rank": 61,
+        "sim": 0.373,
+        "ce_pretrained": 0.4739,
+        "note": "planter beds around street trees",
+        "text": "rtani és a talajt átszelő gyökérhálózat biztosítja, hogy elkerüljük a talaj tömörödését. Így a levegő, a csapadék és a tápanyag is könnyen leszivárog a gyökerekhez. © 2026 Rév8 Zrt. | Minden jog fennt"
+      },
+      {
+        "passage_id": "reszvetel_2023#0",
+        "commitment_id": "C1",
+        "rank": 56,
+        "sim": 0.3852,
+        "ce_pretrained": 0.5705,
+        "note": "Pál utca greening proposal",
+        "text": "Ezen az oldalon a 2024. évi részvételi költségvetésben szavazólapra kerülő ötleteket találod. A nyertes ötletek megvalósítását ezen az oldalon tudod követni. help 1. körzet ötletei A Pál utca zöldítés"
+      },
+      {
+        "passage_id": "reszvetel_2023#3",
+        "commitment_id": "C1",
+        "rank": 62,
+        "sim": 0.3685,
+        "ce_pretrained": 0.839,
+        "note": "Magdolna utca greening proposal",
+        "text": "nat... A Magdolna utca zöldítése a Dankó utca és Dobozi utca közötti szakaszon A Magdolna utca 25–53. közötti utcaszakasz planténeres zöldítésére van szükség. Ez a [...] Becsült költség: 7 millió fori"
+      },
+      {
+        "passage_id": "reszvetel_2024#2",
+        "commitment_id": "C1",
+        "rank": 67,
+        "sim": 0.3455,
+        "ce_pretrained": 0.5788,
+        "note": "Mária utca greening proposal",
+        "text": " ám az utca további [...] Becsült költség: 8 millió Ft Kapott szavazatok: 84 Pillanat... A Mária utca zöldítése magaságyásokkal és a parkolás rendezése A Mária utcában a Szemészeti Klinika előtt halsz"
+      },
+      {
+        "passage_id": "jkit_p13#0",
+        "commitment_id": "C2",
+        "rank": 58,
+        "sim": 0.3405,
+        "ce_pretrained": 0.6828,
+        "note": "Telkes Mária program: courtyard/façade greening, exact Ft amounts",
+        "text": "3. Klíma- és környezetvédelmi pályázatok 13 3. Klíma- és környezetvédelmi pályázatok 3.1. „Telkes Mária józsefvárosi társasházi zöldítési és klímavédelmi program” A klímavédelmi célú társasházi pályáz"
+      },
+      {
+        "passage_id": "jkit_p13#1",
+        "commitment_id": "C2",
+        "rank": 51,
+        "sim": 0.3548,
+        "ce_pretrained": 0.8314,
+        "note": "Telkes Mária program: courtyard/façade greening, exact Ft amounts",
+        "text": "- legfeljebb 2 millió forintra - pá- lyázhatott, és azon belül kellett megjelölni azokat a modulo - kat, amelyre a kívánt összeget elkölteni tervezi. A 2023-ban megjelent pályázat első fordulójában 12"
+      },
+      {
+        "passage_id": "reszvetel_2024#3",
+        "commitment_id": "C3",
+        "rank": 29,
+        "sim": 0.3732,
+        "ce_pretrained": 0.0391,
+        "note": "new community-garden proposal with 30M Ft estimate",
+        "text": " közösségi kert létesült a kerületben, amelyek művelésére mindig [...] Becsült költség: 30 millió Ft Kapott szavazatok: 354 Pillanat... Zöldítéssel egybekötött járda- és járdasziget-rendezés a Nagy Fu"
+      },
+      {
+        "passage_id": "rev8_losonci-ter#1",
+        "commitment_id": "C4",
+        "rank": 73,
+        "sim": 0.2428,
+        "ce_pretrained": 0.0124,
+        "note": "Losonci tér renovated 2023: meeting spots, trees, fitness",
+        "text": "jult. A tervezésnél figyeltünk a mostani szélsőséges időjárási viszonyokra is. A lehető legtöbb helyen szerettük volna feltörni az aszfaltot, amelyek helyett zöldfelületek jöhetnek létre. © 2026 Rév8 "
+      },
+      {
+        "passage_id": "reszvetel_2023#2",
+        "commitment_id": "C4",
+        "rank": 68,
+        "sim": 0.2847,
+        "ce_pretrained": 0.0512,
+        "note": "Magdolna minipark proposal",
+        "text": " a Rákóczi úton Lehetővé kell tenni, hogy a Puskin és Szentkirályi utcák Rákóczi úti torkolatának [...] Becsült költség: 4 millió forint Kapott szavazatok: 88 Pillanat... Babahinta a Vízipók-csodapók "
+      },
+      {
+        "passage_id": "reszvetel_2023#7",
+        "commitment_id": "C4",
+        "rank": 72,
+        "sim": 0.252,
+        "ce_pretrained": 0.1479,
+        "note": "Losonci–Práter community space proposal",
+        "text": "a Magyar [...] Becsült költség: 20 millió forint Kapott szavazatok: 174 Pillanat... Losonci–Práter közösségi tervezés A Práter utca Losonci tér 7. és Práter utca 56. közötti szakaszán gondozott közöss"
+      },
+      {
+        "passage_id": "reszvetel_2024#8",
+        "commitment_id": "C4",
+        "rank": 47,
+        "sim": 0.3989,
+        "ce_pretrained": 0.3606,
+        "note": "park green-surface fix",
+        "text": "ok parkjának zöldfelülete a nagy átmenő forgalom miatt nagyon rossz [...] Becsült költség: 3 millió Ft Kapott szavazatok: 125 Pillanat... help Teljes kerület ötletei A menstruációs szegénység enyhítés"
+      },
+      {
+        "passage_id": "jkit_p14#1",
+        "commitment_id": "C5",
+        "rank": 61,
+        "sim": 0.2679,
+        "ce_pretrained": 0.7544,
+        "note": "Fogadj örökbe egy közterületet: rounds, sites, Ft amounts",
+        "text": "utca 10. szám körüli területek; Nagy Fu - varos u. 12. sz. előtti zöldsáv; Bródy Sándor utca 10. sz. előtti közterület; Villám utca 25. szám előtti közterület; Villám utca 27. szám előtti közterület; "
+      },
+      {
+        "passage_id": "jkit_p14#2",
+        "commitment_id": "C5",
+        "rank": 42,
+        "sim": 0.3203,
+        "ce_pretrained": 0.3502,
+        "note": "Fogadj örökbe egy közterületet: rounds, sites, Ft amounts",
+        "text": "tek a fővárosi tulajdonú, kezelésű közterületekkel is, amelyeknél szükséges a Fővárosi Önkormányzat hozzájárulása is. 2024-ben egy fordulóban 16 pályázat nyert, a támogatási ke - retösszeg összesen 2."
+      },
+      {
+        "passage_id": "jkit_p15#0",
+        "commitment_id": "C5",
+        "rank": 59,
+        "sim": 0.2753,
+        "ce_pretrained": 0.731,
+        "note": "adopted sites and tasks listed",
+        "text": "3. Klíma- és környezetvédelmi pályázatok 15 ház előtti közterület; József utca-Német utca sarkán lévő zöld- felület; Baross utca 118. előtti közterület; Szigetvári u. 1.-mik- ropark; Népszínház utca 2"
+      },
+      {
+        "passage_id": "jkit_p15#2",
+        "commitment_id": "C5",
+        "rank": 31,
+        "sim": 0.368,
+        "ce_pretrained": 0.9588,
+        "note": "adopted sites and tasks listed",
+        "text": " került sor, a 2024- es nyertesekkel kötött szerződések alapján 2025-ben várható - an 2.639.785 Ft kifizetésére fog sor kerülni. Összesen tehát a „Fogadj örökbe egy közterületet” tárgyú pá - lyázatunk"
+      },
+      {
+        "passage_id": "jkit_p13#0",
+        "commitment_id": "C7",
+        "rank": 67,
+        "sim": 0.213,
+        "ce_pretrained": 0.0118,
+        "note": "rain-barrel module among Telkes Mária targets",
+        "text": "3. Klíma- és környezetvédelmi pályázatok 13 3. Klíma- és környezetvédelmi pályázatok 3.1. „Telkes Mária józsefvárosi társasházi zöldítési és klímavédelmi program” A klímavédelmi célú társasházi pályáz"
+      },
+      {
+        "passage_id": "jkit_p13#1",
+        "commitment_id": "C7",
+        "rank": 70,
+        "sim": 0.1963,
+        "ce_pretrained": 0.0026,
+        "note": "rain-barrel module among Telkes Mária targets",
+        "text": "- legfeljebb 2 millió forintra - pá- lyázhatott, és azon belül kellett megjelölni azokat a modulo - kat, amelyre a kívánt összeget elkölteni tervezi. A 2023-ban megjelent pályázat első fordulójában 12"
+      },
+      {
+        "passage_id": "jkit_p13#2",
+        "commitment_id": "C7",
+        "rank": 75,
+        "sim": 0.1795,
+        "ce_pretrained": 0.0015,
+        "note": "rain-barrel module among Telkes Mária targets",
+        "text": "t Égig Érő Fű pályázatra, melynek cél- ja ugyancsak az udvarok, gangok zöldítése, élhetőbbé tétele."
+      },
+      {
+        "passage_id": "reszvetel_2023#3",
+        "commitment_id": "C8",
+        "rank": 82,
+        "sim": 0.247,
+        "ce_pretrained": 0.0225,
+        "note": "energy-efficiency awareness item — adjacent, not heating",
+        "text": "nat... A Magdolna utca zöldítése a Dankó utca és Dobozi utca közötti szakaszon A Magdolna utca 25–53. közötti utcaszakasz planténeres zöldítésére van szükség. Ez a [...] Becsült költség: 7 millió fori"
+      }
+    ],
+    "beyond_60kb": [
+      {
+        "passage_id": "jkit_p53#0",
+        "commitment_id": "C1",
+        "rank": 35,
+        "sim": 0.4875,
+        "ce_pretrained": 0.2007,
+        "note": "Práter/Tömő renewal: new trees, fasor, wider pavements",
+        "text": "9. Komplex intézkedéseket magukba foglaló városfejlesztési projektek 53 9.1.3. Práter utca (Futó -Szigony utca között) és a Tömő utca (Leonardo da Vinci és Szigony utca kö- zött) megújítása 2021-ben d"
+      },
+      {
+        "passage_id": "jkit_p53#1",
+        "commitment_id": "C1",
+        "rank": 27,
+        "sim": 0.5175,
+        "ce_pretrained": 0.7657,
+        "note": "Práter/Tömő renewal: new trees, fasor, wider pavements",
+        "text": " - ban mikromobilitási pontok. A Szigony utcai kereszteződésben külön beruházásban létrejött Bubi pont is növeli az utcában a kerékpározási kedvet. A csomópontokon az úttest a járdaszint- be kerül és "
+      },
+      {
+        "passage_id": "jkit_p53#2",
+        "commitment_id": "C1",
+        "rank": 28,
+        "sim": 0.5161,
+        "ce_pretrained": 0.2214,
+        "note": "Práter/Tömő renewal: new trees, fasor, wider pavements",
+        "text": "Elkészültek a Szigony utca Üllői út és Apáthy István utca közötti szakaszának a meg- újítási tervei, és 2024 tavaszán lezárult a Práter utca a Szigony utca-Illés utca közötti szakasza terveinek vélemé"
+      },
+      {
+        "passage_id": "jkit_p66#1",
+        "commitment_id": "C1",
+        "rank": 24,
+        "sim": 0.5222,
+        "ce_pretrained": 0.531,
+        "note": "Palotanegyed tree planting + Healthy Streets call",
+        "text": "isszajelzések nagyarányú támogatást mutattak, az észrevételeket beépítet - tük a kiviteli tervekbe. A végleges, engedélyes tervek 2025. év elején leszállításra kerültek. A költségvetési lehetőségektől"
+      },
+      {
+        "passage_id": "jkit_p66#2",
+        "commitment_id": "C1",
+        "rank": 42,
+        "sim": 0.4441,
+        "ce_pretrained": 0.9605,
+        "note": "Palotanegyed tree planting + Healthy Streets call",
+        "text": "lógiai szempon - tok érvényesítése, • befogadó, közösségi aktivitást ösztönző közterületek léte - sítése."
+      },
+      {
+        "passage_id": "jkit_p73#1",
+        "commitment_id": "C1",
+        "rank": 47,
+        "sim": 0.4215,
+        "ce_pretrained": 0.1611,
+        "note": "green-strip concepts awaiting permits",
+        "text": "úttól, ami miatt nem szükséges a gyep intenzív kaszálása. A zöldfelület fenntartását kerületünk vállalja. A fenti területekre a vonatkozó elképzelések koncepciói elké - szültek, a Fővárosi engedélyek,"
+      },
+      {
+        "passage_id": "jkit_p73#2",
+        "commitment_id": "C1",
+        "rank": 23,
+        "sim": 0.5266,
+        "ce_pretrained": 0.8209,
+        "note": "green-strip concepts awaiting permits",
+        "text": "yások – igényeit a lehető legjobban felmérjük, majd ezeket összehangolva egy olyan parkot hozzunk létre, amelyben mindenki otthon érzi magát és amelyben a józsefvárosiak egymást és a teret tiszte - le"
+      },
+      {
+        "passage_id": "jkit_p48#1",
+        "commitment_id": "C3",
+        "rank": 47,
+        "sim": 0.3065,
+        "ce_pretrained": 0.0016,
+        "note": "composting available in Auróra Klímakert and Kőris Kert",
+        "text": "ztere. A JGK Zrt. felmérte, hogy melyik negyedben hol és mennyi kommunális hulladékgyűjtő edény van. Az adatok térképre is felkerültek, amely elérhető a térinformatikai rendszerben. 8.2.3. Használtruh"
+      },
+      {
+        "passage_id": "jkit_p53#0",
+        "commitment_id": "C4",
+        "rank": 64,
+        "sim": 0.2977,
+        "ce_pretrained": 0.1135,
+        "note": "street renewal improved the public realm",
+        "text": "9. Komplex intézkedéseket magukba foglaló városfejlesztési projektek 53 9.1.3. Práter utca (Futó -Szigony utca között) és a Tömő utca (Leonardo da Vinci és Szigony utca kö- zött) megújítása 2021-ben d"
+      },
+      {
+        "passage_id": "jkit_p53#1",
+        "commitment_id": "C4",
+        "rank": 18,
+        "sim": 0.4829,
+        "ce_pretrained": 0.1659,
+        "note": "street renewal improved the public realm",
+        "text": " - ban mikromobilitási pontok. A Szigony utcai kereszteződésben külön beruházásban létrejött Bubi pont is növeli az utcában a kerékpározási kedvet. A csomópontokon az úttest a járdaszint- be kerül és "
+      },
+      {
+        "passage_id": "jkit_p53#2",
+        "commitment_id": "C4",
+        "rank": 59,
+        "sim": 0.3408,
+        "ce_pretrained": 0.148,
+        "note": "street renewal improved the public realm",
+        "text": "Elkészültek a Szigony utca Üllői út és Apáthy István utca közötti szakaszának a meg- újítási tervei, és 2024 tavaszán lezárult a Práter utca a Szigony utca-Illés utca közötti szakasza terveinek vélemé"
+      },
+      {
+        "passage_id": "jkit_p53#0",
+        "commitment_id": "C6",
+        "rank": 82,
+        "sim": 0.1933,
+        "ce_pretrained": 0.019,
+        "note": "two-way cycling + Bubi point on the renewed section",
+        "text": "9. Komplex intézkedéseket magukba foglaló városfejlesztési projektek 53 9.1.3. Práter utca (Futó -Szigony utca között) és a Tömő utca (Leonardo da Vinci és Szigony utca kö- zött) megújítása 2021-ben d"
+      },
+      {
+        "passage_id": "jkit_p53#2",
+        "commitment_id": "C6",
+        "rank": 32,
+        "sim": 0.4229,
+        "ce_pretrained": 0.0156,
+        "note": "two-way cycling + Bubi point on the renewed section",
+        "text": "Elkészültek a Szigony utca Üllői út és Apáthy István utca közötti szakaszának a meg- újítási tervei, és 2024 tavaszán lezárult a Práter utca a Szigony utca-Illés utca közötti szakasza terveinek vélemé"
+      },
+      {
+        "passage_id": "jkit_p66#1",
+        "commitment_id": "C6",
+        "rank": 29,
+        "sim": 0.4301,
+        "ce_pretrained": 0.2584,
+        "note": "cyclability on Békési/Kölcsey streets",
+        "text": "isszajelzések nagyarányú támogatást mutattak, az észrevételeket beépítet - tük a kiviteli tervekbe. A végleges, engedélyes tervek 2025. év elején leszállításra kerültek. A költségvetési lehetőségektől"
+      },
+      {
+        "passage_id": "jkit_p66#2",
+        "commitment_id": "C6",
+        "rank": 37,
+        "sim": 0.3956,
+        "ce_pretrained": 0.0053,
+        "note": "cyclability on Békési/Kölcsey streets",
+        "text": "lógiai szempon - tok érvényesítése, • befogadó, közösségi aktivitást ösztönző közterületek léte - sítése."
+      }
+    ],
+    "straddles_60kb": [
+      {
+        "passage_id": "jkit_p45#0",
+        "commitment_id": "C3",
+        "rank": 20,
+        "sim": 0.4225,
+        "ce_pretrained": 0.4517,
+        "note": "community events in Grundkert and gardens",
+        "text": "7. Szemléletformálás 45 közösségszervező eseményt megvalósítani. A felhívásra összesen 58 jelentkezés érkezett. A megvalósult programok közül a természeti környezetet, fenntarthatóságot, környezetvéde"
+      },
+      {
+        "passage_id": "jkit_p45#1",
+        "commitment_id": "C3",
+        "rank": 14,
+        "sim": 0.4633,
+        "ce_pretrained": 0.3575,
+        "note": "community events in Grundkert and gardens",
+        "text": "fűszernövény ültetés, magbörze, használt ruhák csereberéje, szitanyomás színesítette a programot. • A Losonci téri Komposztbarátok szervezésében közös kom- poszt-rostálásra és forgatásra került sor. A"
+      }
+    ]
+  }
+}

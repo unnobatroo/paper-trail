@@ -1,0 +1,52 @@
+{
+  "experiment": "train_classifier",
+  "at": "2026-09-21T15:45:13+00:00",
+  "device": "mps",
+  "gpu": null,
+  "seed": 17,
+  "features": "tfidf",
+  "split": "test",
+  "n_train": 137,
+  "metrics": {
+    "accuracy": 0.3333,
+    "macro_f1": 0.1728,
+    "per_class": {
+      "direct_implementation": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6
+      },
+      "probably_unrelated": {
+        "precision": 0.889,
+        "recall": 0.381,
+        "f1": 0.533,
+        "support": 42
+      },
+      "related_but_indirect": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      "supporting": {
+        "precision": 0.1,
+        "recall": 0.375,
+        "f1": 0.158,
+        "support": 8
+      }
+    },
+    "confusion": {
+      "direct_implementation>supporting": 6,
+      "probably_unrelated>direct_implementation": 5,
+      "probably_unrelated>probably_unrelated": 16,
+      "probably_unrelated>related_but_indirect": 1,
+      "probably_unrelated>supporting": 20,
+      "related_but_indirect>supporting": 1,
+      "supporting>direct_implementation": 3,
+      "supporting>probably_unrelated": 2,
+      "supporting>supporting": 3
+    }
+  },
+  "runtime_s": 0.1
+}

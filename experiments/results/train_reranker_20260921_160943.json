@@ -1,0 +1,33 @@
+{
+  "experiment": "train_reranker",
+  "at": "2026-09-21T16:09:43+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "base": "BAAI/bge-reranker-v2-m3",
+  "epochs": 2,
+  "batch": 8,
+  "train_pairs": 137,
+  "checkpoint": "experiments/checkpoints/reranker_ft",
+  "test_before": {
+    "recall@1": 0.175,
+    "precision@1": 0.375,
+    "recall@3": 0.2562,
+    "precision@3": 0.25,
+    "recall@5": 0.2875,
+    "precision@5": 0.175,
+    "mrr": 0.4375,
+    "ndcg@10": 0.3427
+  },
+  "test_after": {
+    "recall@1": 0.175,
+    "precision@1": 0.375,
+    "recall@3": 0.2812,
+    "precision@3": 0.2917,
+    "recall@5": 0.3063,
+    "precision@5": 0.2,
+    "mrr": 0.4375,
+    "ndcg@10": 0.3905
+  },
+  "runtime_s": 17.0
+}

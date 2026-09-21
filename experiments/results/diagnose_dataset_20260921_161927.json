@@ -1,0 +1,121 @@
+{
+  "experiment": "diagnose_dataset",
+  "at": "2026-09-21T16:19:26+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "n_commitments": 8,
+  "n_passages": 91,
+  "n_sources": 24,
+  "n_curated_labels": 89,
+  "n_pair_rows": 216,
+  "curated_relationship": {
+    "direct_implementation": 40,
+    "related_but_indirect": 6,
+    "supporting": 32,
+    "probably_unrelated": 11
+  },
+  "curated_relevance": {
+    "2": 38,
+    "1": 40,
+    "0": 11
+  },
+  "pairs_by_split": {
+    "train": {
+      "direct_implementation": 24,
+      "related_but_indirect": 5,
+      "supporting": 19,
+      "probably_unrelated": 89
+    },
+    "val": {
+      "direct_implementation": 10,
+      "supporting": 5,
+      "probably_unrelated": 7
+    },
+    "test": {
+      "supporting": 8,
+      "direct_implementation": 6,
+      "probably_unrelated": 42,
+      "related_but_indirect": 1
+    }
+  },
+  "commitments_per_split": {
+    "train": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8"
+    ],
+    "val": [
+      "C1",
+      "C2",
+      "C5",
+      "C6",
+      "C7"
+    ],
+    "test": [
+      "C1",
+      "C3",
+      "C4",
+      "C6",
+      "C7"
+    ]
+  },
+  "sources_per_split": {
+    "train": [
+      "jkit_p45",
+      "jkit_p48",
+      "jkit_p53",
+      "jkit_p64",
+      "jkit_p66",
+      "reszvetel_2023",
+      "rev8_deri-miksa",
+      "rev8_jazminter",
+      "rev8_koris-utca-zolditese",
+      "rev8_nagy-fuvaros-utca-zolditese",
+      "rev8_utcafasitas",
+      "rev8_vigabbutca"
+    ],
+    "val": [
+      "jkit_p13",
+      "jkit_p14",
+      "jkit_p15",
+      "rev8_danko-utca"
+    ],
+    "test": [
+      "jkit_p73",
+      "reszvetel_2024",
+      "rev8_losonci-ter",
+      "rev8_magdolna-kert"
+    ]
+  },
+  "majority_train": {
+    "class": "probably_unrelated",
+    "accuracy": 0.6496
+  },
+  "majority_val": {
+    "class": "direct_implementation",
+    "accuracy": 0.4545
+  },
+  "majority_test": {
+    "class": "probably_unrelated",
+    "accuracy": 0.7368
+  },
+  "passage_chars": {
+    "mean": 700,
+    "min": 89,
+    "max": 800
+  },
+  "near_duplicates": [],
+  "cross_split_dupes": 0,
+  "train_positive_per_class": {
+    "direct_implementation": 24,
+    "related_but_indirect": 5,
+    "supporting": 19
+  },
+  "verdict": "5-class problem with 137 train rows; minority classes have single-digit support — underdetermined."
+}

@@ -1,0 +1,38 @@
+{
+  "experiment": "production_pipeline",
+  "at": "2026-09-21T17:39:47+00:00",
+  "device": "mps",
+  "gpu": null,
+  "seed": 17,
+  "embed": "intfloat/multilingual-e5-large",
+  "chunk": 2400,
+  "candidates": 20,
+  "top_sources": 5,
+  "n_chunks": 38,
+  "jinaai/jina-reranker-v2-base-multilingual": {
+    "recall@1": 0.2322,
+    "precision@1": 0.625,
+    "recall@3": 0.4352,
+    "precision@3": 0.5417,
+    "recall@5": 0.5174,
+    "precision@5": 0.425,
+    "mrr": 0.6875,
+    "ndcg@10": 0.5571,
+    "src_recall@5": 0.7017,
+    "src_precision@5": 0.475,
+    "ms_per_commitment": 19376
+  },
+  "BAAI/bge-reranker-v2-m3": {
+    "recall@1": 0.2634,
+    "precision@1": 0.75,
+    "recall@3": 0.4133,
+    "precision@3": 0.5,
+    "recall@5": 0.4892,
+    "precision@5": 0.4,
+    "mrr": 0.75,
+    "ndcg@10": 0.5495,
+    "src_recall@5": 0.7486,
+    "src_precision@5": 0.525,
+    "ms_per_commitment": 8189
+  }
+}

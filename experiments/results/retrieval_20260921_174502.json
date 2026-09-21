@@ -1,0 +1,21 @@
+{
+  "experiment": "retrieval",
+  "at": "2026-09-21T15:45:02+00:00",
+  "device": "mps",
+  "gpu": null,
+  "seed": 17,
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "metrics": {
+    "recall@1": 0.0963,
+    "precision@1": 0.625,
+    "recall@3": 0.1876,
+    "precision@3": 0.5,
+    "recall@5": 0.2258,
+    "precision@5": 0.4,
+    "mrr": 0.7307,
+    "ndcg@10": 0.3866,
+    "runtime_s": 6.1
+  },
+  "n_passages": 91,
+  "n_queries": 8
+}

@@ -1,0 +1,75 @@
+{
+  "experiment": "pipeline",
+  "at": "2026-09-21T16:19:10+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "embed": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "results": {
+    "stage1": {
+      "C1": {
+        "gold": 29,
+        "in_topk": 8
+      },
+      "C2": {
+        "gold": 3,
+        "in_topk": 1
+      },
+      "C3": {
+        "gold": 9,
+        "in_topk": 4
+      },
+      "C4": {
+        "gold": 17,
+        "in_topk": 2
+      },
+      "C5": {
+        "gold": 6,
+        "in_topk": 2
+      },
+      "C6": {
+        "gold": 8,
+        "in_topk": 4
+      },
+      "C7": {
+        "gold": 5,
+        "in_topk": 1
+      },
+      "C8": {
+        "gold": 1,
+        "in_topk": 0
+      }
+    },
+    "k": 10,
+    "none": {
+      "recall@1": 0.0963,
+      "precision@1": 0.625,
+      "recall@3": 0.1876,
+      "precision@3": 0.5,
+      "recall@5": 0.2258,
+      "precision@5": 0.4,
+      "mrr": 0.7292,
+      "ndcg@10": 0.3866
+    },
+    "ce_pretrained": {
+      "recall@1": 0.117,
+      "precision@1": 0.625,
+      "recall@3": 0.1907,
+      "precision@3": 0.5,
+      "recall@5": 0.2271,
+      "precision@5": 0.4,
+      "mrr": 0.75,
+      "ndcg@10": 0.4017
+    },
+    "ce_finetuned": {
+      "recall@1": 0.1213,
+      "precision@1": 0.75,
+      "recall@3": 0.1933,
+      "precision@3": 0.5417,
+      "recall@5": 0.247,
+      "precision@5": 0.45,
+      "mrr": 0.8125,
+      "ndcg@10": 0.4202
+    }
+  }
+}

@@ -1,0 +1,6 @@
+sentence-transformers>=3.4.0
+scikit-learn>=1.6.0
+datasets>=3.0.0
+accelerate>=1.0.0
+pydantic>=2.13.5
+pypdf>=6.19.0

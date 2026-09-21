@@ -1,0 +1,89 @@
+{
+  "experiment": "ablate_heuristic",
+  "at": "2026-09-21T16:19:36+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "results": {
+    "full": {
+      "recall@1": 0.0963,
+      "precision@1": 0.625,
+      "recall@3": 0.1876,
+      "precision@3": 0.5,
+      "recall@5": 0.2258,
+      "precision@5": 0.4,
+      "mrr": 0.7307,
+      "ndcg@10": 0.3866
+    },
+    "sim_only": {
+      "recall@1": 0.0963,
+      "precision@1": 0.625,
+      "recall@3": 0.1876,
+      "precision@3": 0.5,
+      "recall@5": 0.2258,
+      "precision@5": 0.4,
+      "mrr": 0.7307,
+      "ndcg@10": 0.3866
+    },
+    "entities_only": {
+      "recall@1": 0.0043,
+      "precision@1": 0.125,
+      "recall@3": 0.0129,
+      "precision@3": 0.125,
+      "recall@5": 0.0216,
+      "precision@5": 0.125,
+      "mrr": 0.182,
+      "ndcg@10": 0.1257
+    },
+    "no_orgs": {
+      "recall@1": 0.0963,
+      "precision@1": 0.625,
+      "recall@3": 0.1876,
+      "precision@3": 0.5,
+      "recall@5": 0.2258,
+      "precision@5": 0.4,
+      "mrr": 0.7307,
+      "ndcg@10": 0.3866
+    },
+    "no_places": {
+      "recall@1": 0.0963,
+      "precision@1": 0.625,
+      "recall@3": 0.1876,
+      "precision@3": 0.5,
+      "recall@5": 0.2258,
+      "precision@5": 0.4,
+      "mrr": 0.7307,
+      "ndcg@10": 0.3866
+    },
+    "no_dates": {
+      "recall@1": 0.0963,
+      "precision@1": 0.625,
+      "recall@3": 0.1876,
+      "precision@3": 0.5,
+      "recall@5": 0.2258,
+      "precision@5": 0.4,
+      "mrr": 0.7307,
+      "ndcg@10": 0.3866
+    },
+    "ce_pretrained": {
+      "recall@1": 0.1074,
+      "precision@1": 0.625,
+      "recall@3": 0.2526,
+      "precision@3": 0.5,
+      "recall@5": 0.3312,
+      "precision@5": 0.425,
+      "mrr": 0.7405,
+      "ndcg@10": 0.4993
+    },
+    "ce_finetuned": {
+      "recall@1": 0.117,
+      "precision@1": 0.625,
+      "recall@3": 0.3337,
+      "precision@3": 0.7083,
+      "recall@5": 0.4166,
+      "precision@5": 0.575,
+      "mrr": 0.7542,
+      "ndcg@10": 0.6563
+    }
+  }
+}

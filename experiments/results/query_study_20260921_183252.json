@@ -1,0 +1,90 @@
+{
+  "experiment": "query_study",
+  "at": "2026-09-21T16:32:51+00:00",
+  "device": "mps",
+  "gpu": null,
+  "seed": 17,
+  "corpus": "fixed_2400",
+  "results": {
+    "paraphrase-multilingual-MiniLM-L12-v2 | title": {
+      "recall@5": 0.3072,
+      "precision@5": 0.3,
+      "recall@10": 0.3977,
+      "precision@10": 0.2,
+      "recall@20": 0.5578,
+      "precision@20": 0.1688,
+      "mrr": 0.5382,
+      "ndcg@10": 0.3365
+    },
+    "paraphrase-multilingual-MiniLM-L12-v2 | text": {
+      "recall@5": 0.3019,
+      "precision@5": 0.325,
+      "recall@10": 0.3663,
+      "precision@10": 0.225,
+      "recall@20": 0.6172,
+      "precision@20": 0.1688,
+      "mrr": 0.5522,
+      "ndcg@10": 0.3636
+    },
+    "paraphrase-multilingual-MiniLM-L12-v2 | title_text": {
+      "recall@5": 0.3019,
+      "precision@5": 0.325,
+      "recall@10": 0.3663,
+      "precision@10": 0.225,
+      "recall@20": 0.4953,
+      "precision@20": 0.1625,
+      "mrr": 0.6639,
+      "ndcg@10": 0.3992
+    },
+    "paraphrase-multilingual-MiniLM-L12-v2 | full": {
+      "recall@5": 0.3019,
+      "precision@5": 0.325,
+      "recall@10": 0.3663,
+      "precision@10": 0.225,
+      "recall@20": 0.4953,
+      "precision@20": 0.1625,
+      "mrr": 0.6639,
+      "ndcg@10": 0.3992
+    },
+    "multilingual-e5-large-instruct | title": {
+      "recall@5": 0.4259,
+      "precision@5": 0.375,
+      "recall@10": 0.6811,
+      "precision@10": 0.275,
+      "recall@20": 0.8045,
+      "precision@20": 0.2062,
+      "mrr": 0.6113,
+      "ndcg@10": 0.5305
+    },
+    "multilingual-e5-large-instruct | text": {
+      "recall@5": 0.4093,
+      "precision@5": 0.325,
+      "recall@10": 0.5362,
+      "precision@10": 0.25,
+      "recall@20": 0.8358,
+      "precision@20": 0.2,
+      "mrr": 0.6027,
+      "ndcg@10": 0.5146
+    },
+    "multilingual-e5-large-instruct | title_text": {
+      "recall@5": 0.4292,
+      "precision@5": 0.325,
+      "recall@10": 0.607,
+      "precision@10": 0.275,
+      "recall@20": 0.9182,
+      "precision@20": 0.2062,
+      "mrr": 0.6022,
+      "ndcg@10": 0.5485
+    },
+    "multilingual-e5-large-instruct | full": {
+      "recall@5": 0.4292,
+      "precision@5": 0.325,
+      "recall@10": 0.607,
+      "precision@10": 0.275,
+      "recall@20": 0.9182,
+      "precision@20": 0.2062,
+      "mrr": 0.6022,
+      "ndcg@10": 0.5485
+    }
+  }
+}

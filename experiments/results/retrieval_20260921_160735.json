@@ -1,0 +1,21 @@
+{
+  "experiment": "retrieval",
+  "at": "2026-09-21T16:07:35+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "model": "BAAI/bge-m3",
+  "metrics": {
+    "recall@1": 0.0764,
+    "precision@1": 0.375,
+    "recall@3": 0.177,
+    "precision@3": 0.375,
+    "recall@5": 0.246,
+    "precision@5": 0.35,
+    "mrr": 0.5536,
+    "ndcg@10": 0.4195,
+    "runtime_s": 27.3
+  },
+  "n_passages": 91,
+  "n_queries": 8
+}

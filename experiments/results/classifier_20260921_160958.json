@@ -1,0 +1,59 @@
+{
+  "experiment": "classifier",
+  "at": "2026-09-21T16:09:58+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "model": "heuristic",
+  "split": "test",
+  "metrics": {
+    "accuracy": 0.6667,
+    "macro_f1": 0.2141,
+    "per_class": {
+      "budget": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      "direct_implementation": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6
+      },
+      "probably_unrelated": {
+        "precision": 0.86,
+        "recall": 0.881,
+        "f1": 0.871,
+        "support": 42
+      },
+      "related_but_indirect": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      "supporting": {
+        "precision": 0.5,
+        "recall": 0.125,
+        "f1": 0.2,
+        "support": 8
+      }
+    },
+    "confusion": {
+      "direct_implementation>probably_unrelated": 1,
+      "direct_implementation>related_but_indirect": 4,
+      "direct_implementation>supporting": 1,
+      "probably_unrelated>budget": 2,
+      "probably_unrelated>probably_unrelated": 37,
+      "probably_unrelated>related_but_indirect": 3,
+      "related_but_indirect>probably_unrelated": 1,
+      "supporting>budget": 1,
+      "supporting>probably_unrelated": 4,
+      "supporting>related_but_indirect": 2,
+      "supporting>supporting": 1
+    }
+  },
+  "runtime_s": 0.5
+}

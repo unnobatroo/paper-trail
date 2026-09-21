@@ -1,0 +1,159 @@
+{
+  "experiment": "hybrid",
+  "at": "2026-09-21T16:19:38+00:00",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "seed": 17,
+  "binary": {
+    "heuristic_pos": {
+      "accuracy": 0.807,
+      "precision": 0.643,
+      "recall": 0.6,
+      "f1": 0.621,
+      "tp": 9,
+      "fp": 5,
+      "fn": 6
+    },
+    "sim_threshold": {
+      "accuracy": 0.7895,
+      "precision": 0.667,
+      "recall": 0.4,
+      "f1": 0.5,
+      "tp": 6,
+      "fp": 3,
+      "fn": 9
+    },
+    "ce_pretrained": {
+      "accuracy": 0.2632,
+      "precision": 0.263,
+      "recall": 1.0,
+      "f1": 0.417,
+      "tp": 15,
+      "fp": 42,
+      "fn": 0
+    },
+    "ce_finetuned": {
+      "accuracy": 0.2632,
+      "precision": 0.263,
+      "recall": 1.0,
+      "f1": 0.417,
+      "tp": 15,
+      "fp": 42,
+      "fn": 0
+    },
+    "hybrid_lr": {
+      "accuracy": 0.6842,
+      "precision": 0.412,
+      "recall": 0.467,
+      "f1": 0.437,
+      "tp": 7,
+      "fp": 10,
+      "fn": 8
+    }
+  },
+  "multiclass": {
+    "hybrid_lr": {
+      "accuracy": 0.5789,
+      "macro_f1": 0.3273,
+      "per_class": {
+        "direct_implementation": {
+          "precision": 0.333,
+          "recall": 0.167,
+          "f1": 0.222,
+          "support": 6
+        },
+        "probably_unrelated": {
+          "precision": 0.844,
+          "recall": 0.643,
+          "f1": 0.73,
+          "support": 42
+        },
+        "related_but_indirect": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 1
+        },
+        "supporting": {
+          "precision": 0.25,
+          "recall": 0.625,
+          "f1": 0.357,
+          "support": 8
+        }
+      },
+      "confusion": {
+        "direct_implementation>direct_implementation": 1,
+        "direct_implementation>probably_unrelated": 3,
+        "direct_implementation>supporting": 2,
+        "probably_unrelated>direct_implementation": 1,
+        "probably_unrelated>probably_unrelated": 27,
+        "probably_unrelated>related_but_indirect": 1,
+        "probably_unrelated>supporting": 13,
+        "related_but_indirect>probably_unrelated": 1,
+        "supporting>direct_implementation": 1,
+        "supporting>probably_unrelated": 1,
+        "supporting>related_but_indirect": 1,
+        "supporting>supporting": 5
+      }
+    },
+    "heuristic": {
+      "accuracy": 0.6667,
+      "macro_f1": 0.2141,
+      "per_class": {
+        "budget": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "direct_implementation": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 6
+        },
+        "probably_unrelated": {
+          "precision": 0.86,
+          "recall": 0.881,
+          "f1": 0.871,
+          "support": 42
+        },
+        "related_but_indirect": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 1
+        },
+        "supporting": {
+          "precision": 0.5,
+          "recall": 0.125,
+          "f1": 0.2,
+          "support": 8
+        }
+      },
+      "confusion": {
+        "direct_implementation>probably_unrelated": 1,
+        "direct_implementation>related_but_indirect": 4,
+        "direct_implementation>supporting": 1,
+        "probably_unrelated>budget": 2,
+        "probably_unrelated>probably_unrelated": 37,
+        "probably_unrelated>related_but_indirect": 3,
+        "related_but_indirect>probably_unrelated": 1,
+        "supporting>budget": 1,
+        "supporting>probably_unrelated": 4,
+        "supporting>related_but_indirect": 2,
+        "supporting>supporting": 1
+      }
+    }
+  },
+  "binary_coef": {
+    "sim": 0.492,
+    "ce_pretrained": 1.134,
+    "ce_finetuned": 4.046,
+    "n_orgs": 0.0,
+    "n_places": 0.0,
+    "n_dates": 0.0,
+    "has_budget": -0.406,
+    "heuristic_score": 0.295
+  }
+}

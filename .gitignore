@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+*.bak
+data/processed/
+data/fixtures/
+data/benchmark/raw/
+data/models/
+experiments/checkpoints/
+.agent-vault/
+.streamlit/
