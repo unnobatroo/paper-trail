@@ -42,6 +42,11 @@ def render(state) -> None:
         "official reports — and list the pages that look related. "
         "Nothing counts until you confirm it."
     )
+    st.caption(
+        "The status under each match describes what that specific source "
+        "passage says about this commitment — the same long report can "
+        "honestly say different things for different commitments."
+    )
 
     for com in commitments:
         links = state.evidence.links_for(com.id)

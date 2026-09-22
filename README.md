@@ -38,6 +38,24 @@ uv run streamlit run app.py
 Click **Read the strategy** in the sidebar, then walk the three steps:
 **Check commitments → Find evidence → Paper trail**.
 
+## Demo
+
+The intended demo is the app itself, start to finish in a few minutes:
+
+```text
+Strategy        — "Read the strategy" reads the real Józsefváros climate PDF
+→ Check commits — review the extracted commitments, confirm the ones that matter
+→ Find evidence — Paper Trail searches official municipal sources and proposes links
+→ Confirm match — inspect what each source actually proves, accept or reject
+→ Paper trail   — every confirmed claim traced back to its official source,
+                  with the gaps shown honestly
+```
+
+The demo works on a warm cache (models + fetched pages under `data/`).
+On a cold machine the first search downloads ~2 GB of models — plan for
+that or run `scripts/reset_demo_state.py` beforehand to show the full
+flow from an empty state.
+
 The first evidence search downloads ~2 GB of language models into
 `data/models/` (the app says so) and embedding a full report takes a few
 minutes on CPU. Fetched pages and chunk embeddings are cached under

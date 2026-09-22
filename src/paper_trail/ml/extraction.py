@@ -69,6 +69,28 @@ _VALUE_RE = re.compile(r"(\d[\d\s]*(?:[.,]\d+)?)\s*(%|m2|m²|db|fő|mm|°C|kWh|F
 class RuleBasedExtractor(Extractor):
     """Reads the strategy's own structure — no guessing."""
 
+    # structural furniture that must never appear in a human-facing title
+    _STRUCT_TITLE_RE = re.compile(
+        r"^\s*\d*[\s.]*(?:Tematikus|Stratégiai)\s+cél[:：]?\s*"
+        r"|^\s*Intézkedés kódja\s+\S+\.?\s*"
+        r"|^\s*Indikátorok?[:：]?\s*",
+        re.IGNORECASE,
+    )
+
+    def _clean_title(self, title: str, page_text: str) -> str:
+        """PDF extraction glues headings onto body sentences — the review
+        screen shows the title, so strip the marker and, if the page's own
+        goal heading leaked in, strip that too. Source text stays verbatim."""
+        t = _squash(title)
+        t = self._STRUCT_TITLE_RE.sub("", t)
+        for m in list(_GOAL_RE.finditer(page_text)) \
+                + list(_PILLAR_RE.finditer(page_text)):
+            head = _squash(m.group(2)).rstrip(".")
+            if head and t.startswith(head):
+                t = t[len(head):]
+        t = re.sub(r"\s+([,.;:])", r"\1", t).strip(" .,;:-")
+        return t or title
+
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
         out: list[PolicyCandidate] = []
         seen_titles: set[str] = set()
@@ -101,14 +123,14 @@ class RuleBasedExtractor(Extractor):
                 continue
 
             for m in _GOAL_RE.finditer(text):
-                title = _squash(m.group(2)).rstrip(".")
+                title = self._clean_title(m.group(2), text)
                 add(document_id=0, suggested_type=CandidateType.OBJECTIVE,
                     text=_squash(m.group(0)), normalized_title=title,
                     source_page=page.page_number, source_excerpt=_squash(m.group(0)),
                     code=m.group(1))
 
             for m in _PILLAR_RE.finditer(text):
-                title = _squash(m.group(2)).rstrip(".")
+                title = self._clean_title(m.group(2), text)
                 add(document_id=0, suggested_type=CandidateType.OBJECTIVE,
                     text=_squash(m.group(0)), normalized_title=title,
                     source_page=page.page_number, source_excerpt=_squash(m.group(0)),
@@ -127,7 +149,8 @@ class RuleBasedExtractor(Extractor):
                 org = _META_RES.search(tail)
                 time = _META_TIME.search(tail)
                 add(document_id=0, suggested_type=CandidateType.MEASURE,
-                    text=heading, normalized_title=heading,
+                    text=heading,
+                    normalized_title=self._clean_title(heading, text),
                     source_page=page.page_number,
                     source_excerpt=_squash(text[max(0, m.start() - 160): m.end()]),
                     code=m.group(1),
@@ -146,7 +169,8 @@ class RuleBasedExtractor(Extractor):
                 year = re.search(r"20\d{2}", sent)
                 value = _VALUE_RE.search(sent)
                 add(document_id=0, suggested_type=CandidateType.TARGET,
-                    text=sent, normalized_title=sent[:120],
+                    text=sent,
+                    normalized_title=self._clean_title(sent, text)[:120],
                     source_page=page.page_number, source_excerpt=sent,
                     deadline_year=int(year.group()) if year else None,
                     target_value=(
