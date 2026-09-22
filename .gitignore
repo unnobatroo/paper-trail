@@ -10,4 +10,4 @@ data/benchmark/raw/
 data/models/
 experiments/checkpoints/
 .agent-vault/
-.streamlit/
+.streamlit/secrets.toml
