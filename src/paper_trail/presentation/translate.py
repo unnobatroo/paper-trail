@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ..services.translation import MT_DISCLAIMER, get_translator
+from ..services.translation import get_translator
 
 
 @st.cache_data(ttl="1d", show_spinner=False)
@@ -27,13 +27,8 @@ def english(text: str | None) -> str | None:
 
 
 def render_en(text: str | None) -> None:
-    """Muted English rendering under the Hungarian original, if enabled."""
+    """Muted English rendering under the Hungarian original, if enabled.
+    The disclaimer itself is shown once in the sidebar — not repeated."""
     en = english(text)
     if en:
         st.caption(f"EN · *{en}*")
-
-
-def note() -> None:
-    """One-page disclaimer, shown once when translations are on."""
-    if get_translator() and st.session_state.get("show_en", True):
-        st.caption(MT_DISCLAIMER)

@@ -45,6 +45,18 @@ class ReviewService:
     def reject_candidate(self, candidate_id: int) -> None:
         self._policy.set_candidate_status(candidate_id, ReviewStatus.REJECTED)
 
+    def confirm_candidates(self, candidate_ids: list[int]) -> int:
+        """Batch-confirm candidates with their suggested type/title —
+        editing stays a per-item action."""
+        for cid in candidate_ids:
+            self.accept_candidate(cid)
+        return len(candidate_ids)
+
+    def reject_candidates(self, candidate_ids: list[int]) -> int:
+        for cid in candidate_ids:
+            self.reject_candidate(cid)
+        return len(candidate_ids)
+
     def reject_all_pending(self) -> int:
         """Skip every remaining candidate — returns how many were skipped."""
         pending = self.queue()
@@ -69,3 +81,20 @@ class ReviewService:
 
     def reject_link(self, link_id: int) -> None:
         self._evidence.decide_link(link_id, ReviewStatus.REJECTED)
+
+    def accept_links(
+        self,
+        link_ids: list[int],
+        relationships: dict[int, RelationshipType] | None = None,
+    ) -> int:
+        """Batch-accept links; each keeps its suggested relationship
+        unless the reviewer picked another in `relationships`."""
+        rel = relationships or {}
+        for lid in link_ids:
+            self.accept_link(lid, rel.get(lid))
+        return len(link_ids)
+
+    def reject_links(self, link_ids: list[int]) -> int:
+        for lid in link_ids:
+            self.reject_link(lid)
+        return len(link_ids)

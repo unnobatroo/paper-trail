@@ -78,9 +78,6 @@ def _env_file(path: Path) -> None:
 
 def load() -> Settings:
     _env_file(PROJECT_ROOT / ".env")
-
-
-def load() -> Settings:
     return Settings(
         db_path=Path(
             os.environ.get(

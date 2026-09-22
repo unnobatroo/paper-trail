@@ -14,11 +14,13 @@ from pathlib import Path
 
 import streamlit as st
 
+from paper_trail.domain.enums import ReviewStatus
 from paper_trail.infrastructure.settings import Settings, load
 from paper_trail.ml.embeddings import get_provider
 from paper_trail.ml.rerank import get_reranker
 from paper_trail.ml.extraction import get_extractor
 from paper_trail.presentation import review_commitments, review_evidence, tracker
+from paper_trail.presentation.style import inject
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.ingestion_service import IngestionService
@@ -96,15 +98,39 @@ def get_state() -> AppState:
     )
 
 
-def sidebar(state: AppState) -> str:
-    st.sidebar.title("Paper Trail")
-    st.sidebar.caption("From policy text to implementation evidence.")
+_STEPS = ["Check commitments", "Find evidence", "Paper trail"]
 
+
+def _step_state(state: AppState) -> tuple[set[int], set[int]]:
+    """(done, available) step numbers — drives the sidebar markers."""
+    cands = state.policy.candidates()
+    coms = state.policy.commitments()
+    links = state.evidence.links()
+    pending_links = [l for l in links
+                     if l.review_status == ReviewStatus.UNREVIEWED]
+    done, avail = set(), set()
+    avail.add(1)
+    if cands and all(c.review_status != ReviewStatus.UNREVIEWED
+                     for c in cands):
+        done.add(1)
+    if coms:
+        avail.update({2, 3})
+        if links and not pending_links:
+            done.add(2)
+    return done, avail
+
+
+def _goto(page: int) -> None:
+    st.session_state["page"] = page
+
+
+def sidebar(state: AppState) -> int:
     pdf_path = Path(state.settings.seed_dir) / STRATEGY_PDF
     if not state.policy.documents():
-        st.sidebar.warning("We haven't read the strategy yet.")
+        st.sidebar.info("We haven't read the strategy yet.")
         if pdf_path.exists():
-            if st.sidebar.button("Read the strategy", type="primary"):
+            if st.sidebar.button("Read the strategy", type="primary",
+                                 width="stretch"):
                 with st.spinner("Reading the PDF…"):
                     _, n = state.ingestion.ingest(
                         pdf_path, STRATEGY_TITLE,
@@ -114,15 +140,20 @@ def sidebar(state: AppState) -> str:
                 st.rerun()
         else:
             st.sidebar.error(
-                f"We can't find the strategy PDF at {pdf_path}."
-            )
+                f"We can't find the strategy PDF at {pdf_path}.")
+
+    page = st.session_state.get("page", 1)
+    done, avail = _step_state(state)
+    for n, label in enumerate(_STEPS, start=1):
+        marker = "✓" if n in done else ("●" if n == page else "○")
+        st.sidebar.button(
+            f"{marker}  {n}. {label}",
+            key=f"nav_{n}", width="stretch",
+            disabled=n not in avail,
+            type="primary" if n == page else "secondary",
+            on_click=_goto, args=(n,))
 
     st.sidebar.divider()
-    page = st.sidebar.radio(
-        "Steps",
-        ["1. Check commitments", "2. Find evidence", "3. Paper trail"],
-    )
-
     if get_translator():
         st.sidebar.toggle("English translations", value=True, key="show_en")
         st.sidebar.caption(MT_DISCLAIMER)
@@ -135,6 +166,7 @@ def sidebar(state: AppState) -> str:
 
 def main() -> None:
     st.set_page_config(page_title="Paper Trail", layout="wide")
+    inject()
     state = get_state()
     page = sidebar(state)
 
@@ -145,9 +177,9 @@ def main() -> None:
         "actually happened."
     )
 
-    if page.startswith("1"):
+    if page == 1:
         review_commitments.render(state)
-    elif page.startswith("2"):
+    elif page == 2:
         review_evidence.render(state)
     else:
         tracker.render(state)
