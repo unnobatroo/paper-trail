@@ -1,10 +1,38 @@
+# Paper Trail theme — calm civic/research tool.
+# The theme file is the design system; screens use native components only.
+
 [theme]
 base = "light"
-primaryColor = "#2F6F5E"
-backgroundColor = "#F7F8FA"
+primaryColor = "#2F6F5E"            # restrained green — interaction + confirmed
+backgroundColor = "#F7F8FA"         # calm gray canvas
+secondaryBackgroundColor = "#FFFFFF" # white surfaces (widgets, editor)
+textColor = "#20242C"
+borderColor = "#D9DEE5"
+linkColor = "#2F6F5E"
+linkUnderline = true
+
+baseRadius = "6px"
+buttonRadius = "6px"
+showWidgetBorder = true
+showSidebarBorder = true
+
+baseFontSize = 15
+headingFontSizes = ["1.8rem", "1.3rem", "1.05rem", "1rem", "0.9rem", "0.8rem"]
+headingFontWeights = [700, 600, 600, 500, 500, 500]
+
+# status colours — muted, not alarming
+greenColor = "#2F6F5E"
+redColor = "#A04A43"
+orangeColor = "#8A6A1F"
+grayColor = "#68707D"
+blueColor = "#3A6478"
+
+dataframeBorderColor = "#D9DEE5"
+dataframeHeaderBackgroundColor = "#F1F3F5"
+
+[theme.sidebar]
+backgroundColor = "#F1F3F5"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#20242C"
-linkColor = "#2F6F5E"
-baseRadius = "0.4rem"
 borderColor = "#D9DEE5"
-font = "sans serif"
+primaryColor = "#2F6F5E"

@@ -1,7 +1,7 @@
 """Screen 3 — The paper trail: confirmed commitments and evidence only.
 
-Calm vertical reading: POLICY COMMITMENT → what the evidence shows →
-what is still missing. Objectives stay as section headers.
+Calm vertical reading built from plain Streamlit elements:
+commitment → what the evidence shows → what is still missing.
 """
 
 from __future__ import annotations
@@ -34,6 +34,15 @@ _GROUP_HEAD = {
     RelationshipType.BUDGET: "Budget information",
     RelationshipType.SUPPORTING: "Supporting evidence",
     RelationshipType.INDIRECT: "Related information",
+}
+_STATUS_BADGE_COLOR = {
+    Status.COMPLETED: "green",
+    Status.IN_IMPLEMENTATION: "green",
+    Status.IN_PREPARATION: "orange",
+    Status.ANNOUNCED: "orange",
+    Status.PLANNED: "orange",
+    Status.BUDGET: "blue",
+    Status.BACKGROUND: "gray",
 }
 _MAX_BUDGET_LINES = 6
 
@@ -83,10 +92,8 @@ def render(state) -> None:
 def _block(row) -> None:
     """One commitment as a vertical trace: commitment → evidence → gaps."""
     com = row.commitment
-    with st.container(border=True, key=f"trail-{com.id}"):
-        st.markdown(
-            '<span class="pt-section">Policy commitment</span>',
-            unsafe_allow_html=True)
+    with st.container(border=True):
+        st.caption("POLICY COMMITMENT")
         st.markdown(
             f"**{com.code + ' — ' if com.code else ''}{com.title}**")
         render_en(com.title)
@@ -101,20 +108,19 @@ def _block(row) -> None:
         st.caption(" · ".join(meta))
 
         if row.status != Status.UNKNOWN:
-            st.markdown(
-                f"What the evidence suggests: **{STATUS_LABEL[row.status]}**"
-                + (f" — “{row.status_excerpt}”" if row.status_excerpt else ""))
+            st.badge(
+                f"Source says: {STATUS_LABEL[row.status]}",
+                color=_STATUS_BADGE_COLOR.get(row.status, "gray"))
+            if row.status_excerpt:
+                st.caption(f"“{row.status_excerpt}”")
 
         groups: dict[RelationshipType, list] = {}
         for ev, rel in zip(row.evidence, row.relationships):
             groups.setdefault(rel, []).append(ev)
 
         if groups:
-            st.markdown(
-                '<div class="pt-arrow">↓</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<span class="pt-section">What we found</span>',
-                unsafe_allow_html=True)
+            st.markdown("↓")
+            st.caption("WHAT WE FOUND")
             for rel in _GROUP_ORDER:
                 items = groups.get(rel)
                 if not items:
@@ -142,11 +148,8 @@ def _block(row) -> None:
                                "more figures in the sources")
 
         if row.gaps:
-            st.markdown(
-                '<div class="pt-arrow">↓</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<span class="pt-section">What is still missing</span>',
-                unsafe_allow_html=True)
+            st.markdown("↓")
+            st.caption("WHAT IS STILL MISSING")
             for gap in row.gaps:
                 st.markdown(f"- {gap}")
 

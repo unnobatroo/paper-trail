@@ -20,7 +20,6 @@ from paper_trail.ml.embeddings import get_provider
 from paper_trail.ml.rerank import get_reranker
 from paper_trail.ml.extraction import get_extractor
 from paper_trail.presentation import review_commitments, review_evidence, tracker
-from paper_trail.presentation.style import inject
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.ingestion_service import IngestionService
@@ -166,7 +165,6 @@ def sidebar(state: AppState) -> int:
 
 def main() -> None:
     st.set_page_config(page_title="Paper Trail", layout="wide")
-    inject()
     state = get_state()
     page = sidebar(state)
 
