@@ -2,17 +2,17 @@
 
 **From policy text to implementation evidence.**
 
-Paper Trail reads one official Józsefváros climate strategy PDF, extracts
+Paper Trail reads the real Józsefváros climate strategy PDF, extracts
 candidate commitments, searches official municipal sources for
-implementation evidence, and lets a human decide what becomes part of the
-record. It answers one question:
+implementation evidence, and lets a human decide what enters the record:
 
 > What did the district say it would do, what measurable targets exist,
 > what implementation evidence was found, and what is still missing?
 
-It is not a planner, not an AI researcher, not a GIS platform. It does not
-estimate budgets, infer completion, or judge whether a policy is good.
-Nothing reaches the tracker without a human clicking **Confirm**.
+Nothing reaches the tracker without a human clicking **Confirm**. It does
+not estimate budgets, infer completion, or judge whether a policy is good.
+
+**Live demo: https://paper-trail.streamlit.app**
 
 ## Workflow
 
@@ -21,10 +21,8 @@ strategy PDF
 → extract candidate commitments (page + verbatim excerpt required)
 → human reviews them (Confirm / Edit / Reject)
 → search official sources: jozsefvaros.hu, rev8.hu, budapest.hu
-→ chunk full documents (~2400 chars), embed once, cache
-→ top ~20 chunks by cosine → cross-encoder rerank
-→ best chunk per source → top ~5 proposed links
-→ human reviews links (Confirm / Reject / Change type)
+→ chunk documents (~2400 chars) → embed → top-20 cosine → rerank → top-5
+→ human reviews proposed links
 → confirmed records appear in the Paper Trail, with explicit gaps
 ```
 
@@ -38,56 +36,52 @@ uv run streamlit run app.py
 Click **Read the strategy** in the sidebar, then walk the three steps:
 **Check commitments → Find evidence → Paper trail**.
 
-## Demo
+Hungarian source text can be shown with an automatic English translation
+(sidebar toggle) — labelled machine translation, never an official
+document.
 
-The intended demo is the app itself, start to finish in a few minutes:
+### First run
 
-```text
-Strategy        — "Read the strategy" reads the real Józsefváros climate PDF
-→ Check commits — review the extracted commitments, confirm the ones that matter
-→ Find evidence — Paper Trail searches official municipal sources and proposes links
-→ Confirm match — inspect what each source actually proves, accept or reject
-→ Paper trail   — every confirmed claim traced back to its official source,
-                  with the gaps shown honestly
-```
+- With `JINA_API_KEY` set (see config) the app uses hosted inference —
+  no model downloads, first search just calls the API.
+- Without it, the first search downloads ~2 GB of local models into
+  `data/models/` (the app says so) and embedding takes minutes on CPU.
+  Fetched pages and embeddings are cached under `data/processed/fetched/`.
 
-The demo works on a warm cache (models + fetched pages under `data/`).
-On a cold machine the first search downloads ~2 GB of models — plan for
-that or run `scripts/reset_demo_state.py` beforehand to show the full
-flow from an empty state.
-
-The first evidence search downloads ~2 GB of language models into
-`data/models/` (the app says so) and embedding a full report takes a few
-minutes on CPU. Fetched pages and chunk embeddings are cached under
-`data/processed/fetched/` — later searches are fast.
-
-Reset everything but the caches:
+Reset state without touching caches:
 
 ```bash
-uv run python scripts/reset_demo_state.py   # archives the DB, keeps models/pages
+uv run python scripts/reset_demo_state.py
 ```
+
+Works for both backends: archives the SQLite file, or clears the Supabase
+rows when `SUPABASE_URL`/`SUPABASE_KEY` are set.
+
+## Deploy
+
+The app deploys on Streamlit Community Cloud straight from this repo:
+pick `unnobatroo/paper-trail`, branch `main`, file `app.py`, then paste
+`.streamlit/secrets.toml` (template: `secrets.example.toml`) into the
+app's Secrets. `requirements.txt` covers the build; a `Dockerfile` is
+included for container hosts. Cloud secrets become env vars automatically.
 
 ## Configuration
 
 | env var | default | meaning |
 |---|---|---|
-| `PAPER_TRAIL_DB` | `data/processed/paper_trail.db` | SQLite path |
-| `PAPER_TRAIL_EMBED_MODEL` | `intfloat/multilingual-e5-large` | embedder (`hashing` = offline stub) |
-| `PAPER_TRAIL_RERANKER` | `BAAI/bge-reranker-v2-m3` | cross-encoder (`none` disables; jina ONNX fallback when sentence-transformers absent) |
+| `SUPABASE_URL` / `SUPABASE_KEY` | unset | set both → Supabase/Postgres backend instead of SQLite (run `supabase/migrations/001_schema.sql` once; use the service_role key) |
+| `JINA_API_KEY` | unset | hosted inference — with `PAPER_TRAIL_EMBED_MODEL=jina` + `PAPER_TRAIL_RERANKER=jina` no models are downloaded |
+| `HF_TOKEN` | unset | enables HU→EN machine translation in the UI |
+| `PAPER_TRAIL_DB` | `data/processed/paper_trail.db` | SQLite path (local backend) |
+| `PAPER_TRAIL_EMBED_MODEL` | `intfloat/multilingual-e5-large` | embedder (`jina`, `hashing` = offline stub, or a fastembed model) |
+| `PAPER_TRAIL_RERANKER` | `BAAI/bge-reranker-v2-m3` | cross-encoder (`jina`, `none`, or a local model) |
 | `PAPER_TRAIL_RERANK_K` | `20` | chunks sent to the reranker |
-| `PAPER_TRAIL_MAX_DOC_CHARS` | `4000000` | emergency document bound — truncates AND warns, never silently |
-| `PAPER_TRAIL_SEARCH` | `ddgs` | `ddgs` (DuckDuckGo) or `fixture` (offline JSONL replay) |
-| `PAPER_TRAIL_MODEL_CACHE` | `data/models` | downloaded model files |
+| `PAPER_TRAIL_SEARCH` | `ddgs` | `ddgs` (DuckDuckGo) or `fixture` (offline replay) |
+| `PAPER_TRAIL_MODEL_CACHE` | `data/models` | local model files |
+| `PAPER_TRAIL_MAX_DOC_CHARS` | `4000000` | emergency document bound — truncates and warns, never silently |
 | `PAPER_TRAIL_LLM_BASE_URL` / `_API_KEY` / `_MODEL` | unset | optional OpenAI-compatible extraction endpoint |
-| `SUPABASE_URL` / `SUPABASE_KEY` | unset | when both set, state lives in Supabase/Postgres instead of SQLite (run `supabase/migrations/001_schema.sql` in the SQL editor once; use the service_role key) |
-| `JINA_API_KEY` | unset | hosted inference — set `PAPER_TRAIL_EMBED_MODEL=jina` + `PAPER_TRAIL_RERANKER=jina` and no models are downloaded locally |
-| `HF_TOKEN` | unset | enables optional Hungarian→English machine translation in the UI (Helsinki-NLP/opus-mt-hu-en, labelled MT — not an official document) |
 
-All keys can live in a gitignored `.env` at the repo root (see `.env.example`).
-
-`HF_HUB_DISABLE_XET=1` is set inside the providers: hf-xet's shared blob
-cache puts a model's external ONNX data outside the model directory, which
-onnxruntime refuses to load.
+Keys can live in a gitignored `.env` at the repo root (see `.env.example`).
 
 ## Honesty rules
 
@@ -97,46 +91,38 @@ onnxruntime refuses to load.
   expenditure — never merged, never estimated; only figures near the
   matched excerpt are kept
 - source status comes from cue phrases quoted from the matched excerpt
-  (announced → completed / budget / background / unclear), never inferred
-  from dates
+  (announced → completed / budget / background / unclear), never from dates
 - missing evidence shows as a gap, not a score
+- English text is machine translation, always labelled as such
 
 ## Extraction
 
 `RuleBasedExtractor` (default, offline) parses this document's own
 structure — goal headers, numbered measure cards, target sentences inside
-the action-plan region. It is tuned to this one strategy and deliberately
-not a general parser; target candidates still over-fire occasionally on
-background statistics, which is why the review screen exists. An optional
-`LLMExtractor` posts page windows to any OpenAI-compatible endpoint with
-structured output and verbatim excerpt verification.
+the action-plan region. It is tuned to this one strategy, not a general
+parser; the review screen exists because it occasionally over-fires on
+background statistics. An optional `LLMExtractor` posts page windows to
+any OpenAI-compatible endpoint with structured output and verbatim
+excerpt verification.
 
 ## Retrieval (frozen for the MVP)
 
-Benchmark on 8 commitments × 38 chunks of fetched official text (small —
-do not read it as real-world accuracy): full-document chunking at ~2400
-chars + e5-large embeddings + top-20 cosine + cross-encoder rerank beat
-the old windowed baseline ~2.7× on recall@5. BGE-reranker-v2-m3 was chosen
-over jina-v2-multilingual on source-level metrics (src r@5 0.749 vs 0.702)
-and 2.4× speed. Learned relationship classification was evaluated and
-rejected — the heuristic rules stay; the dataset can't support a learned
-classifier. Raw numbers live in `experiments/results/`.
+Full-document chunking + e5-large + top-20 cosine + BGE cross-encoder
+rerank beat the old windowed baseline ~2.7× on recall@5 in our small
+benchmark; a learned relationship classifier was evaluated and rejected —
+the heuristic rules stay. Raw numbers live in `experiments/results/`.
 
-## Experiments
+The benchmark (`data/benchmark/`) is 8 commitments × 91 real passages ×
+89 hand-labelled pairs (`relevance` 0–2, `relationship` uses the app's
+own enum, every label has a note). Splits are by source document — a test
+passage never has near-copies in train. Regenerate with
+`experiments/build_benchmark.py`; the app does not depend on it.
+Reviewed decisions in the app export as labelled rows for future data:
+`experiments/export_review_data.py` (SQLite backend).
 
-`experiments/` holds the reproducible benchmark harness — optional; the
-app does not depend on it. `data/benchmark/` has 8 commitments × 91 real
-passages × 89 curated labels, split by source document. Reviewed decisions
-in the app export as labelled rows for future training data:
-
-```bash
-uv run python experiments/export_review_data.py
-```
-
-Heavy runs go on a rented GPU (Vast.ai, ~$0.17/hr RTX 3090): sync the
-repo, `pip install sentence-transformers trafilatura pypdf pydantic
-requests` on a stock pytorch image, run, pull the DB back, destroy the
-instance. See `experiments/gpu_warm_e2e.py` for the pattern.
+Heavy runs go on a rented GPU (Vast.ai): sync repo, run on a stock
+pytorch image, pull the DB back, destroy the instance —
+`experiments/gpu_warm_e2e.py` shows the pattern.
 
 ## Layout
 
@@ -148,12 +134,14 @@ src/paper_trail/
                            extraction, matching, rerank
   sources/                 PDF reader, allowlisted search, fetch,
                            official document registry
-  services/                ingestion, evidence discovery, review, metrics
-  repositories/            SQLite data access
+  services/                ingestion, evidence discovery, review,
+                           metrics, translation
+  repositories/            SQLite + Supabase data access
   presentation/            three Streamlit screens
 tests/                     offline: fixture search, hashing embeddings
-data/source_documents/     the strategy PDF + benchmark input PDF
+data/source_documents/     the strategy PDF
 scripts/reset_demo_state.py
+supabase/migrations/       Postgres schema for the cloud backend
 ```
 
 ## Tests
