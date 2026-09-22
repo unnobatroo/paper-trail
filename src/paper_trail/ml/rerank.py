@@ -21,10 +21,13 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
+import requests
+
 log = logging.getLogger(__name__)
 
 DEFAULT_RERANKER = "BAAI/bge-reranker-v2-m3"
 FALLBACK_RERANKER = "jinaai/jina-reranker-v2-base-multilingual"
+JINA_RERANKER = "jina-reranker-v2-base-multilingual"
 
 
 class Reranker(ABC):
@@ -71,6 +74,33 @@ class SentenceTransformerReranker(Reranker):
             [[query, p] for p in passages])]
 
 
+class JinaReranker(Reranker):
+    """Hosted cross-encoder via the Jina AI rerank API — same task as the
+    local ONNX reranker, no model download. Needs JINA_API_KEY."""
+
+    def __init__(self, model: str = JINA_RERANKER,
+                 api_key: str | None = None):
+        key = api_key or os.environ.get("JINA_API_KEY")
+        if not key:
+            raise ValueError("JINA_API_KEY is not set")
+        self.name = model
+        self._headers = {"Authorization": f"Bearer {key}"}
+
+    def score(self, query: str, passages: list[str]) -> list[float]:
+        resp = requests.post(
+            "https://api.jina.ai/v1/rerank",
+            headers=self._headers,
+            json={"model": self.name, "query": query,
+                  "documents": passages, "top_n": len(passages)},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        scores = [0.0] * len(passages)
+        for r in resp.json()["results"]:
+            scores[r["index"]] = float(r["relevance_score"])
+        return scores
+
+
 _FASTEMBED_MODELS = {
     "Xenova/ms-marco-MiniLM-L-6-v2",
     "Xenova/ms-marco-MiniLM-L-12-v2",
@@ -88,6 +118,8 @@ def get_reranker(name: str | None = None,
         "PAPER_TRAIL_RERANKER", DEFAULT_RERANKER)
     if name.lower() in ("none", "off", ""):
         return None
+    if name == "jina" or name.startswith("jina-reranker"):
+        return JinaReranker(name if name != "jina" else JINA_RERANKER)
 
     builds = ((FastembedReranker, SentenceTransformerReranker)
               if name in _FASTEMBED_MODELS

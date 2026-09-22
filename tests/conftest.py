@@ -1,25 +1,23 @@
-import sqlite3
 from pathlib import Path
 
 import pytest
 
-from paper_trail.infrastructure.database import connect
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 
 
 @pytest.fixture
-def conn(tmp_path) -> sqlite3.Connection:
-    return connect(tmp_path / "test.db")
+def db_path(tmp_path) -> Path:
+    return tmp_path / "test.db"
 
 
 @pytest.fixture
-def policy(conn) -> PolicyRepository:
-    return PolicyRepository(conn)
+def policy(db_path) -> PolicyRepository:
+    return PolicyRepository(db_path)
 
 
 @pytest.fixture
-def evidence(conn) -> EvidenceRepository:
-    return EvidenceRepository(conn)
+def evidence(db_path) -> EvidenceRepository:
+    return EvidenceRepository(db_path)
 
 
 @pytest.fixture

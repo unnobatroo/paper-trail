@@ -17,6 +17,7 @@ from .formatting import (
     evidence_kind,
     huf,
 )
+from .translate import note, render_en
 
 
 def render(state) -> None:
@@ -37,6 +38,7 @@ def render(state) -> None:
         f"**{with_target}** with a measurable target, "
         f"**{with_budget}** with a confirmed budget figure."
     )
+    note()
 
     # group rows under their parents for readability
     children: dict[int | None, list] = {}
@@ -48,6 +50,7 @@ def render(state) -> None:
         st.subheader(
             f"{obj.code + ' — ' if obj.code else ''}{obj.title}"
         )
+        render_en(obj.title)
         obj_row = rows_by_id.get(obj.id)
         if obj_row:
             _body(obj_row)
@@ -86,6 +89,7 @@ def _row(row) -> None:
     if row.status != Status.UNKNOWN:
         title += f"  ·  what we know: **{STATUS_LABEL[row.status]}**"
     st.markdown(title)
+    render_en(com.title)
     st.caption(f"Józsefváros Climate Strategy, page {com.source_page}")
 
     details = []

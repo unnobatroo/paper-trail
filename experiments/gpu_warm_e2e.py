@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from pathlib import Path
 
-from paper_trail.infrastructure.database import connect
 from paper_trail.repositories.store import PolicyRepository, EvidenceRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.ml.embeddings import SentenceTransformerProvider
@@ -24,8 +23,8 @@ from paper_trail.sources.web_search import get_search_provider
 
 ROOT = Path(__file__).resolve().parents[1]
 
-conn = connect(ROOT / "data/processed/paper_trail.db")
-policy, evidence = PolicyRepository(conn), EvidenceRepository(conn)
+db = ROOT / "data/processed/paper_trail.db"
+policy, evidence = PolicyRepository(db), EvidenceRepository(db)
 svc = EvidenceService(
     evidence, get_search_provider("fixture", ROOT / "data/fixtures"),
     SentenceTransformerProvider("intfloat/multilingual-e5-large"),

@@ -12,6 +12,7 @@ from .formatting import (
     evidence_kind,
     huf,
 )
+from .translate import english, note, render_en
 
 _EVIDENCE_KINDS = (CandidateType.OBJECTIVE, CandidateType.MEASURE,
                    CandidateType.TARGET)
@@ -47,6 +48,7 @@ def render(state) -> None:
         "passage says about this commitment — the same long report can "
         "honestly say different things for different commitments."
     )
+    note()
 
     for com in commitments:
         links = state.evidence.links_for(com.id)
@@ -58,6 +60,7 @@ def render(state) -> None:
             if com.code:
                 head += f"  ·  `{com.code}`"
             st.markdown(head)
+            render_en(com.title)
             st.caption(f"from the strategy, page {com.source_page}")
 
             if not links:
@@ -105,6 +108,7 @@ def _render_link(state, com, link) -> None:
 
     st.divider()
     st.markdown(f"**[{ev.title}]({ev.url})**")
+    render_en(ev.title)
     st.caption(
         f"{ev.publisher} · {evidence_kind(ev.url, ev.title)} · {ev.url}"
         + (f" · published {ev.published_on}" if ev.published_on else "")
@@ -124,6 +128,9 @@ def _render_link(state, com, link) -> None:
             )
     with st.expander("What the page says"):
         st.caption(ev.snippet[:1500])
+        en = english(ev.snippet[:1500])
+        if en:
+            st.caption(f"EN · *{en}*")
 
     rel = st.selectbox(
         "What does it prove",
@@ -142,7 +149,11 @@ def _render_link(state, com, link) -> None:
 
 
 def _models_cold(state) -> bool:
-    """True when no model files are cached yet — the first search downloads
-    ~2 GB, so the UI should say so instead of looking frozen."""
-    cache = state.settings.model_cache
+    """True when local model files aren't cached yet — the first search
+    downloads ~2 GB, so the UI should say so instead of looking frozen.
+    Hosted inference (Jina) downloads nothing."""
+    s = state.settings
+    if s.embed_model.startswith("jina") or s.reranker_model.startswith("jina"):
+        return False
+    cache = s.model_cache
     return not cache.exists() or not any(cache.iterdir())

@@ -8,12 +8,12 @@ review links → read the paper trail.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 import streamlit as st
 
-from paper_trail.infrastructure.database import connect
 from paper_trail.infrastructure.settings import Settings, load
 from paper_trail.ml.embeddings import get_provider
 from paper_trail.ml.rerank import get_reranker
@@ -24,6 +24,7 @@ from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.ingestion_service import IngestionService
 from paper_trail.services.metrics_service import MetricsService
 from paper_trail.services.review_service import ReviewService
+from paper_trail.services.translation import MT_DISCLAIMER, get_translator
 from paper_trail.sources.web_search import get_search_provider
 
 STRATEGY_PDF = "jozsefvaros_klimastrategia_2021.pdf"
@@ -47,10 +48,30 @@ class AppState:
 
 @st.cache_resource
 def get_state() -> AppState:
+    # on Streamlit Cloud, secrets.toml values arrive via st.secrets —
+    # surface them as env vars so load() sees the same names everywhere
+    try:
+        for k, v in st.secrets.items():
+            os.environ.setdefault(k, str(v))
+    except Exception:
+        pass
+
     settings = load()
-    conn = connect(settings.db_path)
-    policy = PolicyRepository(conn)
-    evidence = EvidenceRepository(conn)
+    # no sqlite3 connection may live inside this cached state — the SQLite
+    # repos hold the path and open per-operation connections; the Supabase
+    # repos hold a stateless HTTP client
+    if settings.supabase_configured:
+        from paper_trail.repositories.supabase_store import (
+            SupabaseEvidenceRepository,
+            SupabasePolicyRepository,
+        )
+        policy = SupabasePolicyRepository(
+            settings.supabase_url, settings.supabase_key)
+        evidence = SupabaseEvidenceRepository(
+            settings.supabase_url, settings.supabase_key)
+    else:
+        policy = PolicyRepository(settings.db_path)
+        evidence = EvidenceRepository(settings.db_path)
     embedder = get_provider(settings.embed_model,
                             cache_dir=str(settings.model_cache))
     extractor = get_extractor(
@@ -97,10 +118,19 @@ def sidebar(state: AppState) -> str:
             )
 
     st.sidebar.divider()
-    return st.sidebar.radio(
+    page = st.sidebar.radio(
         "Steps",
         ["1. Check commitments", "2. Find evidence", "3. Paper trail"],
     )
+
+    if get_translator():
+        st.sidebar.toggle("English translations", value=True, key="show_en")
+        st.sidebar.caption(MT_DISCLAIMER)
+    else:
+        st.session_state["show_en"] = False
+        st.sidebar.caption(
+            "English translations need an HF_TOKEN for machine translation.")
+    return page
 
 
 def main() -> None:

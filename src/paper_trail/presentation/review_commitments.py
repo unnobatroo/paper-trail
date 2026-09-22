@@ -6,6 +6,7 @@ import streamlit as st
 
 from ..domain.enums import CandidateType
 from .formatting import KIND_LABEL
+from .translate import note, render_en
 
 
 def render(state) -> None:
@@ -25,6 +26,7 @@ def render(state) -> None:
         "Check each one against the excerpt — confirm the ones that matter, "
         "reject the rest. Only confirmed items get used to find evidence."
     )
+    note()
     if len(queue) > 10 and st.button(
         f"Skip the remaining {len(queue)} (I've confirmed what I need)",
         key="skip_rest",
@@ -49,7 +51,10 @@ def render(state) -> None:
                 + (f" · code `{cand.code}`" if cand.code else "")
                 + f" · page {cand.source_page} of the strategy"
             )
+            render_en(cand.normalized_title)
             st.write(cand.text)
+            if cand.text != cand.normalized_title:
+                render_en(cand.text)
 
             meta = []
             if cand.responsible_org:
@@ -67,6 +72,7 @@ def render(state) -> None:
                 f"Where the strategy says this (page {cand.source_page})"
             ):
                 st.caption(cand.source_excerpt)
+                render_en(cand.source_excerpt[:1500])
                 if not cand.excerpt_on_page:
                     st.caption("We couldn't re-find this quote on the page — "
                                "worth a closer look.")

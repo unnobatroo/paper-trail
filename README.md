@@ -79,6 +79,11 @@ uv run python scripts/reset_demo_state.py   # archives the DB, keeps models/page
 | `PAPER_TRAIL_SEARCH` | `ddgs` | `ddgs` (DuckDuckGo) or `fixture` (offline JSONL replay) |
 | `PAPER_TRAIL_MODEL_CACHE` | `data/models` | downloaded model files |
 | `PAPER_TRAIL_LLM_BASE_URL` / `_API_KEY` / `_MODEL` | unset | optional OpenAI-compatible extraction endpoint |
+| `SUPABASE_URL` / `SUPABASE_KEY` | unset | when both set, state lives in Supabase/Postgres instead of SQLite (run `supabase/migrations/001_schema.sql` in the SQL editor once; use the service_role key) |
+| `JINA_API_KEY` | unset | hosted inference — set `PAPER_TRAIL_EMBED_MODEL=jina` + `PAPER_TRAIL_RERANKER=jina` and no models are downloaded locally |
+| `HF_TOKEN` | unset | enables optional Hungarian→English machine translation in the UI (Helsinki-NLP/opus-mt-hu-en, labelled MT — not an official document) |
+
+All keys can live in a gitignored `.env` at the repo root (see `.env.example`).
 
 `HF_HUB_DISABLE_XET=1` is set inside the providers: hf-xet's shared blob
 cache puts a model's external ONNX data outside the model directory, which

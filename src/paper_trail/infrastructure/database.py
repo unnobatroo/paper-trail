@@ -93,10 +93,25 @@ CREATE TABLE IF NOT EXISTS budgets (
 
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
+    """Open a fresh connection — callers must close it.
+
+    Connections are deliberately short-lived: a sqlite3 object is bound to
+    the thread that created it, so nothing long-lived (like Streamlit's
+    cached app state) may retain one. Use `init_db` once for schema setup.
+    """
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(SCHEMA)
     return conn
+
+
+def init_db(db_path: Path | str) -> None:
+    """Create the schema if needed. Idempotent and safe to call per process."""
+    conn = connect(db_path)
+    try:
+        conn.executescript(SCHEMA)
+        conn.commit()
+    finally:
+        conn.close()

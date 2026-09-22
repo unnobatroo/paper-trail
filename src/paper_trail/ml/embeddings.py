@@ -12,8 +12,11 @@ import math
 import os
 from abc import ABC, abstractmethod
 
+import requests
+
 
 DEFAULT_EMBED_MODEL = "intfloat/multilingual-e5-large"
+JINA_EMBED_MODEL = "jina-embeddings-v3"
 
 
 class EmbeddingProvider(ABC):
@@ -62,6 +65,30 @@ class SentenceTransformerProvider(EmbeddingProvider):
             texts, convert_to_numpy=True, normalize_embeddings=True)]
 
 
+class JinaEmbeddingProvider(EmbeddingProvider):
+    """Hosted multilingual embeddings via the Jina AI API — no model
+    download, no local compute. Needs JINA_API_KEY."""
+
+    def __init__(self, model: str = JINA_EMBED_MODEL,
+                 api_key: str | None = None):
+        key = api_key or os.environ.get("JINA_API_KEY")
+        if not key:
+            raise ValueError("JINA_API_KEY is not set")
+        self.model_name = model
+        self._headers = {"Authorization": f"Bearer {key}"}
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        resp = requests.post(
+            "https://api.jina.ai/v1/embeddings",
+            headers=self._headers,
+            json={"model": self.model_name, "input": texts},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = sorted(resp.json()["data"], key=lambda d: d["index"])
+        return [list(map(float, d["embedding"])) for d in data]
+
+
 class HashingProvider(EmbeddingProvider):
     """Deterministic token-hash vectors. For tests and fully offline runs —
     not semantically meaningful, but keeps the pipeline exercisable."""
@@ -89,9 +116,13 @@ def cosine(a: list[float], b: list[float]) -> float:
 def get_provider(model: str | None = None,
                  cache_dir: str | None = None,
                  providers: list[str] | None = None) -> EmbeddingProvider:
-    """Default provider: fastembed locally; hashing only when explicitly asked."""
+    """Default provider: fastembed locally; "jina" for the hosted Jina API;
+    hashing only when explicitly asked."""
     model = model or os.environ.get("PAPER_TRAIL_EMBED_MODEL")
     if model == "hashing":
         return HashingProvider()
+    if model == "jina" or (model or "").startswith("jina-embeddings"):
+        return JinaEmbeddingProvider(
+            model if model != "jina" else JINA_EMBED_MODEL)
     return FastEmbedProvider(model or DEFAULT_EMBED_MODEL,
                              cache_dir=cache_dir, providers=providers)

@@ -14,6 +14,14 @@ Environment overrides:
   PAPER_TRAIL_LLM_BASE_URL  OpenAI-compatible endpoint (e.g. Ollama, HF, vLLM)
   PAPER_TRAIL_LLM_API_KEY   API key for that endpoint
   PAPER_TRAIL_LLM_MODEL     model name for structured extraction
+  SUPABASE_URL + SUPABASE_KEY
+                          when both are set, the app stores state in
+                          Supabase/Postgres instead of the local SQLite file
+  JINA_API_KEY              hosted embeddings/reranking — set
+                          PAPER_TRAIL_EMBED_MODEL=jina and
+                          PAPER_TRAIL_RERANKER=jina to use it
+  HF_TOKEN                  enables Hungarian→English machine translation
+                            in the UI (Helsinki-NLP/opus-mt-hu-en)
 """
 
 from __future__ import annotations
@@ -42,10 +50,34 @@ class Settings:
     fixture_dir: Path
     seed_dir: Path
     model_cache: Path
+    supabase_url: str | None
+    supabase_key: str | None
 
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm_base_url and self.llm_model)
+
+    @property
+    def supabase_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_key)
+
+
+def _env_file(path: Path) -> None:
+    """Read KEY=VALUE lines into os.environ defaults — lets the app run
+    from a plain .env without a dotenv dependency."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(),
+                              value.strip().strip('"').strip("'"))
+
+
+def load() -> Settings:
+    _env_file(PROJECT_ROOT / ".env")
 
 
 def load() -> Settings:
@@ -73,4 +105,7 @@ def load() -> Settings:
         model_cache=Path(
             os.environ.get("PAPER_TRAIL_MODEL_CACHE",
                            PROJECT_ROOT / "data" / "models")),
+        supabase_url=os.environ.get("SUPABASE_URL"),
+        supabase_key=(os.environ.get("SUPABASE_KEY")
+                      or os.environ.get("SUPABASE_SERVICE_KEY")),
     )
