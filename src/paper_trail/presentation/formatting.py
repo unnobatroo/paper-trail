@@ -65,7 +65,7 @@ def display_title(title: str) -> str:
     """Strip stray markdown/heading markers from extracted titles so
     they read cleanly as button labels — provenance text is untouched."""
     t = re.sub(r"[*_#`>]+", "", title or "")
-    return re.sub(r"\s+", " ", t).strip()
+    return re.sub(r"\s+", " ", t).strip().strip(".:–—- ")
 
 
 def huf(amount: float | int | None) -> str:
@@ -79,3 +79,16 @@ def evidence_kind(url: str, title: str) -> str:
     project pages so reports don't read like project updates."""
     return "Strategy / report" if is_report_doc(url, title) \
         else "Project / update"
+
+
+def title_groups(records, title, kind):
+    """Presentation-only exact-title groups; every source record is retained.
+
+    Type remains part of the key: a target and an objective with the same
+    heading still have distinct meanings. No fuzzy or semantic merging.
+    """
+    groups = {}
+    for record in records:
+        key = (display_title(title(record)).casefold(), kind(record))
+        groups.setdefault(key, []).append(record)
+    return list(groups.values())

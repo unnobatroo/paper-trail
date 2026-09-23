@@ -30,7 +30,7 @@ from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.ingestion_service import IngestionService
 from paper_trail.services.metrics_service import MetricsService
 from paper_trail.services.review_service import ReviewService
-from paper_trail.services.translation import MT_DISCLAIMER, get_translator
+from paper_trail.services.translation import get_translator
 from paper_trail.sources.web_search import get_search_provider
 
 STRATEGY_PDF = "jozsefvaros_klimastrategia_2021.pdf"
@@ -151,38 +151,35 @@ def sidebar(state: AppState) -> int:
 
     page = st.session_state.get("page", 1)
     done, avail = _step_state(state)
+    st.sidebar.markdown(":material/description: **Paper Trail**")
+    st.sidebar.caption("Józsefváros · Climate Strategy")
     for n, label in enumerate(_STEPS, start=1):
-        marker = "✓" if n in done else ("●" if n == page else "○")
+        marker = "check_circle" if n in done else ("radio_button_checked" if n == page else "radio_button_unchecked")
         st.sidebar.button(
-            f"{marker}  {n}. {label}",
-            key=f"nav_{n}", width="stretch",
+            f"{n}. {label}", icon=f":material/{marker}:",
+            key=f"nav_{'active_' if n == page else ''}{n}", width="stretch",
             disabled=n not in avail,
-            type="primary" if n == page else "tertiary",
+            type="tertiary",
             on_click=_goto, args=(n,))
 
     st.sidebar.divider()
     if get_translator():
         st.sidebar.toggle("English translations", value=True, key="show_en")
-        st.sidebar.caption(MT_DISCLAIMER)
+        st.sidebar.caption("Machine translation · Hungarian sources are authoritative.")
     else:
-        st.session_state["show_en"] = False
-        st.sidebar.caption(
-            "English translations need an HF_TOKEN for machine translation.")
+        st.sidebar.toggle("English translations", value=False, disabled=True, key="show_en",
+                          help="Machine translation is unavailable in this environment.")
     return page
 
 
 def main() -> None:
-    st.set_page_config(page_title="Paper Trail", layout="wide")
+    st.set_page_config(page_title="Paper Trail", page_icon=":material/description:", layout="wide")
     style.inject()
     state = get_state()
     page = sidebar(state)
 
-    st.title("Paper Trail")
-    st.caption(
-        "From policy text to implementation evidence. We read the "
-        "Józsefváros Climate Strategy and check official sources for what "
-        "actually happened."
-    )
+    with st.container(key="pt_breadcrumb"):
+        st.caption(f"JÓZSEFVÁROS CLIMATE STRATEGY  /  STEP {page} OF 3")
 
     if page == 1:
         review_commitments.render(state)

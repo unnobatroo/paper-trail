@@ -5,7 +5,7 @@ Two states on one screen, sharing the same row language as Step 1:
 1. commitments that haven't been searched yet — tick them, press one
    "Find evidence for N selected" button, watch a st.status panel;
 2. pending matches — checkbox selects for batch actions, the evidence
-   title is a link-style button that opens the detail dialog.
+   title is a link-style button that updates the inspector.
 """
 
 from __future__ import annotations
@@ -19,20 +19,22 @@ from .formatting import (
     STATUS_LABEL,
     STATUS_SENTENCE,
     display_title,
+    title_groups,
+    KIND_LABEL,
     evidence_kind,
     huf,
 )
 from .review_commitments import candidate_detail
-from .translate import english, render_en
+from .translate import render_en
+from .guidance import page_header, REL_HELP
+from .style import label, quote, badge
 
 _EVIDENCE_KINDS = (CandidateType.OBJECTIVE, CandidateType.MEASURE,
                    CandidateType.TARGET)
-_COLS = [0.4, 4.2, 2.4, 1.4, 0.9, 1.3]
-_HEAD = ["", "Evidence", "For", "Source says", "Published", "Suggested"]
 
 
 def render(state) -> None:
-    st.header("Find evidence")
+    page_header("Find evidence", "evidence")
     commitments = [
         c for c in state.policy.commitments() if c.kind in _EVIDENCE_KINDS
     ]
@@ -40,11 +42,20 @@ def render(state) -> None:
         st.info("Nothing to check yet — confirm some commitments first.")
         return
 
-    # a queued search replaces the work area with a progress panel
+    # Keep progress and work in separate stable slots. Reusing the cleared
+    # work slot for status coalesces Streamlit deltas and leaves stale rows.
+    progress = st.container()
+    workspace = st.empty()
     if st.session_state.get("_search_ids"):
-        _run_searches(state)
-        return
+        workspace.empty()
+        with progress:
+            _run_searches(state)
+    else:
+        with workspace.container():
+            _workspace(state, commitments)
 
+
+def _workspace(state, commitments):
     found_msg = st.session_state.pop("_found_msg", None)
     if found_msg is not None:
         st.success(
@@ -58,77 +69,76 @@ def render(state) -> None:
     if rev_msg:
         st.success(rev_msg)
 
-    _pick_list(state, commitments)
-    _review_matches(state, commitments)
+    pending = [l for l in state.evidence.links() if l.review_status == ReviewStatus.UNREVIEWED]
+    st.session_state.setdefault("evidence_phase", "Review matches" if pending else "Choose commitments")
+    phase = st.segmented_control("Evidence workflow", ["Choose commitments", "Review matches"],
+                                 key="evidence_phase", label_visibility="collapsed")
+    if phase == "Review matches":
+        _review_matches(state, commitments)
+    else:
+        _pick_list(state, commitments)
 
 
-# --- phase 1: choose commitments to search ---------------------------------
-
-def _pick_list(state, commitments) -> None:
-    unsearched = [
-        c for c in commitments
-        if not state.evidence.links_for(c.id)
-    ]
+def _pick_list(state, commitments):
+    searched = set(st.session_state.get("searched_ids", []))
+    unsearched = [c for c in commitments if not state.evidence.links_for(c.id) and c.id not in searched]
     if not unsearched:
+        st.success("All commitments searched. Review the matches to continue.")
         return
+    groups = title_groups(unsearched, lambda c: c.title, lambda c: c.kind)
+    st.caption(f"{len(groups)} commitments available to search · Click a title to inspect; check a box to select.")
+    left, right = st.columns([1.6, 1], gap=24)
+    with left:
+        selected_groups = [g for g in groups if st.session_state.get(f"esel_{g[0].id}")]
+        selected = [c.id for g in selected_groups for c in g]
+        with st.container(key="ptbatch_s", gap=8):
+            with st.container(horizontal=True, gap=8):
+                st.button("Select all not searched", icon=":material/select_all:", type="tertiary", key="search_selall",
+                          on_click=_set_search_sel, args=([g[0].id for g in groups], True))
+                if selected:
+                    st.button("Clear", icon=":material/deselect:", type="tertiary", key="search_clear",
+                              on_click=_set_search_sel, args=([g[0].id for g in groups], False))
+            st.button(f"Find evidence for {len(selected_groups)} selected", icon=":material/search:", type="primary",
+                      disabled=not selected, key="primary_search_go", on_click=_queue_search, args=(selected,))
+            if len(selected) > len(selected_groups):
+                st.caption(f"Includes all {len(selected)} source mentions of the selected titles.")
+        ids = [g[0].id for g in groups]
+        if st.session_state.get("search_detail_id") not in ids:
+            st.session_state["search_detail_id"] = ids[0]
+        # Native pagination bounds the mobile list; selection survives page changes.
+        pages = (len(groups) + 9) // 10
+        page = min(st.session_state.get("search_page", 1), pages)
+        with st.container(key="ptlist_s", gap=None, height=500):
+            for group in groups[(page-1)*10:page*10]:
+                com = group[0]
+                active = com.id == st.session_state.search_detail_id
+                with st.container(key=f"ptrow_{'sel_' if active else ''}s_{com.id}", gap=None):
+                    with st.container(horizontal=True, gap=8):
+                        st.checkbox(f"Select {display_title(com.title)}", key=f"esel_{com.id}",
+                                    label_visibility="collapsed", width=24, persist_state="session")
+                        with st.container(gap=None):
+                            st.button(display_title(com.title), key=f"hl_s_{com.id}", type="tertiary",
+                                      on_click=_inspect_search, args=(com.id,))
+                            meta = [KIND_LABEL[com.kind].upper(), f"p.{com.source_page}", "Not searched"]
+                            if len(group) > 1:
+                                meta.append(f"{len(group)} source mentions")
+                            st.caption(" · ".join(meta))
+        if pages > 1:
+            st.pagination(pages, key="search_page")
+    with right:
+        with st.container(key="ptinsp", gap=8):
+            group = next(g for g in groups if g[0].id == st.session_state.search_detail_id)
+            candidates = [state.policy.candidate(c.candidate_id) for c in group if c.candidate_id]
+            candidates = [c for c in candidates if c]
+            if candidates:
+                candidate_detail(state, candidates, editable=False)
+            else:
+                st.subheader(display_title(group[0].title))
+                quote(group[0].summary)
 
-    st.subheader("Choose what to search")
-    st.caption(
-        f"{len(unsearched)} commitment(s) haven't been checked against "
-        "official sources yet."
-    )
-    for com in unsearched:
-        with st.container(key=f"ptrow_s_{com.id}", gap=None):
-            cols = st.columns([0.4, 6, 2], vertical_alignment="center")
-            cols[0].checkbox("Select", key=f"esel_{com.id}",
-                             label_visibility="collapsed")
-            cols[1].button(display_title(com.title), key=f"hl_s_{com.id}",
-                           type="tertiary",
-                           on_click=_inspect_cand, args=(com,))
-            meta = [f"strategy p.{com.source_page}" if com.source_page
-                    else "strategy"]
-            if com.deadline_year:
-                meta.append(f"deadline {com.deadline_year}")
-            cols[2].caption(" · ".join(meta) + " · not searched yet")
 
-    selected = [
-        c.id for c in unsearched
-        if st.session_state.get(f"esel_{c.id}")
-    ]
-    with st.container(key="ptbatch_s", horizontal=True,
-                      vertical_alignment="center"):
-        st.markdown(f"**{len(selected)} selected**"
-                    if selected else "Nothing selected")
-        st.button("Select all not searched", type="tertiary",
-                  key="search_selall",
-                  on_click=_set_search_sel,
-                  args=([c.id for c in unsearched], True))
-        st.button("Clear", type="tertiary", disabled=not selected,
-                  key="search_clear",
-                  on_click=_set_search_sel, args=(selected, False))
-        st.button(
-            f"Find evidence for {len(selected)} selected"
-            if selected else "Find evidence",
-            type="primary", disabled=not selected, key="search_go",
-            on_click=_queue_search, args=(selected,))
-
-    _maybe_cand_detail(state)
-
-
-def _inspect_cand(com) -> None:
-    if com.candidate_id is not None:
-        st.session_state["detail_id"] = com.candidate_id
-
-
-def _maybe_cand_detail(state) -> None:
-    did = st.session_state.get("detail_id")
-    if did is None:
-        return
-    cand = state.policy.candidate(did)
-    if cand is None:
-        st.session_state["detail_id"] = None
-        return
-    candidate_detail(state, cand)
+def _inspect_search(cid):
+    st.session_state["search_detail_id"] = cid
 
 
 def _set_search_sel(ids: list[int], on: bool) -> None:
@@ -151,7 +161,7 @@ def _run_searches(state) -> None:
                 "this only happens the first time.")
     total = 0
     warnings: list[str] = []
-    with st.status("Searching official sources…", expanded=True) as status:
+    with st.status("Finding evidence", expanded=True) as status:
         for com in coms:
             status.write(f"● Reading sources for “{com.title}”…")
             try:
@@ -163,12 +173,14 @@ def _run_searches(state) -> None:
                 st.error("We couldn't load the evidence model or finish "
                          f"the search. The details: {type(exc).__name__}.")
                 return
+            st.session_state.setdefault("searched_ids", []).append(com.id)
             total += len(found)
             warnings.extend(state.evidence_svc.warnings)
             status.write(f"✓ {com.title}: {len(found)} possible matches")
         status.update(
             label=f"Search done — {total} possible matches.",
             state="complete", expanded=False)
+    st.session_state["evidence_phase"] = "Review matches"
     st.session_state["_found_msg"] = total
     st.session_state["_found_warn"] = warnings
     st.rerun()
@@ -187,48 +199,41 @@ def _review_matches(state, commitments) -> None:
                 pending.append((com, link, ev))
 
     if not pending:
-        st.caption("No matches waiting for review.")
+        st.success("No matches waiting for review.", icon=":material/task_alt:")
+        st.caption("Choose commitments to search for more evidence, or read the confirmed paper trail.")
         return
 
-    st.subheader("Check the matches")
-    st.caption(
-        "The status under each match describes what that specific source "
-        "passage says about this commitment — the same long report can "
-        "honestly say different things for different commitments."
-    )
-
-    with st.container(key="pthead", gap=None):
-        h = st.columns(_COLS)
-        for i, text in enumerate(_HEAD):
-            if text:
-                h[i].caption(f"**{text}**")
-
-    inspected = st.session_state.get("link_detail_id")
-    for com, link, ev in pending:
-        _link_row(com, link, ev, inspected == link.id)
-
-    selected = [
-        l.id for _, l, _ in pending
-        if st.session_state.get(f"lsel_{l.id}")
-    ]
-    _batch_bar(state, pending, selected)
-    _maybe_detail(state)
+    st.caption(f"{len(pending)} matches waiting for review · Inspect the source before confirming a relationship.")
+    left, right = st.columns([1.6, 1], gap=24)
+    ids = [link.id for _, link, _ in pending]
+    if st.session_state.get("link_detail_id") not in ids:
+        st.session_state["link_detail_id"] = ids[0]
+    with left:
+        selected = [lid for lid in ids if st.session_state.get(f"lsel_{lid}")]
+        _batch_bar(state, pending, selected)
+        pages = (len(pending) + 9) // 10
+        page = min(st.session_state.get("evidence_page", 1), pages)
+        with st.container(key="ptlist_e", gap=None, height=min(500, 112 * len(pending))):
+            for com, link, ev in pending[(page-1)*10:page*10]:
+                _link_row(com, link, ev, st.session_state.link_detail_id == link.id)
+        if pages > 1:
+            st.pagination(pages, key="evidence_page")
+    with right:
+        with st.container(key="ptinsp", gap=8):
+            _maybe_detail(state)
 
 
-def _link_row(com, link, ev, inspected: bool) -> None:
-    key = (f"ptrow_sel_e_{link.id}" if inspected
-           else f"ptrow_e_{link.id}")
-    with st.container(key=key, gap=None):
-        cols = st.columns(_COLS, vertical_alignment="center")
-        cols[0].checkbox("Select", key=f"lsel_{link.id}",
-                         label_visibility="collapsed")
-        cols[1].button(ev.title, key=f"hl_e_{link.id}",
-                       type="tertiary",
-                       on_click=_inspect_link, args=(link.id,))
-        cols[2].caption(com.title[:70])
-        cols[3].caption(STATUS_LABEL[ev.status_hint])
-        cols[4].caption(str(ev.published_on or "—"))
-        cols[5].caption(REL_LABEL[link.suggested_relationship])
+def _link_row(com, link, ev, inspected):
+    with st.container(key=f"ptrow_{'sel_' if inspected else ''}e_{link.id}", gap=None):
+        with st.container(horizontal=True, gap=8):
+            st.checkbox(f"Select {display_title(ev.title)} for {display_title(com.title)}",
+                        key=f"lsel_{link.id}", label_visibility="collapsed", width=24, persist_state="session")
+            with st.container(gap=None):
+                st.button(display_title(ev.title), key=f"hl_e_{link.id}", type="tertiary",
+                          on_click=_inspect_link, args=(link.id,))
+                st.caption(f"For · {display_title(com.title)}")
+                st.caption(" · ".join([ev.publisher or "Official source", str(ev.published_on or "Date unknown"),
+                                       STATUS_LABEL[ev.status_hint].capitalize()]))
 
 
 def _inspect_link(link_id: int) -> None:
@@ -242,7 +247,7 @@ def _set_link_sel(ids: list[int], on: bool) -> None:
 
 def _apply(state, ids: list[int], action: str) -> None:
     if action == "confirm":
-        # per-link relationship choices made in dialogs win over the
+        # per-link relationship choices made in the inspector win over the
         # suggested relationship
         rel = st.session_state.get("rel_choice", {})
         state.review.accept_links(ids, rel)
@@ -254,22 +259,15 @@ def _apply(state, ids: list[int], action: str) -> None:
 
 
 def _batch_bar(state, pending, selected: list[int]) -> None:
-    ids = [l.id for _, l, _ in pending]
-    with st.container(key="ptbatch_e", horizontal=True,
-                      vertical_alignment="center"):
-        st.markdown(f"**{len(selected)} selected**"
-                    if selected else "Nothing selected")
-        st.button("Select all", type="tertiary", key="link_selpage",
-                  on_click=_set_link_sel, args=(ids, True))
-        st.button("Clear", type="tertiary", disabled=not selected,
-                  key="link_clear",
-                  on_click=_set_link_sel, args=(selected, False))
-        st.button("Confirm matches", type="primary",
-                  disabled=not selected, key="link_confirm",
+    with st.container(key="ptbatch_e", horizontal=True, vertical_alignment="center", gap=8):
+        st.caption(f"{len(selected)} selected", width="content")
+        st.button("Confirm selected", icon=":material/check:", type="primary", disabled=not selected, key="primary_link_confirm",
                   on_click=_apply, args=(state, selected, "confirm"))
-        st.button("Reject selected", disabled=not selected,
-                  key="link_reject",
+        st.button("Reject selected", icon=":material/close:", disabled=not selected, key="danger_link_reject",
                   on_click=_apply, args=(state, selected, "reject"))
+        if selected:
+            st.button("Clear", icon=":material/deselect:", type="tertiary", key="link_clear",
+                      on_click=_set_link_sel, args=(selected, False))
 
 
 def _maybe_detail(state) -> None:
@@ -285,71 +283,42 @@ def _maybe_detail(state) -> None:
     _detail(state, com, link, ev)
 
 
-def _close_detail() -> None:
-    st.session_state["link_detail_id"] = None
-
-
 def _remember_rel(link_id: int) -> None:
     st.session_state.setdefault("rel_choice", {})[link_id] = (
         st.session_state[f"rel_{link_id}"])
 
 
-@st.dialog("Possible match", width="large", on_dismiss=_close_detail)
-def _detail(state, com, link, ev) -> None:
-    st.markdown(f"**[{ev.title}]({ev.url})**")
-    render_en(ev.title)
-    meta = [
-        evidence_kind(ev.url, ev.title),
-        ev.publisher or "official source",
-        ev.url.split("/")[2] if "//" in ev.url else ev.url,
-    ]
-    if ev.published_on:
-        meta.append(f"published {ev.published_on}")
-    st.caption(" · ".join(meta))
-    st.caption(f"Possible match for: {com.title}")
-
-    st.markdown(f"*{STATUS_SENTENCE[ev.status_hint]}*"
-                + (f" — “{ev.status_excerpt}”" if ev.status_excerpt else ""))
-    if link.reasons:
-        st.caption("Why it might be related: " + "; ".join(link.reasons))
-
+def _detail(state, com, link, ev):
+    label("Evidence inspector", level=2)
+    st.subheader(display_title(ev.title))
+    render_en(display_title(ev.title))
+    st.caption(" · ".join([ev.publisher or "Official source", str(ev.published_on or "Date unknown"),
+                           evidence_kind(ev.url, ev.title)]))
+    label("Linked commitment")
+    st.markdown(display_title(com.title))
+    label("Matched excerpt")
+    with st.container(height=220, border=False):
+        quote(ev.snippet)
+        render_en(ev.snippet)
+    label("What this source reports")
+    badge(STATUS_LABEL[ev.status_hint].capitalize())
+    st.markdown(STATUS_SENTENCE[ev.status_hint])
+    if ev.status_excerpt:
+        quote(ev.status_excerpt)
+    label("Why Paper Trail matched it")
+    st.caption("; ".join(link.reasons) if link.reasons else "No matching explanation stored.")
     budgets = state.evidence.budgets_for_evidence(ev.id)
     if budgets:
         st.caption("Money mentioned: " + " · ".join(
-            f"{huf(b.amount_huf)} ({BUDGET_LABEL[b.kind]})"
-            for b in budgets[:4]))
-
-    st.markdown("**What the page says**")
-    st.markdown(f"> {ev.snippet[:1500]}")
-    en = english(ev.snippet[:1500])
-    if en:
-        st.caption(f"EN · *{en}*")
-
-    st.divider()
-    rel = st.session_state.setdefault("rel_choice", {}).get(
-        link.id, link.suggested_relationship)
-    st.selectbox(
-        "What does it prove",
-        list(RelationshipType),
-        index=list(RelationshipType).index(rel),
-        format_func=lambda r: REL_LABEL[r],
-        key=f"rel_{link.id}",
-        on_change=_remember_rel, args=(link.id,),
-    )
-    c1, c2 = st.columns(2)
-    if c1.button("Confirm match", type="primary", width="stretch",
-                 key=f"lok_{link.id}"):
-        state.review.accept_link(
-            link.id, st.session_state.get(f"rel_{link.id}",
-                                        link.suggested_relationship))
-        st.session_state["_rev_msg"] = "Match confirmed."
-        st.session_state["link_detail_id"] = None
-        st.rerun()
-    if c2.button("Reject", width="stretch", key=f"lno_{link.id}"):
-        state.review.reject_link(link.id)
-        st.session_state["_rev_msg"] = "Match rejected."
-        st.session_state["link_detail_id"] = None
-        st.rerun()
+            f"{huf(b.amount_huf)} ({BUDGET_LABEL[b.kind]})" for b in budgets[:4]))
+    st.link_button("Read official source", ev.url, icon=":material/open_in_new:")
+    rel = st.session_state.setdefault("rel_choice", {}).get(link.id, link.suggested_relationship)
+    st.selectbox("Relationship", list(RelationshipType), index=list(RelationshipType).index(rel),
+                 format_func=lambda r: REL_LABEL[r], key=f"rel_{link.id}",
+                 help="How this source relates to the commitment. Confirming saves this relationship; source status is a separate assessment.",
+                 on_change=_remember_rel, args=(link.id,))
+    st.caption(REL_HELP[st.session_state[f"rel_{link.id}"]])
+    st.caption("Applied when you confirm this selected match.")
 
 
 def _models_cold(state) -> bool:

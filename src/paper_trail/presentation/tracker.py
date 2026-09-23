@@ -7,7 +7,6 @@ what's still missing. No selection or review controls live here.
 
 from __future__ import annotations
 
-import re
 
 import streamlit as st
 
@@ -22,121 +21,104 @@ from .formatting import (
     KIND_LABEL,
     STATUS_LABEL,
     display_title,
-    evidence_kind,
+    title_groups,
     huf,
 )
 from .translate import render_en
+from .guidance import page_header
+from .style import label, quote, gaps, badge
 
-_GROUP_ORDER = [
-    RelationshipType.DIRECT_IMPLEMENTATION,
-    RelationshipType.BUDGET,
-    RelationshipType.SUPPORTING,
-    RelationshipType.INDIRECT,
-]
-_GROUP_HEAD = {
-    RelationshipType.DIRECT_IMPLEMENTATION: "Implementation evidence",
-    RelationshipType.BUDGET: "Budget information",
-    RelationshipType.SUPPORTING: "Supporting evidence",
-    RelationshipType.INDIRECT: "Related information",
-}
-_STATUS_BADGE_COLOR = {
-    Status.COMPLETED: "green",
-    Status.IN_IMPLEMENTATION: "green",
-    Status.IN_PREPARATION: "orange",
-    Status.ANNOUNCED: "orange",
-    Status.PLANNED: "orange",
-    Status.BUDGET: "blue",
-    Status.BACKGROUND: "gray",
-}
 _FILTER_OPTS = ["All", "Has evidence", "Missing evidence",
                 "Measurable target"]
 _MAX_BUDGET_LINES = 6
 
 
-def _norm_title(title: str) -> str:
-    """Presentation dedupe only: strip markdown/heading artefacts so
-    '**NINCS UTCA ZÖLD NÉLKÜL **' and 'Nincs utca zöld nélkül' collapse
-    into one visible row. Provenance stays on the kept record."""
-    t = re.sub(r"[*_#`>]+", "", title or "")
-    t = re.sub(r"\s+", " ", t).strip().strip(".:–—-").strip()
-    return t.casefold()
+def _dedupe(rows):
+    """Keep all original trail rows behind each display title."""
+    return title_groups(rows, lambda r: r.commitment.title, lambda r: r.commitment.kind)
 
 
-def _dedupe(rows) -> list[tuple]:
-    """Collapse exact (normalized title, kind) duplicates.
+def _objective_groups(groups):
+    """Use recorded parents or explicit code ancestry, never semantic guessing.
 
-    Returns [(row, mentions)] — keeps the row with the most evidence.
-    Genuinely different records (different kind) are never merged."""
-    best: dict[tuple, list] = {}
-    for r in rows:
-        key = (_norm_title(r.commitment.title), r.commitment.kind)
-        best.setdefault(key, []).append(r)
-    out = []
-    for group in best.values():
-        group.sort(key=lambda r: len(r.evidence), reverse=True)
-        out.append((group[0], len(group)))
-    return out
+    Resolve before filtering so children remain visible when their objective
+    does not match the evidence filter. Duplicate IDs map to the same heading.
+    """
+    by_id = {r.commitment.id: g for g in groups for r in g}
+    objectives = [g for g in groups if g[0].commitment.kind == CandidateType.OBJECTIVE]
 
+    def parent(group):
+        for row in group:
+            p = by_id.get(row.commitment.parent_id)
+            if p is not None and p is not group:
+                return p
+        code = group[0].commitment.code or ""
+        ancestors = [g for g in objectives if g is not group and g[0].commitment.code
+                     and code.startswith(g[0].commitment.code + ".")]
+        return max(ancestors, key=lambda g: len(g[0].commitment.code)) if ancestors else None
 
-def _evidence_note(row) -> str:
-    n = len(row.evidence)
-    if not n:
-        return "no evidence yet"
-    return f"{n} evidence source{'s' if n > 1 else ''}"
+    grouped = {}
+    for group in groups:
+        root, seen = group, set()
+        while root[0].commitment.id not in seen:
+            seen.add(root[0].commitment.id)
+            p = parent(root)
+            if p is None:
+                break
+            root = p
+        key = root[0].commitment.id if root[0].commitment.kind == CandidateType.OBJECTIVE else None
+        grouped.setdefault(key, []).append(group)
+    return grouped, by_id
 
 
 def render(state) -> None:
-    st.header("Paper trail")
+    page_header("Paper trail", "trail")
     rows = state.metrics.trail()
     if not rows:
         st.info("Nothing here yet — confirm some commitments and "
                 "matches first.")
         return
 
-    deduped = _dedupe(rows)
-    with_evidence = sum(1 for r, _ in deduped if r.evidence)
-    with_target = sum(1 for r, _ in deduped if r.commitment.is_measurable)
-    st.caption(
-        f"{len(deduped)} commitments · {with_evidence} with evidence · "
-        f"{with_target} measurable targets"
-    )
-
+    groups = _dedupe(rows)
+    with_evidence = sum(any(r.evidence for r in group) for group in groups)
+    st.caption(f"{len(groups)} commitments · {with_evidence} with evidence · Read-only")
     flt = st.pills("Show", _FILTER_OPTS, default="All", key="trail_filter",
                    label_visibility="collapsed") or "All"
-    shown = [(r, m) for r, m in deduped if _matches(r, flt)]
-
-    # group rows under their parent objective
-    by_id = {r.commitment.id: (r, m) for r, m in shown}
-    children: dict[int | None, list] = {}
-    for r, m in shown:
-        children.setdefault(r.commitment.parent_id, []).append((r, m))
-    objectives = [
-        (r, m) for r, m in shown
-        if r.commitment.kind == CandidateType.OBJECTIVE
-    ]
-    orphans = [
-        (r, m) for r, m in children.get(None, [])
-        if r.commitment.kind != CandidateType.OBJECTIVE
-    ]
-
-    sel = st.session_state.get("trail_sel")
-
-    left, right = st.columns([1.5, 1], gap="large")
-    with left:
-        if not shown:
-            st.caption("Nothing matches this filter.")
-        for obj_row, mentions in objectives:
-            obj = obj_row.commitment
-            kids = children.get(obj.id, [])
-            _objective_group(state, obj_row, mentions, kids, sel)
-        for row, mentions in orphans:
-            _trail_row(row, mentions, sel)
+    grouped, by_id = _objective_groups(groups)
+    ordered = sorted(grouped.items(), key=lambda item: item[0] is None)
+    shown = [g for _, children in ordered for g in children if any(_matches(r, flt) for r in g)]
+    if not shown:
+        st.caption("Nothing matches this filter.")
+        return
+    shown_ids = {g[0].commitment.id for g in shown}
+    if st.session_state.get("trail_sel") not in shown_ids:
+        st.session_state["trail_sel"] = shown[0][0].commitment.id
+    selected = st.session_state.trail_sel
+    left, right = st.columns([1.6, 1], gap=24)
+    with left, st.container(height=500, border=False, key="trail_list"):
+        for root_id, children in ordered:
+            visible = [g for g in children if g[0].commitment.id in shown_ids]
+            if not visible:
+                continue
+            root = by_id[root_id][0].commitment if root_id else None
+            with st.container(key=f"ptg_{root_id}", gap=None):
+                with st.container(key=f"ptghead_{root_id}", gap=None):
+                    st.markdown("**" + (f"{root.code + ' · ' if root.code else ''}{display_title(root.title)}"
+                                         if root else "Other commitments") + "**")
+                    st.caption(f"{len(visible)} commitments · {sum(any(r.evidence for r in g) for g in visible)} with evidence")
+                for group in visible:
+                    _trail_row(group, selected)
     with right:
         with st.container(key="ptinsp"):
-            _inspector(state, by_id, shown)
-
-    st.divider()
-    _timeline(state)
+            group = next(g for g in shown if g[0].commitment.id == selected)
+            row = group[0]
+            if len(group) > 1:
+                row = st.selectbox("Source mention", group,
+                    format_func=lambda r: f"p.{r.commitment.source_page} · {len(r.evidence)} evidence source{'s' if len(r.evidence) != 1 else ''} · mention {r.commitment.id}",
+                    key=f"trail_mention_{selected}")
+            _trail_detail(state, row, len(group))
+    with st.expander("Dates we know", icon=":material/calendar_month:"):
+        _timeline(state)
 
 
 def _matches(row, flt: str) -> bool:
@@ -149,64 +131,34 @@ def _matches(row, flt: str) -> bool:
     return True
 
 
-def _objective_group(state, obj_row, mentions, kids, sel) -> None:
-    obj = obj_row.commitment
-    with st.container(key=f"ptg_{obj.id}", gap=None):
-        with st.container(key=f"ptghead_{obj.id}", gap=None):
-            st.button(
-                f"{obj.code + ' · ' if obj.code else ''}"
-                f"{display_title(obj.title)}",
-                key=f"hl_t_{obj.id}", type="tertiary",
-                on_click=_inspect, args=(obj.id,))
-            n = len(kids) + 1
-            ev = sum(1 for r, _ in [(obj_row, mentions), *kids]
-                     if r.evidence)
-            st.caption(
-                f"{n} commitment{'s' if n != 1 else ''} · "
-                f"{ev} with evidence · {n - ev} still missing evidence")
-        for row, mentions in kids:
-            _trail_row(row, mentions, sel)
-
-
-def _trail_row(row, mentions, sel, grouped: bool = False) -> None:
+def _trail_row(group, selected):
+    row = group[0]
     com = row.commitment
-    key = (f"ptt_sel_{com.id}" if sel == com.id else f"ptt_{com.id}")
-    with st.container(key=key, gap=None):
-        st.button(display_title(com.title), key=f"hl_t_{com.id}",
-                  type="tertiary", on_click=_inspect, args=(com.id,))
-        meta = [
-            KIND_LABEL[com.kind].upper(),
-            f"p.{com.source_page}" if com.source_page else "—",
-        ]
+    with st.container(key=f"ptt_{'sel_' if selected == com.id else ''}{com.id}", gap=None):
+        st.button(display_title(com.title), key=f"hl_t_{com.id}", type="tertiary",
+                  on_click=_inspect, args=(com.id,))
+        meta = [KIND_LABEL[com.kind].upper(), f"p.{com.source_page}" if com.source_page else "Strategy"]
         if com.deadline_year:
             meta.append(f"deadline {com.deadline_year}")
-        meta.append(_evidence_note(row))
-        if mentions > 1:
-            meta.append(f"{mentions} source mentions")
+        if len(group) > 1:
+            meta.append(f"{len(group)} source mentions")
         st.caption(" · ".join(meta))
+        sources = {e.url for r in group for e in r.evidence}
+        note = (f"{len(sources)} evidence source{'s' if len(sources) != 1 else ''}"
+                if sources else "No evidence yet")
+        statuses = list(dict.fromkeys(STATUS_LABEL[r.status].capitalize() for r in group if r.status != Status.UNKNOWN))
+        st.caption(" · ".join([note, *statuses]))
 
 
 def _inspect(com_id: int) -> None:
     st.session_state["trail_sel"] = com_id
 
 
-def _inspector(state, by_id, shown) -> None:
-    sel = st.session_state.get("trail_sel")
-    row = by_id.get(sel, (None, 0))[0] if sel in by_id else None
-    if row is None:
-        if not shown:
-            st.caption("Select a commitment to read its trail.")
-            return
-        row, _ = shown[0]
-        st.session_state["trail_sel"] = row.commitment.id
-    mentions = by_id.get(row.commitment.id, (row, 1))[1]
-    _trail_detail(state, row, mentions)
-
-
 def _trail_detail(state, row, mentions: int) -> None:
     com = row.commitment
-    st.subheader(com.title)
-    render_en(com.title)
+    label("Selected paper trail", level=2)
+    st.subheader(display_title(com.title))
+    render_en(display_title(com.title))
 
     meta = [KIND_LABEL[com.kind].upper()]
     if com.source_page:
@@ -221,17 +173,16 @@ def _trail_detail(state, row, mentions: int) -> None:
         meta.append(f"{mentions} source mentions")
     st.caption(" · ".join(meta))
     if row.status != Status.UNKNOWN:
-        st.badge(f"Source says: {STATUS_LABEL[row.status]}",
-                 color=_STATUS_BADGE_COLOR.get(row.status, "gray"))
+        badge(f"Source says: {STATUS_LABEL[row.status]}")
 
     # --- promise ------------------------------------------------------
-    st.markdown("**PROMISE**")
+    label("Promise")
     cand = (state.policy.candidate(com.candidate_id)
             if com.candidate_id else None)
     excerpt = cand.source_excerpt if cand else com.summary
     if excerpt:
-        st.markdown(f"> {excerpt[:1500]}")
-        render_en(excerpt[:1500])
+        quote(excerpt)
+        render_en(excerpt)
     else:
         st.caption("No source wording stored for this commitment.")
 
@@ -240,27 +191,25 @@ def _trail_detail(state, row, mentions: int) -> None:
     for ev, rel in zip(row.evidence, row.relationships):
         groups.setdefault(rel, []).append(ev)
 
-    st.markdown("**IMPLEMENTATION**")
     impl = groups.get(RelationshipType.DIRECT_IMPLEMENTATION, [])
     if impl:
+        label("Implementation")
         for ev in impl:
             _evidence_line(ev)
         if row.status_excerpt:
             st.caption(f"“{row.status_excerpt}”")
-    else:
-        st.caption("No confirmed implementation evidence yet.")
 
     support = [ev for rel in (RelationshipType.SUPPORTING,
                               RelationshipType.INDIRECT)
                for ev in groups.get(rel, [])]
     if support:
-        st.markdown("**SUPPORTING EVIDENCE**")
+        label("Supporting evidence")
         for ev in support:
             _evidence_line(ev)
 
     budget_items = groups.get(RelationshipType.BUDGET, [])
     if budget_items or row.budgets:
-        st.markdown("**BUDGET**")
+        label("Budget")
         for ev in budget_items:
             _evidence_line(ev)
         for b in row.budgets[:_MAX_BUDGET_LINES]:
@@ -275,9 +224,8 @@ def _trail_detail(state, row, mentions: int) -> None:
 
     # --- gaps ----------------------------------------------------------
     if row.gaps:
-        st.markdown("**STILL MISSING**")
-        for gap in row.gaps:
-            st.markdown(f"- {gap}")
+        label("Still missing")
+        gaps(row.gaps)
 
 
 def _evidence_line(ev) -> None:
@@ -285,7 +233,7 @@ def _evidence_line(ev) -> None:
     if ev.published_on:
         meta.append(str(ev.published_on))
     meta.append(STATUS_LABEL[ev.status_hint])
-    st.markdown(f"- [{ev.title}]({ev.url})")
+    st.markdown(f":material/open_in_new: [{display_title(ev.title)}]({ev.url})")
     st.caption(" · ".join(meta))
 
 

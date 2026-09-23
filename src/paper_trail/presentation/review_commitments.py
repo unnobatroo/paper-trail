@@ -1,273 +1,190 @@
-"""Screen 1 — Check what we found in the strategy.
-
-A compact review list: one row per commitment — a checkbox for batch
-selection, the title itself as a link-style button that opens the
-detail dialog, then type/status/page metadata. Unchecked means "not
-selected" — it never rejects anything.
-"""
-
+"""Commitment review: titles inspect, checkboxes select source records."""
 from __future__ import annotations
 
 import math
-
 import streamlit as st
 
 from ..domain.enums import CandidateType, ReviewStatus
-from .filters import (
-    STATUS_ALL,
-    STATUS_CONFIRMED,
-    STATUS_PENDING,
-    STATUS_REJECTED,
-    filter_candidates,
-)
-from .formatting import KIND_LABEL, display_title
+from .filters import (STATUS_ALL, STATUS_CONFIRMED, STATUS_PENDING,
+                      STATUS_REJECTED, filter_candidates)
+from .formatting import KIND_LABEL, display_title, title_groups
 from .translate import render_en
+from .guidance import page_header
+from .style import label, quote, badge
 
-_PAGE = 15
+_PAGE = 10
 _TYPE_OPTS = ["All", "Objectives", "Measures", "Targets"]
-_STATUS_OPTS = [STATUS_PENDING, STATUS_CONFIRMED, STATUS_REJECTED,
-                STATUS_ALL]
-_COLS = [0.4, 4.6, 0.9, 1.15, 0.55, 0.85, 0.75]
-_HEAD = ["", "Commitment", "Type", "Status", "Page", "Deadline", "Target"]
+_STATUS_OPTS = [STATUS_PENDING, STATUS_CONFIRMED, STATUS_REJECTED, STATUS_ALL]
 
 
-def _status_text(cand) -> str:
+def _status_text(cand):
     if cand.review_status == ReviewStatus.ACCEPTED:
         return "Confirmed"
     if cand.review_status == ReviewStatus.REJECTED:
         return "Rejected"
-    if cand.excerpt_on_page is False:
-        return "Unclear"
-    return "Needs review"
+    return "Unclear" if cand.excerpt_on_page is False else "Needs review"
 
 
-def render(state) -> None:
-    st.header("Check what we found")
-
+def render(state):
+    page_header("Check commitments", "commitments")
     cands = state.policy.candidates()
     if not cands:
         st.info("Nothing to check yet — read the strategy from the sidebar.")
         return
-
-    msg = st.session_state.pop("_rev_msg", None)
-    if msg:
+    if msg := st.session_state.pop("_rev_msg", None):
         st.success(msg)
-
-    done = [c for c in cands if c.review_status != ReviewStatus.UNREVIEWED]
-    st.caption(
-        f"{len(cands)} possible commitments · {len(done)} reviewed · "
-        f"{len(cands) - len(done)} left"
-    )
-
-    st.text_input("Search commitments", placeholder="Search commitments…",
-                  label_visibility="collapsed", key="cq",
-                  on_change=_reset_page)
-    f1, f2 = st.columns([1.6, 1.4])
-    type_label = f1.segmented_control(
-        "Type", _TYPE_OPTS, default="All", key="ct",
-        label_visibility="collapsed", on_change=_reset_page) or "All"
-    status_label = f2.pills(
-        "Status", _STATUS_OPTS, default=STATUS_PENDING, key="cs",
-        label_visibility="collapsed",
-        on_change=_reset_page) or STATUS_PENDING
-
-    visible = filter_candidates(
-        cands, query=st.session_state.get("cq", "") or "",
-        type_label=type_label, status_label=status_label)
-    if not visible:
-        if status_label == STATUS_PENDING and done:
-            _all_reviewed(state)
-            return
-        st.caption("Nothing matches these filters.")
+    remaining = sum(c.review_status == ReviewStatus.UNREVIEWED for c in cands)
+    st.caption(f"{len(cands)} source mentions · {len(cands)-remaining} reviewed · {remaining} left")
+    if not remaining and st.session_state.get("cs", STATUS_PENDING) == STATUS_PENDING:
+        _all_reviewed()
         return
 
-    num_pages = max(1, math.ceil(len(visible) / _PAGE))
-    page = min(st.session_state.get("cand_page", 1), num_pages)
-    page_rows = visible[(page - 1) * _PAGE: page * _PAGE]
+    left, right = st.columns([1.6, 1], gap=24)
+    with left:
+        st.text_input("Search commitments", placeholder="Search commitments…", icon=":material/search:",
+                      label_visibility="collapsed", key="cq", on_change=_reset_page)
+        type_label = st.segmented_control("Type", _TYPE_OPTS, default="All", key="ct",
+                          label_visibility="collapsed", on_change=_reset_page) or "All"
+        status = st.pills("Status", _STATUS_OPTS, default=STATUS_PENDING, key="cs",
+                          label_visibility="collapsed", on_change=_reset_page) or STATUS_PENDING
+        visible = filter_candidates(cands, query=st.session_state.get("cq", ""),
+                                    type_label=type_label, status_label=status)
+        groups = title_groups(visible, lambda c: c.normalized_title, lambda c: c.suggested_type)
+        if not groups:
+            st.caption("Nothing matches these filters.")
+            return
+        pages = max(1, math.ceil(len(groups) / _PAGE))
+        page = min(st.session_state.get("cand_page", 1), pages)
+        groups = groups[(page-1)*_PAGE:page*_PAGE]
+        ids = [g[0].id for g in groups]
+        if st.session_state.get("detail_id") not in ids:
+            st.session_state["detail_id"] = ids[0]
+        selected_groups = [g for g in groups if st.session_state.get(f"csel_{g[0].id}")]
+        selected = [c.id for g in selected_groups for c in g]
+        _batch_bar(state, groups, selected_groups, selected)
+        with st.container(key="ptlist_c", gap=None):
+            for group in groups:
+                _row(group, st.session_state.detail_id == group[0].id)
+        st.caption(f"Page {page} of {pages} · Selection applies to this page.")
+        if pages > 1:
+            st.pagination(pages, key="cand_page")
+    with right:
+        with st.container(key="ptinsp", gap="small"):
+            group = next(g for g in groups if g[0].id == st.session_state.detail_id)
+            candidate_detail(state, group)
 
-    with st.container(key="pthead", gap=None):
-        h = st.columns(_COLS)
-        for i, text in enumerate(_HEAD):
-            if text:
-                h[i].caption(f"**{text}**")
 
-    inspected = st.session_state.get("detail_id")
-    for cand in page_rows:
-        _row(cand, inspected == cand.id)
-
-    st.caption(
-        f"{len(visible)} matching · page {page} of {num_pages} · "
-        "selection applies to the rows on this page"
-    )
-    st.pagination(num_pages, key="cand_page")
-
-    selected = [
-        c.id for c in page_rows
-        if st.session_state.get(f"csel_{c.id}")
-    ]
-    _batch_bar(state, page_rows, selected)
-    _maybe_detail(state)
-
-
-def _row(cand, inspected: bool) -> None:
-    key = f"ptrow_sel_c_{cand.id}" if inspected else f"ptrow_c_{cand.id}"
+def _row(group, inspected):
+    cand = group[0]
+    key = f"ptrow_{'sel_' if inspected else ''}c_{cand.id}"
     with st.container(key=key, gap=None):
-        cols = st.columns(_COLS, vertical_alignment="center")
-        cols[0].checkbox("Select", key=f"csel_{cand.id}",
-                         label_visibility="collapsed")
-        cols[1].button(display_title(cand.normalized_title),
-                       key=f"hl_c_{cand.id}", type="tertiary",
-                       on_click=_inspect, args=(cand.id,))
-        cols[2].caption(KIND_LABEL[cand.suggested_type])
-        cols[3].caption(_status_text(cand))
-        cols[4].caption(str(cand.source_page))
-        cols[5].caption(str(cand.deadline_year or "—"))
-        cols[6].caption(
-            f"{cand.target_value:g} {cand.unit or ''}".strip()
-            if cand.target_value is not None else "—")
+        with st.container(horizontal=True, gap=8, vertical_alignment="top"):
+            st.checkbox(f"Select {display_title(cand.normalized_title)}", key=f"csel_{cand.id}",
+                        label_visibility="collapsed", width=24)
+            with st.container(gap=None):
+                st.button(display_title(cand.normalized_title), key=f"hl_c_{cand.id}",
+                          type="tertiary", on_click=_inspect, args=(cand.id,))
+                statuses = list(dict.fromkeys(_status_text(c) for c in group))
+                meta = [KIND_LABEL[cand.suggested_type].upper(), "/".join(statuses),
+                        "p." + ", ".join(str(p) for p in dict.fromkeys(c.source_page for c in group))]
+                if len(group) > 1:
+                    meta.append(f"{len(group)} source mentions")
+                st.caption(" · ".join(meta))
 
 
-def _all_reviewed(state) -> None:
-    st.success("All commitments reviewed.")
-    c1, c2, c3, _ = st.columns([1.4, 1.4, 1.2, 4])
-    c1.button("View confirmed", key="view_confirmed",
-              on_click=_view, args=(STATUS_CONFIRMED,))
-    c2.button("View rejected", key="view_rejected",
-              on_click=_view, args=(STATUS_REJECTED,))
-    c3.button("View all", key="view_all",
-              on_click=_view, args=(STATUS_ALL,))
+def _all_reviewed():
+    st.success("All commitments reviewed.", icon=":material/task_alt:")
+    with st.container(horizontal=True, gap=8):
+        for text, status in [("View confirmed", STATUS_CONFIRMED),
+                             ("View rejected", STATUS_REJECTED), ("View all", STATUS_ALL)]:
+            st.button(text, on_click=_view, args=(status,))
 
 
-def _view(label: str) -> None:
-    st.session_state["cs"] = label
+def _view(status):
+    st.session_state["cs"] = status
     _reset_page()
 
 
-def _reset_page() -> None:
+def _reset_page():
     st.session_state["cand_page"] = 1
 
 
-def _inspect(cand_id: int) -> None:
-    st.session_state["detail_id"] = cand_id
+def _inspect(cid):
+    st.session_state["detail_id"] = cid
 
 
-def _set_selection(ids: list[int], on: bool) -> None:
-    """Tick/untick visible checkboxes — plain widget state, so a simple
-    assignment in a callback is enough."""
+def _set_selection(ids, on):
     for cid in ids:
         st.session_state[f"csel_{cid}"] = on
 
 
-def _apply(state, ids: list[int], action: str) -> None:
+def _apply(state, ids, representatives, action):
     if action == "confirm":
         state.review.confirm_candidates(ids)
-        st.session_state["_rev_msg"] = f"{len(ids)} confirmed."
     else:
         state.review.reject_candidates(ids)
-        st.session_state["_rev_msg"] = f"{len(ids)} rejected."
-    _set_selection(ids, False)
+    st.session_state["_rev_msg"] = f"{len(ids)} source mentions {'confirmed' if action == 'confirm' else 'rejected'}."
+    _set_selection(representatives, False)
 
 
-def _batch_bar(state, page_rows, selected: list[int]) -> None:
-    ids = [c.id for c in page_rows]
-    with st.container(key="ptbatch_c", horizontal=True,
-                      vertical_alignment="center"):
-        st.markdown(f"**{len(selected)} selected**"
-                    if selected else "Nothing selected")
-        st.button("Select page", type="tertiary", key="cand_selpage",
-                  on_click=_set_selection, args=(ids, True))
-        st.button("Clear", type="tertiary", disabled=not selected,
-                  key="cand_clear",
-                  on_click=_set_selection, args=(selected, False))
-        st.button("Confirm selected", type="primary",
-                  disabled=not selected, key="cand_confirm",
-                  on_click=_apply, args=(state, selected, "confirm"))
-        st.button("Reject selected", disabled=not selected,
-                  key="cand_reject",
-                  on_click=_apply, args=(state, selected, "reject"))
+def _batch_bar(state, groups, selected_groups, selected):
+    representatives = [g[0].id for g in selected_groups]
+    with st.container(key="ptbatch_c", horizontal=True, vertical_alignment="center", gap=8):
+        st.caption(f"{len(selected_groups)} selected", width="content")
+        st.button("Confirm selected", icon=":material/check:", type="primary", key="primary_confirm_c", disabled=not selected,
+                  on_click=_apply, args=(state, selected, representatives, "confirm"))
+        st.button("Reject selected", icon=":material/close:", key="danger_reject_c", disabled=not selected,
+                  on_click=_apply, args=(state, selected, representatives, "reject"))
+        if selected:
+            st.button("Clear", icon=":material/deselect:", type="tertiary", on_click=_set_selection, args=(representatives, False))
+        if len(selected) > len(selected_groups):
+            st.caption(f"Includes {len(selected)} source mentions.")
 
 
-def _maybe_detail(state) -> None:
-    did = st.session_state.get("detail_id")
-    if did is None:
-        return
-    cand = state.policy.candidate(did)
-    if cand is None:
-        st.session_state["detail_id"] = None
-        return
-    candidate_detail(state, cand)
-
-
-def _close_detail() -> None:
-    st.session_state["detail_id"] = None
-
-
-@st.dialog("Commitment", width="large", on_dismiss=_close_detail)
-def candidate_detail(state, cand) -> None:
-    """Detail dialog for one candidate — also opened from Step 2's
-    search pick-list, where it is read-only for confirmed items."""
-    st.markdown(f"**{cand.normalized_title}**")
-    render_en(cand.normalized_title)
-
-    meta = [
-        KIND_LABEL[cand.suggested_type],
-        _status_text(cand),
-        f"strategy p.{cand.source_page}",
-    ]
-    if cand.deadline_year:
-        meta.append(f"deadline {cand.deadline_year}")
+def candidate_detail(state, group, *, editable=True):
+    """Inline inspector. Choosing a source mention never changes a review."""
+    cand = group[0]
+    label("Commitment inspector", level=2)
+    st.subheader(display_title(cand.normalized_title))
+    render_en(display_title(cand.normalized_title))
+    if len(group) > 1:
+        cand = st.selectbox("Source mention", group,
+                            format_func=lambda c: f"p.{c.source_page} · {_status_text(c)} · mention {c.id}",
+                            key=f"mention_c_{group[0].id}")
+    with st.container(horizontal=True, gap=8, vertical_alignment="center"):
+        badge(_status_text(cand))
+        st.caption(f"{KIND_LABEL[cand.suggested_type].capitalize()} · Page {cand.source_page}", width="content")
+    if cand.deadline_year or cand.timeframe:
+        st.markdown(f"**Deadline** · {cand.deadline_year or cand.timeframe}")
     if cand.target_value is not None:
-        meta.append(f"target {cand.target_value:g} {cand.unit or ''}".strip())
+        st.markdown(f"**Target** · {cand.target_value:g} {cand.unit or ''}")
     if cand.responsible_org:
-        meta.append(f"who: {cand.responsible_org}")
-    st.caption(" · ".join(meta))
-
-    st.markdown("**Official wording**")
-    st.markdown(f"> {cand.source_excerpt[:1500]}")
-    render_en(cand.source_excerpt[:1500])
+        st.caption(cand.responsible_org)
+    label("Official Hungarian text")
+    quote(cand.source_excerpt)
+    render_en(cand.source_excerpt)
     if cand.excerpt_on_page is False:
-        st.caption("We couldn't re-find this quote on the page — "
-                   "worth a closer look.")
-    st.caption(f"Source · Józsefváros Climate Strategy · "
-               f"page {cand.source_page}")
-
-    if cand.review_status != ReviewStatus.UNREVIEWED:
-        return
-
-    st.divider()
-    if st.toggle("Edit fields", key=f"ed_{cand.id}"):
-        accepted = state.policy.commitments()
-        parent_options = {
-            "— on its own —": None,
-            **{f"{c.code + ' – ' if c.code else ''}{c.title}": c.id
-               for c in accepted},
-        }
-        kind = st.selectbox(
-            "What is it", list(CandidateType),
-            index=list(CandidateType).index(cand.suggested_type),
-            format_func=lambda k: KIND_LABEL[k], key=f"kind_{cand.id}")
-        title = st.text_input("Short name", value=cand.normalized_title,
-                              key=f"title_{cand.id}")
-        parent = st.selectbox("Part of", list(parent_options),
-                              key=f"parent_{cand.id}")
-        if st.button("Save as commitment", type="primary",
-                     key=f"save_{cand.id}"):
-            state.review.accept_candidate(
-                cand.id, kind=kind, title=title.strip(),
-                parent_id=parent_options[parent])
-            st.session_state["_rev_msg"] = "Saved as a commitment."
-            st.session_state["detail_id"] = None
-            st.rerun()
+        st.caption("We couldn't re-find this quote on the page — worth a closer look.")
+    doc = next((d for d in state.policy.documents() if d.id == cand.document_id), None)
+    if doc and doc.url:
+        st.link_button(f"Strategy · page {cand.source_page}", doc.url.split('#')[0] + f"#page={cand.source_page}", icon=":material/open_in_new:")
     else:
-        c1, c2 = st.columns(2)
-        if c1.button("Confirm", type="primary", key=f"ok_{cand.id}",
-                     width="stretch"):
-            state.review.accept_candidate(cand.id)
-            st.session_state["_rev_msg"] = "Confirmed."
-            st.session_state["detail_id"] = None
-            st.rerun()
-        if c2.button("Reject", key=f"no_{cand.id}", width="stretch"):
-            state.review.reject_candidate(cand.id)
-            st.session_state["_rev_msg"] = "Rejected."
-            st.session_state["detail_id"] = None
-            st.rerun()
+        st.caption(f"Source · Józsefváros Climate Strategy · page {cand.source_page}")
+    if editable and cand.review_status == ReviewStatus.UNREVIEWED:
+        with st.expander("Edit", icon=":material/edit:"):
+            st.caption("Saving confirms this source mention as a commitment.")
+            accepted = state.policy.commitments()
+            parents = {"— on its own —": None, **{
+                f"{c.code or ''} · {display_title(c.title)} [{c.id}]": c.id for c in accepted}}
+            with st.form(f"edit_{cand.id}"):
+                kind = st.selectbox("Commitment type", list(CandidateType),
+                    index=list(CandidateType).index(cand.suggested_type), format_func=lambda k: KIND_LABEL[k])
+                title = st.text_input("Short name", value=display_title(cand.normalized_title))
+                parent = st.selectbox("Part of", list(parents))
+                if st.form_submit_button("Save as commitment", type="primary"):
+                    if not title.strip():
+                        st.error("Enter a short name.")
+                    else:
+                        state.review.accept_candidate(cand.id, kind=kind, title=title.strip(), parent_id=parents[parent])
+                        st.session_state["_rev_msg"] = "Saved as a commitment."
+                        st.rerun()
