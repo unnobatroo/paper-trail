@@ -17,9 +17,14 @@ import streamlit as st
 from paper_trail.domain.enums import ReviewStatus
 from paper_trail.infrastructure.settings import Settings, load
 from paper_trail.ml.embeddings import get_provider
-from paper_trail.ml.rerank import get_reranker
 from paper_trail.ml.extraction import get_extractor
-from paper_trail.presentation import review_commitments, review_evidence, tracker
+from paper_trail.ml.rerank import get_reranker
+from paper_trail.presentation import (
+    review_commitments,
+    review_evidence,
+    style,
+    tracker,
+)
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.ingestion_service import IngestionService
@@ -121,6 +126,9 @@ def _step_state(state: AppState) -> tuple[set[int], set[int]]:
 
 def _goto(page: int) -> None:
     st.session_state["page"] = page
+    # inspectors/dialogs belong to the screen that opened them
+    for k in ("detail_id", "link_detail_id", "trail_sel"):
+        st.session_state.pop(k, None)
 
 
 def sidebar(state: AppState) -> int:
@@ -149,7 +157,7 @@ def sidebar(state: AppState) -> int:
             f"{marker}  {n}. {label}",
             key=f"nav_{n}", width="stretch",
             disabled=n not in avail,
-            type="primary" if n == page else "secondary",
+            type="primary" if n == page else "tertiary",
             on_click=_goto, args=(n,))
 
     st.sidebar.divider()
@@ -165,6 +173,7 @@ def sidebar(state: AppState) -> int:
 
 def main() -> None:
     st.set_page_config(page_title="Paper Trail", layout="wide")
+    style.inject()
     state = get_state()
     page = sidebar(state)
 

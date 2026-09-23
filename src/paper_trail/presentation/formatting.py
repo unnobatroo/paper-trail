@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ..domain.enums import (
     BudgetKind,
     CandidateType,
@@ -57,6 +59,13 @@ BUDGET_LABEL = {
     BudgetKind.APPROVED_ALLOCATION: "approved funding",
     BudgetKind.REPORTED_EXPENDITURE: "reported spending",
 }
+
+
+def display_title(title: str) -> str:
+    """Strip stray markdown/heading markers from extracted titles so
+    they read cleanly as button labels — provenance text is untouched."""
+    t = re.sub(r"[*_#`>]+", "", title or "")
+    return re.sub(r"\s+", " ", t).strip()
 
 
 def huf(amount: float | int | None) -> str:

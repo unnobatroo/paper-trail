@@ -1,16 +1,15 @@
 """Screen 1 — Check what we found in the strategy.
 
-A native review table: one row per commitment, a checkbox column for
-batch selection, a Details button per row opening a dialog, filters +
-pagination as native widgets, and batch actions pinned in st.bottom.
-Unchecked means "not selected" — it never rejects anything.
+A compact review list: one row per commitment — a checkbox for batch
+selection, the title itself as a link-style button that opens the
+detail dialog, then type/status/page metadata. Unchecked means "not
+selected" — it never rejects anything.
 """
 
 from __future__ import annotations
 
 import math
 
-import pandas as pd
 import streamlit as st
 
 from ..domain.enums import CandidateType, ReviewStatus
@@ -21,15 +20,15 @@ from .filters import (
     STATUS_REJECTED,
     filter_candidates,
 )
-from .formatting import KIND_LABEL
+from .formatting import KIND_LABEL, display_title
 from .translate import render_en
 
 _PAGE = 15
 _TYPE_OPTS = ["All", "Objectives", "Measures", "Targets"]
-_STATUS_OPTS = [STATUS_PENDING, STATUS_CONFIRMED, STATUS_REJECTED, STATUS_ALL]
-_EDITABLE = ["Select"]
-_READONLY = ["Commitment", "Type", "Status", "Page", "Deadline",
-             "Target", "Details"]
+_STATUS_OPTS = [STATUS_PENDING, STATUS_CONFIRMED, STATUS_REJECTED,
+                STATUS_ALL]
+_COLS = [0.4, 4.6, 0.9, 1.15, 0.55, 0.85, 0.75]
+_HEAD = ["", "Commitment", "Type", "Status", "Page", "Deadline", "Target"]
 
 
 def _status_text(cand) -> str:
@@ -40,32 +39,6 @@ def _status_text(cand) -> str:
     if cand.excerpt_on_page is False:
         return "Unclear"
     return "Needs review"
-
-
-def _frame(cands) -> pd.DataFrame:
-    """Review table — index is the candidate id so checkbox edits and
-    the Details button map straight back to the row's record.
-    `Select` is pre-checked for ids in the forced-selection set (used by
-    Select page / programmatic selection)."""
-    forced = st.session_state.get("cand_forced", set())
-    rows = [{
-        "id": c.id,
-        "Select": c.id in forced,
-        "Commitment": c.normalized_title,
-        "Type": KIND_LABEL[c.suggested_type],
-        "Status": _status_text(c),
-        "Page": c.source_page,
-        "Deadline": c.deadline_year or "",
-        "Target": (
-            f"{c.target_value:g} {c.unit or ''}".strip()
-            if c.target_value is not None else ""
-        ),
-        "Details": "Open",
-    } for c in cands]
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    return df.set_index("id")
 
 
 def render(state) -> None:
@@ -102,6 +75,9 @@ def render(state) -> None:
         cands, query=st.session_state.get("cq", "") or "",
         type_label=type_label, status_label=status_label)
     if not visible:
+        if status_label == STATUS_PENDING and done:
+            _all_reviewed(state)
+            return
         st.caption("Nothing matches these filters.")
         return
 
@@ -109,37 +85,16 @@ def render(state) -> None:
     page = min(st.session_state.get("cand_page", 1), num_pages)
     page_rows = visible[(page - 1) * _PAGE: page * _PAGE]
 
-    t1, t2, _ = st.columns([2, 2, 6])
-    t1.button("Select page", on_click=_select_page,
-              args=([c.id for c in page_rows], True))
-    t2.button("Clear selection", on_click=_select_page,
-              args=([c.id for c in page_rows], False))
+    with st.container(key="pthead", gap=None):
+        h = st.columns(_COLS)
+        for i, text in enumerate(_HEAD):
+            if text:
+                h[i].caption(f"**{text}**")
 
-    # Details clicks report a row *position* — remember which ids are on
-    # this page so the callback can map position -> candidate id.
-    st.session_state["_cand_page_ids"] = [c.id for c in page_rows]
+    inspected = st.session_state.get("detail_id")
+    for cand in page_rows:
+        _row(cand, inspected == cand.id)
 
-    # The editor key carries a generation number: data_editor widget
-    # state can't be written programmatically, so Select-page/Clear
-    # bump the generation -> a fresh editor mounts with pre-checked rows.
-    gen = st.session_state.get("cand_gen", 0)
-    edited = st.data_editor(
-        _frame(page_rows),
-        key=f"cand_editor_{gen}",
-        on_change=_sync_forced,
-        hide_index=True,
-        num_rows="fixed",
-        disabled=_READONLY,
-        column_config={
-            "Select": st.column_config.CheckboxColumn("Select",
-                                                      width="small"),
-            "Commitment": st.column_config.TextColumn("Commitment",
-                                                      width="large"),
-            "Details": st.column_config.ButtonColumn(
-                "Details", on_click=_open_detail, key="cand_detail",
-                type="tertiary"),
-        },
-    )
     st.caption(
         f"{len(visible)} matching · page {page} of {num_pages} · "
         "selection applies to the rows on this page"
@@ -147,48 +102,60 @@ def render(state) -> None:
     st.pagination(num_pages, key="cand_page")
 
     selected = [
-        i for i, on in edited["Select"].items() if bool(on)
+        c.id for c in page_rows
+        if st.session_state.get(f"csel_{c.id}")
     ]
-    _batch_bar(state, selected)
+    _batch_bar(state, page_rows, selected)
     _maybe_detail(state)
+
+
+def _row(cand, inspected: bool) -> None:
+    key = f"ptrow_sel_c_{cand.id}" if inspected else f"ptrow_c_{cand.id}"
+    with st.container(key=key, gap=None):
+        cols = st.columns(_COLS, vertical_alignment="center")
+        cols[0].checkbox("Select", key=f"csel_{cand.id}",
+                         label_visibility="collapsed")
+        cols[1].button(display_title(cand.normalized_title),
+                       key=f"hl_c_{cand.id}", type="tertiary",
+                       on_click=_inspect, args=(cand.id,))
+        cols[2].caption(KIND_LABEL[cand.suggested_type])
+        cols[3].caption(_status_text(cand))
+        cols[4].caption(str(cand.source_page))
+        cols[5].caption(str(cand.deadline_year or "—"))
+        cols[6].caption(
+            f"{cand.target_value:g} {cand.unit or ''}".strip()
+            if cand.target_value is not None else "—")
+
+
+def _all_reviewed(state) -> None:
+    st.success("All commitments reviewed.")
+    c1, c2, c3, _ = st.columns([1.4, 1.4, 1.2, 4])
+    c1.button("View confirmed", key="view_confirmed",
+              on_click=_view, args=(STATUS_CONFIRMED,))
+    c2.button("View rejected", key="view_rejected",
+              on_click=_view, args=(STATUS_REJECTED,))
+    c3.button("View all", key="view_all",
+              on_click=_view, args=(STATUS_ALL,))
+
+
+def _view(label: str) -> None:
+    st.session_state["cs"] = label
+    _reset_page()
 
 
 def _reset_page() -> None:
     st.session_state["cand_page"] = 1
 
 
-def _sync_forced() -> None:
-    """Manual (un)checking feeds back into the forced set so pagination
-    doesn't resurrect a checkbox the user cleared. edited_rows is keyed
-    by row position — map through the page's id list."""
-    state_ = st.session_state.get(
-        f"cand_editor_{st.session_state.get('cand_gen', 0)}") or {}
-    page_ids = st.session_state.get("_cand_page_ids", [])
-    forced = st.session_state.setdefault("cand_forced", set())
-    for pos, cols in (state_.get("edited_rows") or {}).items():
-        if "Select" not in cols:
-            continue
-        cid = page_ids[int(pos)] if 0 <= int(pos) < len(page_ids) else None
-        if cid is None:
-            continue
-        (forced.add if cols["Select"] else forced.discard)(cid)
+def _inspect(cand_id: int) -> None:
+    st.session_state["detail_id"] = cand_id
 
 
-def _select_page(ids: list[int], on: bool) -> None:
-    """Programmatic (un)check: rebuild the editor with those rows'
-    Select column set — data_editor state is not writable directly."""
-    forced = st.session_state.setdefault("cand_forced", set())
-    (forced.update if on else forced.difference_update)(ids)
-    st.session_state["cand_gen"] = st.session_state.get("cand_gen", 0) + 1
-
-
-def _open_detail() -> None:
-    click = st.session_state.get("cand_detail")
-    if click is not None and getattr(click, "row", None) is not None:
-        # .row is a position in the displayed page; map it to the id
-        page_rows = st.session_state.get("_cand_page_ids", [])
-        if 0 <= click.row < len(page_rows):
-            st.session_state["detail_id"] = page_rows[click.row]
+def _set_selection(ids: list[int], on: bool) -> None:
+    """Tick/untick visible checkboxes — plain widget state, so a simple
+    assignment in a callback is enough."""
+    for cid in ids:
+        st.session_state[f"csel_{cid}"] = on
 
 
 def _apply(state, ids: list[int], action: str) -> None:
@@ -198,22 +165,26 @@ def _apply(state, ids: list[int], action: str) -> None:
     else:
         state.review.reject_candidates(ids)
         st.session_state["_rev_msg"] = f"{len(ids)} rejected."
-    st.session_state["cand_forced"] = set()
-    st.session_state["cand_gen"] = st.session_state.get("cand_gen", 0) + 1
+    _set_selection(ids, False)
 
 
-def _batch_bar(state, selected: list[int]) -> None:
-    with st.bottom:
-        c1, c2, c3, c4 = st.columns([2.5, 2, 2, 1.5])
-        c1.markdown(f"**{len(selected)} selected**"
+def _batch_bar(state, page_rows, selected: list[int]) -> None:
+    ids = [c.id for c in page_rows]
+    with st.container(key="ptbatch_c", horizontal=True,
+                      vertical_alignment="center"):
+        st.markdown(f"**{len(selected)} selected**"
                     if selected else "Nothing selected")
-        c2.button("Confirm selected", type="primary", width="stretch",
-                  disabled=not selected,
+        st.button("Select page", type="tertiary", key="cand_selpage",
+                  on_click=_set_selection, args=(ids, True))
+        st.button("Clear", type="tertiary", disabled=not selected,
+                  key="cand_clear",
+                  on_click=_set_selection, args=(selected, False))
+        st.button("Confirm selected", type="primary",
+                  disabled=not selected, key="cand_confirm",
                   on_click=_apply, args=(state, selected, "confirm"))
-        c3.button("Reject selected", width="stretch", disabled=not selected,
+        st.button("Reject selected", disabled=not selected,
+                  key="cand_reject",
                   on_click=_apply, args=(state, selected, "reject"))
-        c4.button("Clear", width="stretch", disabled=not selected,
-                  on_click=_select_page, args=(selected, False))
 
 
 def _maybe_detail(state) -> None:
@@ -224,7 +195,7 @@ def _maybe_detail(state) -> None:
     if cand is None:
         st.session_state["detail_id"] = None
         return
-    _detail(state, cand)
+    candidate_detail(state, cand)
 
 
 def _close_detail() -> None:
@@ -232,7 +203,9 @@ def _close_detail() -> None:
 
 
 @st.dialog("Commitment", width="large", on_dismiss=_close_detail)
-def _detail(state, cand) -> None:
+def candidate_detail(state, cand) -> None:
+    """Detail dialog for one candidate — also opened from Step 2's
+    search pick-list, where it is read-only for confirmed items."""
     st.markdown(f"**{cand.normalized_title}**")
     render_en(cand.normalized_title)
 

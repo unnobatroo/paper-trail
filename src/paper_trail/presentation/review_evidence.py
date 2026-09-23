@@ -1,14 +1,15 @@
-"""Screen 2 — Check the possible matches.
+"""Screen 2 — Find evidence, then check the possible matches.
 
-Same interaction model as the commitment review: a native table of
-pending evidence links, checkbox batch selection, a Details button per
-row opening a dialog (snippet + relationship choice + single-link
-actions), and batch actions pinned in st.bottom.
+Two states on one screen, sharing the same row language as Step 1:
+
+1. commitments that haven't been searched yet — tick them, press one
+   "Find evidence for N selected" button, watch a st.status panel;
+2. pending matches — checkbox selects for batch actions, the evidence
+   title is a link-style button that opens the detail dialog.
 """
 
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
 
 from ..domain.enums import CandidateType, RelationshipType, ReviewStatus
@@ -17,15 +18,17 @@ from .formatting import (
     REL_LABEL,
     STATUS_LABEL,
     STATUS_SENTENCE,
+    display_title,
     evidence_kind,
     huf,
 )
+from .review_commitments import candidate_detail
 from .translate import english, render_en
 
 _EVIDENCE_KINDS = (CandidateType.OBJECTIVE, CandidateType.MEASURE,
                    CandidateType.TARGET)
-_READONLY = ["Evidence", "For", "Source says", "Publisher", "Date",
-             "Suggested", "Details"]
+_COLS = [0.4, 4.2, 2.4, 1.4, 0.9, 1.3]
+_HEAD = ["", "Evidence", "For", "Source says", "Published", "Suggested"]
 
 
 def render(state) -> None:
@@ -35,6 +38,11 @@ def render(state) -> None:
     ]
     if not commitments:
         st.info("Nothing to check yet — confirm some commitments first.")
+        return
+
+    # a queued search replaces the work area with a progress panel
+    if st.session_state.get("_search_ids"):
+        _run_searches(state)
         return
 
     found_msg = st.session_state.pop("_found_msg", None)
@@ -50,32 +58,130 @@ def render(state) -> None:
     if rev_msg:
         st.success(rev_msg)
 
-    st.caption(
-        "The status under each match describes what that specific source "
-        "passage says about this commitment — the same long report can "
-        "honestly say different things for different commitments."
-    )
+    _pick_list(state, commitments)
+    _review_matches(state, commitments)
 
-    # --- commitments needing searches -------------------------------------
+
+# --- phase 1: choose commitments to search ---------------------------------
+
+def _pick_list(state, commitments) -> None:
+    unsearched = [
+        c for c in commitments
+        if not state.evidence.links_for(c.id)
+    ]
+    if not unsearched:
+        return
+
+    st.subheader("Choose what to search")
+    st.caption(
+        f"{len(unsearched)} commitment(s) haven't been checked against "
+        "official sources yet."
+    )
+    for com in unsearched:
+        with st.container(key=f"ptrow_s_{com.id}", gap=None):
+            cols = st.columns([0.4, 6, 2], vertical_alignment="center")
+            cols[0].checkbox("Select", key=f"esel_{com.id}",
+                             label_visibility="collapsed")
+            cols[1].button(display_title(com.title), key=f"hl_s_{com.id}",
+                           type="tertiary",
+                           on_click=_inspect_cand, args=(com,))
+            meta = [f"strategy p.{com.source_page}" if com.source_page
+                    else "strategy"]
+            if com.deadline_year:
+                meta.append(f"deadline {com.deadline_year}")
+            cols[2].caption(" · ".join(meta) + " · not searched yet")
+
+    selected = [
+        c.id for c in unsearched
+        if st.session_state.get(f"esel_{c.id}")
+    ]
+    with st.container(key="ptbatch_s", horizontal=True,
+                      vertical_alignment="center"):
+        st.markdown(f"**{len(selected)} selected**"
+                    if selected else "Nothing selected")
+        st.button("Select all not searched", type="tertiary",
+                  key="search_selall",
+                  on_click=_set_search_sel,
+                  args=([c.id for c in unsearched], True))
+        st.button("Clear", type="tertiary", disabled=not selected,
+                  key="search_clear",
+                  on_click=_set_search_sel, args=(selected, False))
+        st.button(
+            f"Find evidence for {len(selected)} selected"
+            if selected else "Find evidence",
+            type="primary", disabled=not selected, key="search_go",
+            on_click=_queue_search, args=(selected,))
+
+    _maybe_cand_detail(state)
+
+
+def _inspect_cand(com) -> None:
+    if com.candidate_id is not None:
+        st.session_state["detail_id"] = com.candidate_id
+
+
+def _maybe_cand_detail(state) -> None:
+    did = st.session_state.get("detail_id")
+    if did is None:
+        return
+    cand = state.policy.candidate(did)
+    if cand is None:
+        st.session_state["detail_id"] = None
+        return
+    candidate_detail(state, cand)
+
+
+def _set_search_sel(ids: list[int], on: bool) -> None:
+    for cid in ids:
+        st.session_state[f"esel_{cid}"] = on
+
+
+def _queue_search(ids: list[int]) -> None:
+    st.session_state["_search_ids"] = ids
+    _set_search_sel(ids, False)
+
+
+def _run_searches(state) -> None:
+    """Runs instead of the work area while a search is queued."""
+    ids = st.session_state.pop("_search_ids", [])
+    coms = [state.policy.commitment(i) for i in ids]
+    coms = [c for c in coms if c]
+    if _models_cold(state):
+        st.info("Paper Trail is downloading its language models — "
+                "this only happens the first time.")
+    total = 0
+    warnings: list[str] = []
+    with st.status("Searching official sources…", expanded=True) as status:
+        for com in coms:
+            status.write(f"● Reading sources for “{com.title}”…")
+            try:
+                found = state.evidence_svc.find_evidence(
+                    com, progress=status.write)
+            except Exception as exc:
+                status.update(label="The search didn't finish.",
+                              state="error")
+                st.error("We couldn't load the evidence model or finish "
+                         f"the search. The details: {type(exc).__name__}.")
+                return
+            total += len(found)
+            warnings.extend(state.evidence_svc.warnings)
+            status.write(f"✓ {com.title}: {len(found)} possible matches")
+        status.update(
+            label=f"Search done — {total} possible matches.",
+            state="complete", expanded=False)
+    st.session_state["_found_msg"] = total
+    st.session_state["_found_warn"] = warnings
+    st.rerun()
+
+
+# --- phase 2: review pending matches ----------------------------------------
+
+def _review_matches(state, commitments) -> None:
     pending: list[tuple] = []  # (commitment, link, evidence)
     for com in commitments:
-        links = state.evidence.links_for(com.id)
-        to_check = [l for l in links
-                    if l.review_status == ReviewStatus.UNREVIEWED]
-        with st.container(horizontal=True, vertical_alignment="center"):
-            st.markdown(
-                f"**{com.title}**"
-                + (f" · `{com.code}`" if com.code else "")
-                + f"  — p.{com.source_page}, "
-                + (f"{len(to_check)} to check"
-                   if to_check else
-                   (f"{len(links)} checked" if links else "not searched yet"))
-            )
-            if not links:
-                if st.button("Find evidence", key=f"find_{com.id}",
-                             type="primary"):
-                    _search(state, com)
-        for link in to_check:
+        for link in state.evidence.links_for(com.id):
+            if link.review_status != ReviewStatus.UNREVIEWED:
+                continue
             ev = state.evidence.evidence(link.evidence_id)
             if ev is not None:
                 pending.append((com, link, ev))
@@ -84,109 +190,54 @@ def render(state) -> None:
         st.caption("No matches waiting for review.")
         return
 
-    t1, t2, _ = st.columns([2, 2, 6])
-    t1.button("Select all", on_click=_select,
-              args=([l.id for _, l, _ in pending], True))
-    t2.button("Clear selection", on_click=_select,
-              args=([l.id for _, l, _ in pending], False))
-
-    st.session_state["_link_row_ids"] = [l.id for _, l, _ in pending]
-    gen = st.session_state.get("link_gen", 0)
-    edited = st.data_editor(
-        _frame(pending),
-        key=f"link_editor_{gen}",
-        on_change=_sync_forced,
-        hide_index=True,
-        num_rows="fixed",
-        disabled=_READONLY,
-        column_config={
-            "Select": st.column_config.CheckboxColumn("Select",
-                                                      width="small"),
-            "Evidence": st.column_config.TextColumn("Evidence",
-                                                    width="large"),
-            "Details": st.column_config.ButtonColumn(
-                "Details", on_click=_open_detail, key="link_detail",
-                type="tertiary"),
-        },
+    st.subheader("Check the matches")
+    st.caption(
+        "The status under each match describes what that specific source "
+        "passage says about this commitment — the same long report can "
+        "honestly say different things for different commitments."
     )
 
-    selected = [i for i, on in edited["Select"].items() if bool(on)]
-    _batch_bar(state, selected)
+    with st.container(key="pthead", gap=None):
+        h = st.columns(_COLS)
+        for i, text in enumerate(_HEAD):
+            if text:
+                h[i].caption(f"**{text}**")
+
+    inspected = st.session_state.get("link_detail_id")
+    for com, link, ev in pending:
+        _link_row(com, link, ev, inspected == link.id)
+
+    selected = [
+        l.id for _, l, _ in pending
+        if st.session_state.get(f"lsel_{l.id}")
+    ]
+    _batch_bar(state, pending, selected)
     _maybe_detail(state)
 
 
-def _frame(pending) -> pd.DataFrame:
-    """Pending links indexed by link id."""
-    forced = st.session_state.get("link_forced", set())
-    rows = [{
-        "id": link.id,
-        "Select": link.id in forced,
-        "Evidence": ev.title,
-        "For": com.title[:60],
-        "Source says": STATUS_LABEL[ev.status_hint],
-        "Publisher": ev.publisher or "official source",
-        "Date": str(ev.published_on or ""),
-        "Suggested": REL_LABEL[link.suggested_relationship],
-        "Details": "Open",
-    } for com, link, ev in pending]
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    return df.set_index("id")
+def _link_row(com, link, ev, inspected: bool) -> None:
+    key = (f"ptrow_sel_e_{link.id}" if inspected
+           else f"ptrow_e_{link.id}")
+    with st.container(key=key, gap=None):
+        cols = st.columns(_COLS, vertical_alignment="center")
+        cols[0].checkbox("Select", key=f"lsel_{link.id}",
+                         label_visibility="collapsed")
+        cols[1].button(ev.title, key=f"hl_e_{link.id}",
+                       type="tertiary",
+                       on_click=_inspect_link, args=(link.id,))
+        cols[2].caption(com.title[:70])
+        cols[3].caption(STATUS_LABEL[ev.status_hint])
+        cols[4].caption(str(ev.published_on or "—"))
+        cols[5].caption(REL_LABEL[link.suggested_relationship])
 
 
-def _search(state, com) -> None:
-    with st.status("Searching official sources…", expanded=True) as status:
-        if _models_cold(state):
-            status.write(
-                "Paper Trail is downloading its language "
-                "models — this only happens the first time.")
-        try:
-            found = state.evidence_svc.find_evidence(
-                com, progress=status.write)
-        except Exception as exc:
-            status.update(label="The search didn't finish.", state="error")
-            st.error(
-                "We couldn't load the evidence model or "
-                f"finish the search. The details: {type(exc).__name__}.")
-            return
-        status.update(label=f"Search done — {len(found)} possible matches.",
-                      state="complete", expanded=False)
-    st.session_state["_found_msg"] = len(found)
-    st.session_state["_found_warn"] = list(state.evidence_svc.warnings)
-    st.rerun()
+def _inspect_link(link_id: int) -> None:
+    st.session_state["link_detail_id"] = link_id
 
 
-def _sync_forced() -> None:
-    """edited_rows is keyed by row position — map through the rendered
-    link id list."""
-    state_ = st.session_state.get(
-        f"link_editor_{st.session_state.get('link_gen', 0)}") or {}
-    ids = st.session_state.get("_link_row_ids", [])
-    forced = st.session_state.setdefault("link_forced", set())
-    for pos, cols in (state_.get("edited_rows") or {}).items():
-        if "Select" not in cols:
-            continue
-        lid = ids[int(pos)] if 0 <= int(pos) < len(ids) else None
-        if lid is None:
-            continue
-        (forced.add if cols["Select"] else forced.discard)(lid)
-
-
-def _select(ids: list[int], on: bool) -> None:
-    """Rebuild the editor with those rows pre-(un)checked — data_editor
-    widget state is not writable, so we remount it via a new key."""
-    forced = st.session_state.setdefault("link_forced", set())
-    (forced.update if on else forced.difference_update)(ids)
-    st.session_state["link_gen"] = st.session_state.get("link_gen", 0) + 1
-
-
-def _open_detail() -> None:
-    click = st.session_state.get("link_detail")
-    if click is not None and getattr(click, "row", None) is not None:
-        ids = st.session_state.get("_link_row_ids", [])
-        if 0 <= click.row < len(ids):
-            st.session_state["link_detail_id"] = ids[click.row]
+def _set_link_sel(ids: list[int], on: bool) -> None:
+    for lid in ids:
+        st.session_state[f"lsel_{lid}"] = on
 
 
 def _apply(state, ids: list[int], action: str) -> None:
@@ -199,22 +250,26 @@ def _apply(state, ids: list[int], action: str) -> None:
     else:
         state.review.reject_links(ids)
         st.session_state["_rev_msg"] = f"{len(ids)} match(es) rejected."
-    st.session_state["link_forced"] = set()
-    st.session_state["link_gen"] = st.session_state.get("link_gen", 0) + 1
+    _set_link_sel(ids, False)
 
 
-def _batch_bar(state, selected: list[int]) -> None:
-    with st.bottom:
-        c1, c2, c3, c4 = st.columns([2.5, 2, 2, 1.5])
-        c1.markdown(f"**{len(selected)} selected**"
+def _batch_bar(state, pending, selected: list[int]) -> None:
+    ids = [l.id for _, l, _ in pending]
+    with st.container(key="ptbatch_e", horizontal=True,
+                      vertical_alignment="center"):
+        st.markdown(f"**{len(selected)} selected**"
                     if selected else "Nothing selected")
-        c2.button("Confirm matches", type="primary", width="stretch",
-                  disabled=not selected,
+        st.button("Select all", type="tertiary", key="link_selpage",
+                  on_click=_set_link_sel, args=(ids, True))
+        st.button("Clear", type="tertiary", disabled=not selected,
+                  key="link_clear",
+                  on_click=_set_link_sel, args=(selected, False))
+        st.button("Confirm matches", type="primary",
+                  disabled=not selected, key="link_confirm",
                   on_click=_apply, args=(state, selected, "confirm"))
-        c3.button("Reject selected", width="stretch", disabled=not selected,
+        st.button("Reject selected", disabled=not selected,
+                  key="link_reject",
                   on_click=_apply, args=(state, selected, "reject"))
-        c4.button("Clear", width="stretch", disabled=not selected,
-                  on_click=_select, args=(selected, False))
 
 
 def _maybe_detail(state) -> None:
