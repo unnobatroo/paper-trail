@@ -2,76 +2,98 @@
 
 **From policy text to implementation evidence.**
 
-Paper Trail reads the real Józsefváros climate strategy PDF, extracts
-candidate commitments, searches official municipal sources for
-implementation evidence, and lets a human decide what enters the record:
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](tests/)
+
+Paper Trail reads a real municipal climate strategy — the Józsefváros
+(Budapest District VIII) strategy PDF — extracts the commitments it
+contains, searches official municipal sources for evidence that each one
+was actually implemented, and lets a **human reviewer** decide what enters
+the permanent record:
 
 > What did the district say it would do, what measurable targets exist,
 > what implementation evidence was found, and what is still missing?
 
-Nothing reaches the tracker without a human clicking **Confirm**. It does
-not estimate budgets, infer completion, or judge whether a policy is good.
+Nothing reaches the tracker without a person clicking **Confirm**. The
+software proposes; the human disposes. It never estimates budgets, never
+infers completion, and never judges whether a policy is good.
 
-**Live demo: https://paper-trail.streamlit.app**
+## Why this exists
 
-## Workflow
+Councils publish ambitious strategies; years later, nobody can tell which
+promises became real. Implementation evidence does exist — procurement
+notices, annual reports, budget resolutions — but it is scattered across
+official websites in PDFs and news posts. Paper Trail automates the
+tedious part (finding and ranking candidate evidence) while keeping the
+accountable part (deciding what counts) human.
+
+## The workflow
 
 ```text
 strategy PDF
-→ extract candidate commitments (page + verbatim excerpt required)
-→ human reviews them (Confirm / Edit / Reject)
-→ search official sources: jozsefvaros.hu, rev8.hu, budapest.hu
-→ chunk documents (~2400 chars) → embed → top-20 cosine → rerank → top-5
-→ human reviews proposed links
-→ confirmed records appear in the Paper Trail, with explicit gaps
+  → extract candidate commitments (page + verbatim excerpt required)
+  → human reviews them (Confirm / Edit / Reject)
+  → search official sources: jozsefvaros.hu, rev8.hu, budapest.hu
+  → chunk documents → embed → top-20 semantic match → rerank → top-5
+  → human reviews proposed links
+  → confirmed records appear in the Paper Trail, with explicit gaps
 ```
 
-## Run
+Every record carries its provenance: the page number, the verbatim
+excerpt, the source URL, the matched passage — so a claim can always be
+traced back to the document that made it.
+
+## Quickstart
 
 ```bash
-uv sync
-uv run streamlit run app.py
+git clone https://github.com/unnobatroo/paper-trail
+cd paper-trail
+uv sync                          # or: pip install -e .
+uv run streamlit run app.py      # interactive UI
 ```
 
-Click **Read the strategy** in the sidebar, then walk the three steps:
+In the sidebar click **Read the strategy**, then walk the three steps:
 **Check commitments → Find evidence → Paper trail**.
 
-Hungarian source text can be shown with an automatic English translation
-(sidebar toggle) — labelled machine translation, never an official
-document.
+Everything works offline except fetching pages from the official sites:
+the test suite and the `fixture`/`hashing` providers need no keys and no
+network. First real run downloads ~2 GB of local models (or set
+`JINA_API_KEY` for hosted inference and download nothing).
 
-### First run
-
-- With `JINA_API_KEY` set (see config) the app uses hosted inference —
-  no model downloads, first search just calls the API.
-- Without it, the first search downloads ~2 GB of local models into
-  `data/models/` (the app says so) and embedding takes minutes on CPU.
-  Fetched pages and embeddings are cached under `data/processed/fetched/`.
-
-Reset state without touching caches:
+Prefer an API over the UI? The same services are exposed as REST:
 
 ```bash
-uv run python scripts/reset_demo_state.py
+uv run uvicorn paper_trail.api.app:app --app-dir src   # → http://localhost:8000/docs
 ```
 
-Works for both backends: archives the SQLite file, or clears the Supabase
-rows when `SUPABASE_URL`/`SUPABASE_KEY` are set.
+## Documentation
 
-## Deploy
+Full docs with UML diagrams live in the
+[project wiki](https://github.com/unnobatroo/paper-trail/wiki):
 
-The app deploys on Streamlit Community Cloud straight from this repo:
-pick `unnobatroo/paper-trail`, branch `main`, file `app.py`, then paste
-`.streamlit/secrets.toml` (template: `secrets.example.toml`) into the
-app's Secrets. `requirements.txt` covers the build; a `Dockerfile` is
-included for container hosts. Cloud secrets become env vars automatically.
+| Page | What it covers |
+|---|---|
+| [Architecture](https://github.com/unnobatroo/paper-trail/wiki/Architecture) | How the pieces fit — layers, interfaces, wiring |
+| [Ranking Pipeline](https://github.com/unnobatroo/paper-trail/wiki/Ranking-Pipeline) | Search → fetch → chunk → embed → rerank → review, stage by stage |
+| [Machine Learning](https://github.com/unnobatroo/paper-trail/wiki/Machine-Learning) | Models (embeddings, reranker, extraction, translation) and how to swap them |
+| [Data Layer](https://github.com/unnobatroo/paper-trail/wiki/Data-Layer) | Schema, pgvector caches, storage buckets |
+| [API Reference](https://github.com/unnobatroo/paper-trail/wiki/API-Reference) | Every REST endpoint |
+| [Development](https://github.com/unnobatroo/paper-trail/wiki/Development) | Setup, tests, conventions |
+| [Deployment](https://github.com/unnobatroo/paper-trail/wiki/Deployment) | Supabase, containers, Streamlit Cloud |
 
 ## Configuration
 
+Everything has an offline-friendly default; a gitignored `.env` at the
+repo root holds real values (see [.env.example](.env.example)):
+
 | env var | default | meaning |
 |---|---|---|
-| `SUPABASE_URL` / `SUPABASE_KEY` | unset | set both → Supabase/Postgres backend instead of SQLite (run `supabase/migrations/001_schema.sql` once; use the service_role key) |
+| `SUPABASE_URL` / `SUPABASE_KEY` | unset | set both → Postgres + pgvector + Storage instead of SQLite/files (run `supabase/migrations/` 001–003 once; use the service_role key) |
+| `PAPER_TRAIL_STORAGE_BUCKET` | `source-documents` | Supabase Storage bucket holding source PDFs |
+| `PAPER_TRAIL_API_ORIGINS` | `http://localhost:3000` | comma-separated CORS origins for the REST API |
 | `JINA_API_KEY` | unset | hosted inference — with `PAPER_TRAIL_EMBED_MODEL=jina` + `PAPER_TRAIL_RERANKER=jina` no models are downloaded |
-| `HF_TOKEN` | unset | enables HU→EN machine translation in the UI |
+| `HF_TOKEN` | unset | enables HU→EN machine translation |
 | `PAPER_TRAIL_DB` | `data/processed/paper_trail.db` | SQLite path (local backend) |
 | `PAPER_TRAIL_EMBED_MODEL` | `intfloat/multilingual-e5-large` | embedder (`jina`, `hashing` = offline stub, or a fastembed model) |
 | `PAPER_TRAIL_RERANKER` | `BAAI/bge-reranker-v2-m3` | cross-encoder (`jina`, `none`, or a local model) |
@@ -81,9 +103,9 @@ included for container hosts. Cloud secrets become env vars automatically.
 | `PAPER_TRAIL_MAX_DOC_CHARS` | `4000000` | emergency document bound — truncates and warns, never silently |
 | `PAPER_TRAIL_LLM_BASE_URL` / `_API_KEY` / `_MODEL` | unset | optional OpenAI-compatible extraction endpoint |
 
-Keys can live in a gitignored `.env` at the repo root (see `.env.example`).
+## The honesty rules
 
-## Honesty rules
+These are the product, not an afterthought:
 
 - no claim without a page number and a verbatim excerpt (re-verified
   against the page text)
@@ -95,57 +117,16 @@ Keys can live in a gitignored `.env` at the repo root (see `.env.example`).
 - missing evidence shows as a gap, not a score
 - English text is machine translation, always labelled as such
 
-## Extraction
+## Contributing
 
-`RuleBasedExtractor` (default, offline) parses this document's own
-structure — goal headers, numbered measure cards, target sentences inside
-the action-plan region. It is tuned to this one strategy, not a general
-parser; the review screen exists because it occasionally over-fires on
-background statistics. An optional `LLMExtractor` posts page windows to
-any OpenAI-compatible endpoint with structured output and verbatim
-excerpt verification.
+Bug reports and pull requests welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see
+[SECURITY.md](SECURITY.md). Everyone participating is covered by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Retrieval (frozen for the MVP)
+## License
 
-Full-document chunking + e5-large + top-20 cosine + BGE cross-encoder
-rerank beat the old windowed baseline ~2.7× on recall@5 in our small
-benchmark; a learned relationship classifier was evaluated and rejected —
-the heuristic rules stay. Raw numbers live in `experiments/results/`.
+Copyright © 2026 Paper Trail contributors.
 
-The benchmark (`data/benchmark/`) is 8 commitments × 91 real passages ×
-89 hand-labelled pairs (`relevance` 0–2, `relationship` uses the app's
-own enum, every label has a note). Splits are by source document — a test
-passage never has near-copies in train. Regenerate with
-`experiments/build_benchmark.py`; the app does not depend on it.
-Reviewed decisions in the app export as labelled rows for future data:
-`experiments/export_review_data.py` (SQLite backend).
-
-Heavy runs go on a rented GPU (Vast.ai): sync repo, run on a stock
-pytorch image, pull the DB back, destroy the instance —
-`experiments/gpu_warm_e2e.py` shows the pattern.
-
-## Layout
-
-```text
-app.py                     entry point / wiring
-src/paper_trail/
-  domain/                  enums + Pydantic models
-  ml/                      embeddings, entity/money/status parsing,
-                           extraction, matching, rerank
-  sources/                 PDF reader, allowlisted search, fetch,
-                           official document registry
-  services/                ingestion, evidence discovery, review,
-                           metrics, translation
-  repositories/            SQLite + Supabase data access
-  presentation/            three Streamlit screens
-tests/                     offline: fixture search, hashing embeddings
-data/source_documents/     the strategy PDF
-scripts/reset_demo_state.py
-supabase/migrations/       Postgres schema for the cloud backend
-```
-
-## Tests
-
-```bash
-uv run pytest          # all offline
-```
+[GPL-3.0](LICENSE) — free to use, study, share and improve; derivatives
+stay open.

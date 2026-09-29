@@ -35,12 +35,15 @@ coverage.xml
 .streamlit/secrets.*.toml
 !.streamlit/secrets.example.toml
 
-# Runtime data and downloaded models
+# Runtime data and downloaded models — nothing under data/ is source;
+# documents and benchmark files sync via scripts/push_data.py / pull_data.py
 data/processed/
 data/fixtures/
-data/benchmark/raw/
+data/source_documents/
+data/benchmark/
 data/models/
 experiments/checkpoints/
+experiments/results/
 
 # Supabase CLI local state (not migrations)
 supabase/.temp/

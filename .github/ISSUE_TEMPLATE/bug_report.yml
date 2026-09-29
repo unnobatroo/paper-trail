@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in Paper Trail is broken or wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you get?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Steps or a minimal snippet. For extraction/ranking bugs, the input text or document section helps most.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where?
+      options:
+        - Streamlit UI
+        - REST API
+        - Extraction (PDF → candidates)
+        - Evidence ranking
+        - Storage / Supabase
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: "local / Streamlit Cloud / container; backend: sqlite or supabase; embed model + reranker settings"
+  - type: checkboxes
+    id: honesty
+    attributes:
+      label: Does this involve an honesty-rule violation?
+      description: E.g. a claim without a verbatim excerpt, merged/estimated money, auto-accepted output — those are severity-critical here.
+      options:
+        - label: Yes — output reached the record without human review or provenance

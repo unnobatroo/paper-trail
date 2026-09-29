@@ -38,6 +38,10 @@ def fetch(url: str) -> FetchedPage | None:
         resp.raise_for_status()
     except requests.RequestException:
         return None
+    # redirects are followed implicitly — re-check the allowlist on the
+    # final URL so an on-list page can't point the fetcher off-list
+    if not allowed(resp.url):
+        return None
 
     if url.lower().endswith(".pdf") or resp.headers.get("content-type", "").startswith(
         "application/pdf"

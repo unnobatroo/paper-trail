@@ -1,5 +1,8 @@
 """Runtime configuration — everything has an offline-friendly default.
 
+Backed by pydantic-settings: env vars win, then a gitignored `.env` at the
+repo root (see .env.example). Unknown keys are ignored.
+
 Environment overrides:
   PAPER_TRAIL_DB            SQLite path (default data/processed/paper_trail.db)
   PAPER_TRAIL_EMBED_MODEL   fastembed model name
@@ -22,13 +25,19 @@ Environment overrides:
                           PAPER_TRAIL_RERANKER=jina to use it
   HF_TOKEN                  enables Hungarian→English machine translation
                             in the UI (Helsinki-NLP/opus-mt-hu-en)
+  PAPER_TRAIL_STORAGE_BUCKET
+                            Supabase Storage bucket for source PDFs
+                            (default "source-documents")
+  PAPER_TRAIL_API_ORIGINS   comma-separated CORS origins for the API
+                            (default http://localhost:3000)
 """
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
 from pathlib import Path
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..ml.embeddings import DEFAULT_EMBED_MODEL
 from ..ml.rerank import DEFAULT_RERANKER
@@ -36,22 +45,50 @@ from ..ml.rerank import DEFAULT_RERANKER
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
-@dataclass(frozen=True)
-class Settings:
-    db_path: Path
-    embed_model: str
-    reranker_model: str
-    rerank_candidates: int
-    max_doc_chars: int
-    search_provider: str
-    llm_base_url: str | None
-    llm_api_key: str | None
-    llm_model: str
-    fixture_dir: Path
-    seed_dir: Path
-    model_cache: Path
-    supabase_url: str | None
-    supabase_key: str | None
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=PROJECT_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    db_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "processed" / "paper_trail.db",
+        validation_alias="PAPER_TRAIL_DB")
+    embed_model: str = Field(
+        default=DEFAULT_EMBED_MODEL, validation_alias="PAPER_TRAIL_EMBED_MODEL")
+    reranker_model: str = Field(
+        default=DEFAULT_RERANKER, validation_alias="PAPER_TRAIL_RERANKER")
+    rerank_candidates: int = Field(
+        default=20, validation_alias="PAPER_TRAIL_RERANK_K")
+    max_doc_chars: int = Field(
+        default=4_000_000, validation_alias="PAPER_TRAIL_MAX_DOC_CHARS")
+    search_provider: str = Field(
+        default="ddgs", validation_alias="PAPER_TRAIL_SEARCH")
+    llm_base_url: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_LLM_BASE_URL")
+    llm_api_key: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_LLM_API_KEY")
+    llm_model: str = Field(
+        default="", validation_alias="PAPER_TRAIL_LLM_MODEL")
+    fixture_dir: Path = PROJECT_ROOT / "data" / "fixtures"
+    seed_dir: Path = PROJECT_ROOT / "data" / "source_documents"
+    # stable on-disk model cache — fastembed's default is $TMPDIR,
+    # which macOS cleans and which broke downloaded models
+    model_cache: Path = Field(
+        default=PROJECT_ROOT / "data" / "models",
+        validation_alias="PAPER_TRAIL_MODEL_CACHE")
+    supabase_url: str | None = Field(
+        default=None, validation_alias="SUPABASE_URL")
+    supabase_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SUPABASE_KEY", "SUPABASE_SERVICE_KEY"))
+    storage_bucket: str = Field(
+        default="source-documents",
+        validation_alias="PAPER_TRAIL_STORAGE_BUCKET")
+    api_origins_raw: str = Field(
+        default="http://localhost:3000",
+        validation_alias="PAPER_TRAIL_API_ORIGINS")
 
     @property
     def llm_configured(self) -> bool:
@@ -61,48 +98,11 @@ class Settings:
     def supabase_configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_key)
 
-
-def _env_file(path: Path) -> None:
-    """Read KEY=VALUE lines into os.environ defaults — lets the app run
-    from a plain .env without a dotenv dependency."""
-    if not path.exists():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(),
-                              value.strip().strip('"').strip("'"))
+    @property
+    def api_origins(self) -> list[str]:
+        return [o.strip() for o in self.api_origins_raw.split(",")
+                if o.strip()]
 
 
 def load() -> Settings:
-    _env_file(PROJECT_ROOT / ".env")
-    return Settings(
-        db_path=Path(
-            os.environ.get(
-                "PAPER_TRAIL_DB", PROJECT_ROOT / "data" / "processed" / "paper_trail.db"
-            )
-        ),
-        embed_model=os.environ.get("PAPER_TRAIL_EMBED_MODEL",
-                                   DEFAULT_EMBED_MODEL),
-        reranker_model=os.environ.get("PAPER_TRAIL_RERANKER",
-                                      DEFAULT_RERANKER),
-        rerank_candidates=int(os.environ.get("PAPER_TRAIL_RERANK_K", "20")),
-        max_doc_chars=int(
-            os.environ.get("PAPER_TRAIL_MAX_DOC_CHARS", "4000000")),
-        search_provider=os.environ.get("PAPER_TRAIL_SEARCH", "ddgs"),
-        llm_base_url=os.environ.get("PAPER_TRAIL_LLM_BASE_URL"),
-        llm_api_key=os.environ.get("PAPER_TRAIL_LLM_API_KEY"),
-        llm_model=os.environ.get("PAPER_TRAIL_LLM_MODEL", ""),
-        fixture_dir=PROJECT_ROOT / "data" / "fixtures",
-        seed_dir=PROJECT_ROOT / "data" / "source_documents",
-        # stable on-disk model cache — fastembed's default is $TMPDIR,
-        # which macOS cleans and which broke downloaded models
-        model_cache=Path(
-            os.environ.get("PAPER_TRAIL_MODEL_CACHE",
-                           PROJECT_ROOT / "data" / "models")),
-        supabase_url=os.environ.get("SUPABASE_URL"),
-        supabase_key=(os.environ.get("SUPABASE_KEY")
-                      or os.environ.get("SUPABASE_SERVICE_KEY")),
-    )
+    return Settings()

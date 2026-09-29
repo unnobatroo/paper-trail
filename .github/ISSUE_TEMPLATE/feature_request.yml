@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a capability or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case, not just the feature you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should change? Which part of the pipeline does it touch?
+  - type: checkboxes
+    id: honesty
+    attributes:
+      label: Does it preserve the honesty rules?
+      description: Nothing auto-accepted · provenance on every claim · money stays typed · status from quoted cues · MT labelled.
+      options:
+        - label: Yes, I checked
+        - label: Needs discussion

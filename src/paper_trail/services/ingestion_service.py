@@ -15,14 +15,14 @@ class IngestionService:
         self._repo = repo
         self._extractor = extractor
 
-    def ingest(self, pdf_path: str | Path, title: str, publisher: str,
+    def ingest(self, pdf: str | Path | bytes, title: str, publisher: str,
                url: str = "") -> tuple[int, int]:
-        """Returns (document_id, candidate_count)."""
-        path = Path(pdf_path)
+        """Returns (document_id, candidate_count). `pdf` is a path or the
+        document's bytes (e.g. straight from object storage)."""
         doc_id = self._repo.add_document(SourceDocument(
             title=title, publisher=publisher, url=url,
         ))
-        pages = read_pages(path)
+        pages = read_pages(pdf)
         candidates = self._extractor.extract(pages)
         page_text = {p.page_number: p.text for p in pages}
         n = 0

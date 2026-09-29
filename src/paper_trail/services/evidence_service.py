@@ -11,11 +11,11 @@ review.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from contextvars import ContextVar
 from pathlib import Path
+from typing import Callable
 
 from ..domain.models import (
     BudgetRecord,
@@ -24,8 +24,14 @@ from ..domain.models import (
     EvidenceLink,
 )
 from ..ml import entities, matching
-from ..ml.embeddings import EmbeddingProvider, cosine
+from ..ml.embeddings import EmbeddingProvider
 from ..ml.rerank import Reranker
+from ..repositories.cache import (
+    FilePageStore,
+    FileVectorIndex,
+    PageStore,
+    VectorIndex,
+)
 from ..repositories.store import EvidenceRepository
 from ..sources import fetch as fetching
 from ..sources.fetch import FetchedPage
@@ -37,6 +43,13 @@ _CHUNK = 2400  # evaluated: larger semantic units retrieve better
 # Emergency bound against corrupt/pathological input only — hitting it
 # truncates AND warns; normal official documents are processed in full.
 _DEFAULT_MAX_DOC_CHARS = 4_000_000
+
+# per-run state — two evidence jobs running on the shared service must not
+# overwrite each other's progress callback or warnings list
+_run_warnings: ContextVar[list[str] | None] = ContextVar(
+    "pt_warnings", default=None)
+_run_progress: ContextVar[Callable[[str], None] | None] = ContextVar(
+    "pt_progress", default=None)
 
 
 def _key(commitment: Commitment) -> str:
@@ -56,11 +69,13 @@ class EvidenceService:
         repo: EvidenceRepository,
         search: SearchProvider,
         embedder: EmbeddingProvider,
-        cache_dir: Path,
+        cache_dir: Path | str | None = None,
         fetcher=None,
         reranker: Reranker | None = None,
         candidates: int = 20,
         max_doc_chars: int = _DEFAULT_MAX_DOC_CHARS,
+        page_store: PageStore | None = None,
+        vector_index: VectorIndex | None = None,
     ):
         self._repo = repo
         self._search = search
@@ -69,33 +84,61 @@ class EvidenceService:
         self._reranker = reranker
         self._candidates = candidates
         self._max_doc_chars = max_doc_chars
-        self._cache = Path(cache_dir)
-        self._cache.mkdir(parents=True, exist_ok=True)
+        # caches: explicit stores win (Supabase/pgvector); otherwise the
+        # original on-disk layout under cache_dir
+        if page_store is None or vector_index is None:
+            if cache_dir is None:
+                raise ValueError(
+                    "EvidenceService needs cache_dir or explicit stores")
+            page_store = page_store or FilePageStore(Path(cache_dir))
+            vector_index = vector_index or FileVectorIndex(Path(cache_dir))
+        self._pages = page_store
+        self._index = vector_index
         self.warnings: list[str] = []
         self._progress = lambda msg: None
 
     # -- public ------------------------------------------------------------
 
+    def _say(self, msg: str) -> None:
+        progress = _run_progress.get()
+        (progress if progress is not None else self._progress)(msg)
+
+    def _warn(self, msg: str) -> None:
+        warnings = _run_warnings.get()
+        (warnings if warnings is not None else self.warnings).append(msg)
+
     def find_evidence(
         self,
         commitment: Commitment,
         progress=None,
+        warnings: list[str] | None = None,
     ) -> list[EvidenceLink]:
         """Run the bounded discovery pipeline for one commitment.
 
         `progress(msg)` is called at each stage so the UI can show that a
-        cold first run is working, not hung.
+        cold first run is working, not hung. `warnings` collects truncation
+        notices for this run — pass a list when running jobs concurrently;
+        otherwise they land on `self.warnings` as before.
         """
-        self._progress = progress or (lambda msg: None)
-        self.warnings = []
-        self._progress("Finding official sources…")
+        if warnings is None:
+            self.warnings = warnings = []
+        w_tok = _run_warnings.set(warnings)
+        p_tok = _run_progress.set(progress or (lambda msg: None))
+        try:
+            return self._discover(commitment)
+        finally:
+            _run_warnings.reset(w_tok)
+            _run_progress.reset(p_tok)
+
+    def _discover(self, commitment: Commitment) -> list[EvidenceLink]:
+        self._say("Finding official sources…")
         urls = self._collect_urls(commitment)
-        self._progress(f"Found {len(urls)} official pages to check — reading them…")
+        self._say(f"Found {len(urls)} official pages to check — reading them…")
         # fetches are pure I/O waits — run them concurrently so a few slow
         # official servers don't stall the whole search
         with ThreadPoolExecutor(max_workers=6) as pool:
             pages = [p for p in pool.map(self._fetch_page, urls) if p]
-        self._progress(f"Read {len(pages)} pages — indexing their text…")
+        self._say(f"Read {len(pages)} pages — indexing their text…")
         if not pages:
             return []
 
@@ -170,26 +213,17 @@ class EvidenceService:
         return out
 
     def _fetch_page(self, url: str) -> FetchedPage | None:
-        """Fetch once; cache text + title + date under the URL hash."""
-        key = hashlib.sha256(url.encode()).hexdigest()[:16]
-        txt = self._cache / f"{key}.txt"
-        meta = self._cache / f"{key}.json"
-        if txt.exists() and meta.exists():
-            m = json.loads(meta.read_text(encoding="utf-8"))
-            return FetchedPage(
-                url=url, title=m["title"], text=txt.read_text(encoding="utf-8"),
-                published_on=date.fromisoformat(m["date"]) if m["date"] else None,
-            )
+        """Fetch once; the page store caches text + title + date."""
+        cached = self._pages.get(url)
+        if cached is not None:
+            return cached
         page = self._fetch(url)
         if page is None:
             return None
-        title = self._better_title(url, page.title)
-        txt.write_text(page.text, encoding="utf-8")
-        meta.write_text(json.dumps({
-            "title": title,
-            "date": page.published_on.isoformat() if page.published_on else None,
-        }), encoding="utf-8")
-        return FetchedPage(url, title, page.text, page.published_on)
+        page = FetchedPage(url, self._better_title(url, page.title),
+                           page.text, page.published_on)
+        self._pages.put(page)
+        return page
 
     @staticmethod
     def _better_title(url: str, fetched: str) -> str:
@@ -239,31 +273,36 @@ class EvidenceService:
         return [text[i: i + _CHUNK]
                 for i in range(0, len(text), _CHUNK)]
 
-    def _doc_vectors(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
-        """Chunks + embeddings for a document, cached by content hash so
-        re-running 'Find evidence' never re-embeds unchanged text."""
+    def _warn_if_oversized(self, page: FetchedPage) -> None:
+        """The emergency bound truncates — the user must always see it."""
         if len(page.text) > self._max_doc_chars:
-            self.warnings.append(
+            self._warn(
                 f"{page.title or page.url} is larger than the safety "
                 f"limit ({self._max_doc_chars:,} chars) — only the first "
                 "part was searched.")
-        key = hashlib.sha256(
-            f"{self._embed.model_name}|{_CHUNK}|{page.text}".encode()
-        ).hexdigest()[:24]
-        emb_dir = self._cache / "embeddings"
-        cached = emb_dir / f"{key}.json"
-        if cached.exists():
-            d = json.loads(cached.read_text(encoding="utf-8"))
-            return [(c, v) for c, v in zip(d["chunks"], d["vectors"])]
 
+    def _embed_and_store(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
         chunks = self._doc_chunks(page)
         vectors = self._embed.embed(chunks)
-        emb_dir.mkdir(parents=True, exist_ok=True)
-        cached.write_text(json.dumps({
-            "model": self._embed.model_name, "chunk_size": _CHUNK,
-            "url": page.url, "chunks": chunks, "vectors": vectors,
-        }, ensure_ascii=False), encoding="utf-8")
-        return list(zip(chunks, vectors))
+        pairs = list(zip(chunks, vectors))
+        self._index.put(page, self._embed.model_name, _CHUNK, pairs)
+        return pairs
+
+    def _ensure_indexed(self, page: FetchedPage) -> None:
+        """Populate the vector index for a page without pulling cached
+        vectors back — the remote index only needs a 1-row `has()` check."""
+        self._warn_if_oversized(page)
+        if not self._index.has(page, self._embed.model_name, _CHUNK):
+            self._embed_and_store(page)
+
+    def _doc_vectors(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
+        """Chunks + embeddings for a document, cached in the vector index
+        so re-running 'Find evidence' never re-embeds unchanged text."""
+        self._warn_if_oversized(page)
+        cached = self._index.get(page, self._embed.model_name, _CHUNK)
+        if cached is not None:
+            return cached
+        return self._embed_and_store(page)
 
     def _rank(self, commitment: Commitment, pages: list[FetchedPage],
               ) -> list[tuple[FetchedPage, str, float]]:
@@ -273,18 +312,16 @@ class EvidenceService:
         )
         q = self._embed.embed([query_text])[0]
 
-        scored: list[tuple[FetchedPage, str, float]] = []
         for i, page in enumerate(pages):
-            self._progress(
+            self._say(
                 f"Indexing page {i + 1}/{len(pages)} — {page.title[:60]}")
-            for chunk, vec in self._doc_vectors(page):
-                scored.append((page, chunk.strip(), cosine(q, vec)))
-        scored.sort(key=lambda r: r[2], reverse=True)
+            self._ensure_indexed(page)
+        top = self._index.match(
+            q, self._embed.model_name, _CHUNK, pages, self._candidates)
 
-        top = scored[: self._candidates]
-        self._progress("Ranking the best candidates…")
+        self._say("Ranking the best candidates…")
         if self._reranker is None:
-            self.warnings.append(
+            self._warn(
                 "Ranked by text similarity only — no reranker is loaded.")
         elif top:
             ce = self._reranker.score(query_text, [c[1] for c in top])

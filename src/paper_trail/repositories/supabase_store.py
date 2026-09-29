@@ -32,26 +32,57 @@ class _SupabaseRepo:
         self._db = client or create_client(url, key)
 
 
+_PAGE = 1000
+_IN_CHUNK = 200  # keep `in.()` filter URLs well under PostgREST's limit
+
+
+def select_all(query) -> list[dict]:
+    """Page through a select — PostgREST silently caps responses
+    (PGRST_DB_MAX_ROWS, default 1000), so a bare `.execute()` truncates
+    large tables. `query` must already carry filters and ordering."""
+    out, start = [], 0
+    while True:
+        rows = query.range(start, start + _PAGE - 1).execute().data or []
+        out.extend(rows)
+        if len(rows) < _PAGE:
+            return out
+        start += _PAGE
+
+
 class SupabasePolicyRepository(_SupabaseRepo):
     """Documents, extraction candidates and accepted commitments."""
 
     # documents -----------------------------------------------------------
     def add_document(self, doc: SourceDocument) -> int:
+        # natural-key dedupe — a retried ingest returns the existing row
+        existing = (self._db.table("documents").select("id")
+                    .eq("title", doc.title).eq("publisher", doc.publisher)
+                    .eq("url", doc.url).limit(1).execute()).data
+        if existing:
+            return existing[0]["id"]
         res = self._db.table("documents").insert(
             {"title": doc.title, "publisher": doc.publisher, "url": doc.url}
         ).execute()
         return res.data[0]["id"]
 
     def documents(self) -> list[SourceDocument]:
-        res = self._db.table("documents").select("*").order("id").execute()
+        rows = select_all(self._db.table("documents").select("*").order("id"))
         return [
             SourceDocument(id=r["id"], title=r["title"],
                            publisher=r["publisher"], url=r["url"])
-            for r in res.data
+            for r in rows
         ]
 
     # candidates ----------------------------------------------------------
     def add_candidate(self, cand: PolicyCandidate) -> int:
+        # dedupe on (document, page, text) — re-ingesting keeps existing
+        # candidate rows and their review_status
+        existing = (self._db.table("candidates").select("id")
+                    .eq("document_id", cand.document_id)
+                    .eq("source_page", cand.source_page)
+                    .eq("text", cand.text).limit(1).execute()).data
+        if existing:
+            return existing[0]["id"]
         res = self._db.table("candidates").insert({
             "document_id": cand.document_id,
             "suggested_type": cand.suggested_type.value,
@@ -73,8 +104,7 @@ class SupabasePolicyRepository(_SupabaseRepo):
         q = self._db.table("candidates").select("*")
         if status:
             q = q.eq("review_status", status.value)
-        res = q.order("source_page").execute()
-        return [_candidate(r) for r in res.data]
+        return [_candidate(r) for r in select_all(q.order("source_page"))]
 
     def candidate(self, candidate_id: int) -> PolicyCandidate | None:
         res = (self._db.table("candidates").select("*")
@@ -89,6 +119,14 @@ class SupabasePolicyRepository(_SupabaseRepo):
 
     # commitments ---------------------------------------------------------
     def add_commitment(self, com: Commitment) -> int:
+        # one commitment per accepted candidate — a double accept returns
+        # the existing row
+        if com.candidate_id is not None:
+            existing = (self._db.table("commitments").select("id")
+                        .eq("candidate_id", com.candidate_id)
+                        .limit(1).execute()).data
+            if existing:
+                return existing[0]["id"]
         res = self._db.table("commitments").insert({
             "candidate_id": com.candidate_id,
             "parent_id": com.parent_id,
@@ -109,8 +147,7 @@ class SupabasePolicyRepository(_SupabaseRepo):
         q = self._db.table("commitments").select("*")
         if kind:
             q = q.eq("kind", kind.value)
-        res = q.order("code").order("id").execute()
-        return [_commitment(r) for r in res.data]
+        return [_commitment(r) for r in select_all(q.order("code").order("id"))]
 
     def commitment(self, commitment_id: int) -> Commitment | None:
         res = (self._db.table("commitments").select("*")
@@ -143,6 +180,16 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
                .eq("id", evidence_id).execute())
         return _evidence(res.data[0]) if res.data else None
 
+    def evidence_many(self, ids: list[int]) -> dict[int, EvidenceItem]:
+        """Batch fetch — the links view and trail rollups would otherwise
+        issue one request per row."""
+        out: dict[int, EvidenceItem] = {}
+        for i in range(0, len(ids), _IN_CHUNK):
+            rows = select_all(self._db.table("evidence").select("*")
+                              .in_("id", ids[i: i + _IN_CHUNK]))
+            out.update({r["id"]: _evidence(r) for r in rows})
+        return out
+
     def add_link(self, link: EvidenceLink) -> int:
         res = self._db.table("links").upsert({
             "commitment_id": link.commitment_id,
@@ -164,14 +211,13 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         q = self._db.table("links").select("*")
         if status:
             q = q.eq("review_status", status.value)
-        res = q.order("score", desc=True).execute()
-        return [_link(r) for r in res.data]
+        return [_link(r) for r in select_all(q.order("score", desc=True))]
 
     def links_for(self, commitment_id: int) -> list[EvidenceLink]:
-        res = (self._db.table("links").select("*")
-               .eq("commitment_id", commitment_id)
-               .order("score", desc=True).execute())
-        return [_link(r) for r in res.data]
+        rows = select_all(self._db.table("links").select("*")
+                          .eq("commitment_id", commitment_id)
+                          .order("score", desc=True))
+        return [_link(r) for r in rows]
 
     def link(self, link_id: int) -> EvidenceLink | None:
         res = (self._db.table("links").select("*")
@@ -187,6 +233,17 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
 
     # budgets --------------------------------------------------------------
     def add_budget(self, b: BudgetRecord) -> int:
+        # evidence rows upsert, so a re-run reaches here with the same
+        # evidence_id — don't insert the same figure twice
+        q = (self._db.table("budgets").select("id")
+             .eq("evidence_id", b.evidence_id).eq("kind", b.kind.value)
+             .eq("amount_raw", b.amount_raw)
+             .eq("description", b.description))
+        q = (q.is_("fiscal_year", "null") if b.fiscal_year is None
+             else q.eq("fiscal_year", b.fiscal_year))
+        existing = q.limit(1).execute().data
+        if existing:
+            return existing[0]["id"]
         res = self._db.table("budgets").insert({
             "evidence_id": b.evidence_id,
             "kind": b.kind.value,
@@ -199,6 +256,19 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         return res.data[0]["id"]
 
     def budgets_for_evidence(self, evidence_id: int) -> list[BudgetRecord]:
-        res = (self._db.table("budgets").select("*")
-               .eq("evidence_id", evidence_id).order("id").execute())
-        return [_budget(r) for r in res.data]
+        rows = select_all(self._db.table("budgets").select("*")
+                          .eq("evidence_id", evidence_id).order("id"))
+        return [_budget(r) for r in rows]
+
+    def budgets_many(
+            self, evidence_ids: list[int]) -> dict[int, list[BudgetRecord]]:
+        """Batch fetch — one chunked query instead of one per evidence row."""
+        out: dict[int, list[BudgetRecord]] = {}
+        for i in range(0, len(evidence_ids), _IN_CHUNK):
+            rows = select_all(
+                self._db.table("budgets").select("*")
+                .in_("evidence_id", evidence_ids[i: i + _IN_CHUNK])
+                .order("id"))
+            for r in rows:
+                out.setdefault(r["evidence_id"], []).append(_budget(r))
+        return out

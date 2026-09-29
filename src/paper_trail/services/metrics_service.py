@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 from ..domain.enums import RelationshipType, ReviewStatus, Status
@@ -51,26 +52,35 @@ class MetricsService:
         self._evidence = evidence
 
     def trail(self) -> list[TrailRow]:
+        # batch the reads — a per-link evidence()/budgets_for_evidence()
+        # loop costs two queries per link (hundreds per trail view)
+        links = self._evidence.links()
+        ev_ids = sorted({l.evidence_id for l in links})
+        ev_map = self._evidence.evidence_many(ev_ids)
+        budget_map = self._evidence.budgets_many(ev_ids)
+
+        by_commit: dict[int, list] = defaultdict(list)
+        for link in links:
+            by_commit[link.commitment_id].append(link)
+
         rows = []
         for com in self._policy.commitments():
             accepted = [
-                l for l in self._evidence.links_for(com.id)
+                l for l in by_commit.get(com.id, [])
                 if l.review_status == ReviewStatus.ACCEPTED
             ]
-            items = [
-                self._evidence.evidence(l.evidence_id)
-                for l in accepted
-            ]
-            items = [e for e in items if e]
+            # pair link↔evidence so a missing evidence row can't shift the
+            # pairing (zip(items, accepted) would silently misalign)
+            pairs = [(l, e) for l in accepted
+                     if (e := ev_map.get(l.evidence_id)) is not None]
+            items = [e for _, e in pairs]
             budgets = _dedupe(
-                b for e in items
-                for b in self._evidence.budgets_for_evidence(e.id)
-            )
+                b for e in items for b in budget_map.get(e.id, []))
             # only evidence the reviewer called "direct implementation" can
             # mark a commitment as progressing or done — supporting/budget
             # pages never promote status on their own
             direct = [
-                e for e, l in zip(items, accepted)
+                e for l, e in pairs
                 if (l.relationship or l.suggested_relationship)
                 == RelationshipType.DIRECT_IMPLEMENTATION
             ]

@@ -150,7 +150,15 @@ class PolicyRepository(_Repo):
 
     # documents -----------------------------------------------------------
     def add_document(self, doc: SourceDocument) -> int:
+        # natural-key dedupe — a retried ingest returns the existing row
+        # instead of duplicating the document (and its candidate set)
         with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM documents"
+                " WHERE title=? AND publisher=? AND url=?",
+                (doc.title, doc.publisher, doc.url)).fetchone()
+            if row:
+                return row["id"]
             cur = conn.execute(
                 "INSERT INTO documents(title, publisher, url) VALUES (?,?,?)",
                 (doc.title, doc.publisher, doc.url),
@@ -169,7 +177,15 @@ class PolicyRepository(_Repo):
 
     # candidates ----------------------------------------------------------
     def add_candidate(self, cand: PolicyCandidate) -> int:
+        # dedupe on (document, page, text) — re-ingesting a document keeps
+        # existing candidate rows, and with them their review_status
         with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM candidates WHERE document_id=?"
+                " AND source_page=? AND text=?",
+                (cand.document_id, cand.source_page, cand.text)).fetchone()
+            if row:
+                return row["id"]
             cur = conn.execute(
                 """INSERT INTO candidates(document_id, suggested_type, text, normalized_title,
                    source_page, source_excerpt, code, excerpt_on_page, responsible_org,
@@ -207,6 +223,14 @@ class PolicyRepository(_Repo):
     # commitments ---------------------------------------------------------
     def add_commitment(self, com: Commitment) -> int:
         with self._connect() as conn:
+            # one commitment per accepted candidate — a retried/double
+            # accept returns the existing row
+            if com.candidate_id is not None:
+                row = conn.execute(
+                    "SELECT id FROM commitments WHERE candidate_id=?",
+                    (com.candidate_id,)).fetchone()
+                if row:
+                    return row["id"]
             cur = conn.execute(
                 """INSERT INTO commitments(candidate_id, parent_id, kind, title, summary, code,
                    responsible_org, timeframe, deadline_year, unit, target_value, source_page)
@@ -267,6 +291,16 @@ class EvidenceRepository(_Repo):
                                (evidence_id,)).fetchone()
         return _evidence(row) if row else None
 
+    def evidence_many(self, ids: list[int]) -> dict[int, EvidenceItem]:
+        """Batch fetch — one query instead of one per link."""
+        if not ids:
+            return {}
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM evidence WHERE id IN (%s)"
+                % ",".join("?" * len(ids)), ids).fetchall()
+        return {r["id"]: _evidence(r) for r in rows}
+
     def add_link(self, link: EvidenceLink) -> int:
         with self._connect() as conn:
             conn.execute(
@@ -325,6 +359,15 @@ class EvidenceRepository(_Repo):
     # budgets --------------------------------------------------------------
     def add_budget(self, b: BudgetRecord) -> int:
         with self._connect() as conn:
+            # evidence rows upsert, so a re-run reaches here with the same
+            # evidence_id — don't insert the same figure twice
+            row = conn.execute(
+                "SELECT id FROM budgets WHERE evidence_id=? AND kind=?"
+                " AND amount_raw=? AND fiscal_year IS ? AND description=?",
+                (b.evidence_id, b.kind.value, b.amount_raw,
+                 b.fiscal_year, b.description)).fetchone()
+            if row:
+                return row["id"]
             cur = conn.execute(
                 """INSERT INTO budgets(evidence_id, kind, amount_huf, amount_raw,
                    fiscal_year, description, source_url) VALUES (?,?,?,?,?,?,?)""",
@@ -339,4 +382,18 @@ class EvidenceRepository(_Repo):
                 "SELECT * FROM budgets WHERE evidence_id=? ORDER BY id",
                 (evidence_id,)).fetchall()
         return [_budget(r) for r in rows]
+
+    def budgets_many(
+            self, evidence_ids: list[int]) -> dict[int, list[BudgetRecord]]:
+        """Batch fetch — one query instead of one per evidence row."""
+        if not evidence_ids:
+            return {}
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM budgets WHERE evidence_id IN (%s) ORDER BY id"
+                % ",".join("?" * len(evidence_ids)), evidence_ids).fetchall()
+        out: dict[int, list[BudgetRecord]] = {}
+        for r in rows:
+            out.setdefault(r["evidence_id"], []).append(_budget(r))
+        return out
 

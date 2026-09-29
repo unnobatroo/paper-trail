@@ -15,7 +15,6 @@ Run:  uv run python scripts/reset_demo_state.py
 
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 import time
@@ -31,19 +30,16 @@ TABLES = ["budgets", "links", "evidence", "commitments", "candidates",
 
 
 def reset_supabase() -> int:
-    from paper_trail.infrastructure.settings import _env_file
-    _env_file(ROOT / ".env")
-    url = os.environ.get("SUPABASE_URL")
-    key = (os.environ.get("SUPABASE_KEY")
-           or os.environ.get("SUPABASE_SERVICE_KEY"))
-    if not (url and key):
+    from paper_trail.infrastructure.settings import load
+    settings = load()
+    if not settings.supabase_configured:
         return -1
     from supabase import create_client
-    db = create_client(url, key)
+    db = create_client(settings.supabase_url, settings.supabase_key)
     for table in TABLES:
         db.table(table).delete().neq("id", 0).execute()
-    print("Cleared all application rows in Supabase "
-          "(schema kept). Caches on disk are untouched.")
+    print("Cleared all application rows in Supabase (schema kept). "
+          "The pages/chunks caches are kept, so the next run is fast.")
     return 0
 
 
