@@ -50,10 +50,13 @@ traced back to the document that made it.
 git clone https://github.com/unnobatroo/paper-trail
 cd paper-trail
 uv sync                          # or: pip install -e .
-uv run streamlit run app.py      # interactive UI
+uv run uvicorn paper_trail.api.app:app --app-dir src   # API → :8000
+cd web && npm install && npm run dev                  # UI → :3000
 ```
 
-In the sidebar click **Read the strategy**, then walk the three steps:
+The product UI is the Next.js app in [`web/`](web/) (React + shadcn/ui +
+Tailwind, all open source). In the sidebar click **Read the strategy**,
+then walk the three steps:
 **Check commitments → Find evidence → Paper trail**.
 
 Everything works offline except fetching pages from the official sites:
@@ -61,11 +64,8 @@ the test suite and the `fixture`/`hashing` providers need no keys and no
 network. First real run downloads ~2 GB of local models (or set
 `JINA_API_KEY` for hosted inference and download nothing).
 
-Prefer an API over the UI? The same services are exposed as REST:
-
-```bash
-uv run uvicorn paper_trail.api.app:app --app-dir src   # → http://localhost:8000/docs
-```
+The API is also usable directly — OpenAPI docs at
+`http://localhost:8000/docs`.
 
 ## Documentation
 

@@ -22,6 +22,13 @@ def documents(state: AppState = Depends(get_state)) -> list[SourceDocument]:
     return state.policy.documents()
 
 
+@router.get("/available")
+def available(state: AppState = Depends(get_state)) -> list[str]:
+    """Filenames in the document store (bucket/local dir) — what
+    POST /ingest can be called with."""
+    return state.docs.list()
+
+
 @router.post("/ingest", status_code=202)
 def ingest(req: IngestRequest,
            state: AppState = Depends(get_state),
