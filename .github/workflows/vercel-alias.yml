@@ -22,10 +22,13 @@ jobs:
           PROJECT_ID: prj_lqNrgCmKlUzo4p4snhNSYNSU17Lc
           TEAM_ID: team_92HtIdnyTnVtduxORyV3Vq3K
         run: |
-          DEPLOY_URL=$(curl -sf \
+          DEPLOY_ID=$(curl -sf \
             "https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&teamId=${TEAM_ID}&target=production&state=READY&limit=1" \
             -H "Authorization: Bearer ${VERCEL_TOKEN}" \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['deployments'][0]['url'])")
-          npm install -g vercel@latest
-          vercel alias set "https://${DEPLOY_URL}" paper-trail.vercel.app \
-            --token "${VERCEL_TOKEN}" --scope mashincar
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['deployments'][0]; print(d.get('uid') or d['id'])")
+          curl -sf -X POST \
+            "https://api.vercel.com/v2/deployments/${DEPLOY_ID}/aliases?teamId=${TEAM_ID}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"alias": "paper-trail.vercel.app"}'
+          echo "paper-trail.vercel.app -> ${DEPLOY_ID}"
