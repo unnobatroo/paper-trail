@@ -16,7 +16,11 @@ from paper_trail.domain.models import Commitment
 from paper_trail.ml.embeddings import HashingProvider
 from paper_trail.ml.rerank import Reranker
 from paper_trail.repositories.store import EvidenceRepository
-from paper_trail.services.evidence_service import EvidenceService, _CHUNK
+from paper_trail.services.evidence_service import (
+    EvidenceService,
+    _CHUNK,
+    _CHUNK_STRIDE,
+)
 from paper_trail.sources.fetch import FetchedPage
 from paper_trail.sources.web_search import SearchHit
 
@@ -69,8 +73,12 @@ def test_full_document_is_chunked(policy, evidence, tmp_path):
     text = "x " * 40_000  # ~80 KB — beyond the old 60 KB boundary
     svc, _ = _svc(tmp_path, evidence, policy, text)
     chunks = svc._doc_chunks(FetchedPage(url=URL, title="t", text=text))
-    assert len(chunks) == len(text) // _CHUNK + (
-        1 if len(text) % _CHUNK else 0)
+    assert len(chunks) == len(text) // _CHUNK_STRIDE + (
+        1 if len(text) % _CHUNK_STRIDE else 0)
+    # overlapping windows: each chunk still max _CHUNK, consecutive
+    # chunks share a boundary region
+    assert all(len(c) <= _CHUNK for c in chunks)
+    assert chunks[0].endswith(chunks[1][: _CHUNK - _CHUNK_STRIDE])
     assert not svc.warnings  # nothing truncated, nothing warned
 
 

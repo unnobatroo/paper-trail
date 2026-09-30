@@ -26,9 +26,13 @@ W_ORG = 0.15
 W_LOCATION = 0.15
 W_DATE = 0.10
 
-DIRECT_SIMILARITY = 0.72
-SUPPORTING_SIMILARITY = 0.60
-INDIRECT_SIMILARITY = 0.45
+# Calibrated on the bundled MiniLM-scale cosine distribution (the
+# multilingual fastembed default): real evidence clusters ~0.4–0.6,
+# background noise ~0.33. Larger models (e5-large, jina-v3) spread wider
+# and still satisfy these thresholds.
+DIRECT_SIMILARITY = 0.58
+SUPPORTING_SIMILARITY = 0.48
+INDIRECT_SIMILARITY = 0.40
 
 
 def _norm(names: list[str]) -> set[str]:

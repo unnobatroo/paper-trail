@@ -40,6 +40,7 @@ from ..sources.web_search import ALLOWED_DOMAINS, SearchProvider
 
 TOP_K = 5
 _CHUNK = 2400  # evaluated: larger semantic units retrieve better
+_CHUNK_STRIDE = _CHUNK - 400  # overlap so evidence at chunk edges isn't split
 # Emergency bound against corrupt/pathological input only — hitting it
 # truncates AND warns; normal official documents are processed in full.
 _DEFAULT_MAX_DOC_CHARS = 4_000_000
@@ -271,7 +272,7 @@ class EvidenceService:
         if len(text) > self._max_doc_chars:
             text = text[: self._max_doc_chars]
         return [text[i: i + _CHUNK]
-                for i in range(0, len(text), _CHUNK)]
+                for i in range(0, len(text), _CHUNK_STRIDE)]
 
     def _warn_if_oversized(self, page: FetchedPage) -> None:
         """The emergency bound truncates — the user must always see it."""

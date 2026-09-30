@@ -95,7 +95,7 @@ repo root holds real values (see [.env.example](.env.example)):
 | `JINA_API_KEY` | unset | hosted inference — with `PAPER_TRAIL_EMBED_MODEL=jina` + `PAPER_TRAIL_RERANKER=jina` no models are downloaded |
 | `HF_TOKEN` | unset | enables HU→EN machine translation |
 | `PAPER_TRAIL_DB` | `data/processed/paper_trail.db` | SQLite path (local backend) |
-| `PAPER_TRAIL_EMBED_MODEL` | `intfloat/multilingual-e5-large` | embedder (`jina`, `hashing` = offline stub, or a fastembed model) |
+| `PAPER_TRAIL_EMBED_MODEL` | `paraphrase-multilingual-MiniLM-L12-v2` | embedder (`jina` = hosted, `hashing` = offline stub, or any fastembed model — e5-large needs ~2 GB) |
 | `PAPER_TRAIL_RERANKER` | `BAAI/bge-reranker-v2-m3` | cross-encoder (`jina`, `none`, or a local model) |
 | `PAPER_TRAIL_RERANK_K` | `20` | chunks sent to the reranker |
 | `PAPER_TRAIL_SEARCH` | `ddgs` | `ddgs` (DuckDuckGo) or `fixture` (offline replay) |

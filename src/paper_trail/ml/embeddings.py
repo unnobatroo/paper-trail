@@ -15,7 +15,9 @@ from abc import ABC, abstractmethod
 import requests
 
 
-DEFAULT_EMBED_MODEL = "intfloat/multilingual-e5-large"
+# Benchmarked stage-1 retriever (see experiments/), ~220MB ONNX —
+# small enough for free-tier hosts; e5-large is stronger but needs ~2GB.
+DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 JINA_EMBED_MODEL = "jina-embeddings-v3"
 
 
