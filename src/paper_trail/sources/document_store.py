@@ -13,7 +13,9 @@ import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from supabase import Client, create_client
+from supabase import Client
+
+from ..infrastructure.supabase_client import create as create_supabase
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class StorageDocumentStore(DocumentStore):
     def __init__(self, url: str, key: str, bucket: str = DEFAULT_BUCKET,
                  client: Client | None = None):
         self._bucket = bucket
-        self._files = (client or create_client(url, key)).storage.from_(bucket)
+        self._files = (client or create_supabase(url, key)).storage.from_(bucket)
 
     def read(self, name: str) -> bytes | None:
         try:

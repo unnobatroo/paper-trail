@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 
-from supabase import Client, create_client
+from supabase import Client
+
+from ..infrastructure.supabase_client import create as create_supabase
 
 from ..domain.enums import CandidateType, RelationshipType, ReviewStatus
 from ..domain.models import (
@@ -29,7 +31,7 @@ class _SupabaseRepo:
     """Shared base: a Supabase client (stateless HTTP, thread-safe)."""
 
     def __init__(self, url: str, key: str, client: Client | None = None):
-        self._db = client or create_client(url, key)
+        self._db = client or create_supabase(url, key)
 
 
 _PAGE = 1000

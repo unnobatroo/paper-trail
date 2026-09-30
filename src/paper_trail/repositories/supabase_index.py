@@ -14,7 +14,9 @@ from __future__ import annotations
 import json
 from datetime import date
 
-from supabase import Client, create_client
+from supabase import Client
+
+from ..infrastructure.supabase_client import create as create_supabase
 
 from ..sources.fetch import FetchedPage
 from .cache import PageStore, VectorIndex, pad_vector
@@ -38,7 +40,7 @@ def _parse_vec(raw) -> list[float]:
 
 class SupabasePageStore(PageStore):
     def __init__(self, url: str, key: str, client: Client | None = None):
-        self._db = client or create_client(url, key)
+        self._db = client or create_supabase(url, key)
 
     def get(self, url: str) -> FetchedPage | None:
         res = (self._db.table("pages")
@@ -70,7 +72,7 @@ class SupabasePageStore(PageStore):
 
 class SupabaseVectorIndex(VectorIndex):
     def __init__(self, url: str, key: str, client: Client | None = None):
-        self._db = client or create_client(url, key)
+        self._db = client or create_supabase(url, key)
         self._page_ids: dict[str, int] = {}
 
     def _page_id(self, url: str) -> int | None:

@@ -115,9 +115,9 @@ class SupabaseJobRunner:
 
     def __init__(self, url: str, key: str, handlers: dict[str, Handler],
                  *, max_workers: int = 4, worker_id: str | None = None):
-        from supabase import create_client
+        from ..infrastructure.supabase_client import create
 
-        self._db = create_client(url, key)
+        self._db = create(url, key)
         self._handlers = handlers
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._worker = worker_id or (
