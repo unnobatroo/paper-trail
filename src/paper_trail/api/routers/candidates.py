@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
 from ...domain.models import PolicyCandidate
-from ..deps import get_state
+from ..deps import get_state, require_key
 from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
@@ -22,7 +22,8 @@ def candidates(status: ReviewStatus | None = None,
 
 @router.post("/{candidate_id}/accept")
 def accept(candidate_id: int, req: AcceptCandidateRequest | None = None,
-           state: AppState = Depends(get_state)) -> dict:
+           state: AppState = Depends(get_state),
+           _: None = Depends(require_key)) -> dict:
     req = req or AcceptCandidateRequest()
     try:
         cid = state.review.accept_candidate(
@@ -35,7 +36,8 @@ def accept(candidate_id: int, req: AcceptCandidateRequest | None = None,
 
 @router.post("/{candidate_id}/reject")
 def reject(candidate_id: int,
-           state: AppState = Depends(get_state)) -> dict:
+           state: AppState = Depends(get_state),
+           _: None = Depends(require_key)) -> dict:
     if state.policy.candidate(candidate_id) is None:
         raise HTTPException(404, f"unknown candidate {candidate_id}")
     state.review.reject_candidate(candidate_id)
@@ -44,7 +46,8 @@ def reject(candidate_id: int,
 
 @router.post("/bulk")
 def bulk(req: BulkCandidatesRequest,
-         state: AppState = Depends(get_state)) -> dict:
+         state: AppState = Depends(get_state),
+         _: None = Depends(require_key)) -> dict:
     accepted = state.review.confirm_candidates(req.accept)
     rejected = state.review.reject_candidates(req.reject)
     if req.reject_rest:

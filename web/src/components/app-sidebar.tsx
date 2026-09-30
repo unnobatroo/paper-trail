@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { ReviewKey } from "./review-key";
 import { ThemeToggle } from "./theme-toggle";
 import {
   keys,
@@ -162,6 +163,7 @@ export function AppSidebar() {
           <Languages className="size-4" />
           {translateOn ? "Hide English" : "Show English"}
         </Button>
+        <ReviewKey />
         <ThemeToggle />
         <p className="text-[10px] text-muted-foreground">
           Press <kbd className="rounded border px-1">⌘K</kbd> for the command

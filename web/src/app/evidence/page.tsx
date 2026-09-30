@@ -48,6 +48,7 @@ import {
   useCommitments,
   useInvalidateDomain,
   useJobs,
+  useLink,
   useLinks,
 } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
@@ -472,6 +473,9 @@ function ReviewMatches({
   const pageItems = orderedPending.slice((page - 1) * PAGE, page * PAGE);
   const detail =
     pageItems[Math.min(cursor, Math.max(0, pageItems.length - 1))] ?? null;
+  // rows are fetched lite; the inspector hydrates the selected link
+  const detailQuery = useLink(detail?.link.id ?? null);
+  const detailView = detailQuery.data ?? detail;
 
   useHotkeys("j", () => !editable() && setCursor((c) => Math.min(c + 1, pageItems.length - 1)), [pageItems.length]);
   useHotkeys("k", () => !editable() && setCursor((c) => Math.max(c - 1, 0)), []);
@@ -581,9 +585,9 @@ function ReviewMatches({
         </div>
 
         <div className="rounded-md border p-4">
-          {detail?.evidence && (
+          {detailView?.evidence && (
             <LinkInspector
-              view={detail as LinkView & { evidence: EvidenceItem }}
+              view={detailView as LinkView & { evidence: EvidenceItem }}
               commitment={comById.get(detail.link.commitment_id)}
               rel={
                 relChoice.get(detail.link.id) ??

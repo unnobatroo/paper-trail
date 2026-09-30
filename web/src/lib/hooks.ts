@@ -16,6 +16,7 @@ export const keys = {
   candidates: ["candidates"] as const,
   commitments: ["commitments"] as const,
   links: ["links"] as const,
+  link: (id: number) => ["link", id] as const,
   trail: ["trail"] as const,
   job: (id: string) => ["job", id] as const,
   translate: (text: string) => ["translate", text] as const,
@@ -38,7 +39,17 @@ export function useCommitments() {
 }
 
 export function useLinks() {
-  return useQuery({ queryKey: keys.links, queryFn: api.links });
+  // lite=1 keeps the queue payload small — the inspector fetches the
+  // full evidence record on demand via useLink
+  return useQuery({ queryKey: keys.links, queryFn: () => api.links(true) });
+}
+
+export function useLink(id: number | null) {
+  return useQuery({
+    queryKey: keys.link(id ?? -1),
+    queryFn: () => api.link(id!),
+    enabled: id != null,
+  });
 }
 
 export function useTrail() {

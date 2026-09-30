@@ -176,13 +176,36 @@ export class ApiError extends Error {
   }
 }
 
+/** The review key, entered once in the UI and kept for the tab session.
+ *  The API only requires it when PAPER_TRAIL_API_KEY is configured —
+ *  mutating endpoints answer 401 without it, reads stay open. */
+const KEY_STORAGE = "pt_review_key";
+
+export function getReviewKey(): string {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(KEY_STORAGE) ?? "";
+}
+
+export function setReviewKey(key: string) {
+  sessionStorage.setItem(KEY_STORAGE, key);
+}
+
+export function clearReviewKey() {
+  sessionStorage.removeItem(KEY_STORAGE);
+}
+
 async function req<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const key = getReviewKey();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: {
+      "content-type": "application/json",
+      ...(key ? { authorization: `Bearer ${key}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     let detail = res.statusText;
@@ -191,6 +214,10 @@ async function req<T>(
       detail = body?.detail ?? detail;
     } catch {
       /* non-JSON error body */
+    }
+    if (res.status === 401) {
+      detail =
+        "Review key required — unlock via the lock icon in the sidebar.";
     }
     throw new ApiError(res.status, String(detail));
   }
@@ -244,11 +271,16 @@ export const api = {
       method: "POST",
     }),
 
-  links: () => req<LinkView[]>("/api/links"),
+  links: (lite = false) =>
+    req<LinkView[]>(`/api/links${lite ? "?lite=1" : ""}`),
+  link: (id: number) => req<LinkView>(`/api/links/${id}`),
   decideLink: (id: number, accept: boolean, relationship?: RelationshipType) =>
     req<{ ok: boolean }>(`/api/links/${id}/decide`, {
       method: "POST",
-      body: JSON.stringify({ accept, relationship }),
+      body: JSON.stringify({
+        decision: accept ? "accept" : "reject",
+        relationship,
+      }),
     }),
   bulkLinks: (body: {
     accept?: number[];

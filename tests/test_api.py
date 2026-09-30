@@ -25,7 +25,7 @@ def state(tmp_path, monkeypatch):
     # empty strings defeat .env loading (setdefault) and mark the
     # services unconfigured → fully offline
     for var in ("SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_SERVICE_KEY",
-                "JINA_API_KEY", "HF_TOKEN"):
+                "JINA_API_KEY", "HF_TOKEN", "PAPER_TRAIL_API_KEY"):
         monkeypatch.setenv(var, "")
     monkeypatch.setenv("PAPER_TRAIL_DB", str(tmp_path / "t.db"))
     monkeypatch.setenv("PAPER_TRAIL_EMBED_MODEL", "hashing")
@@ -51,6 +51,17 @@ def test_health_and_meta(client):
     meta = client.get("/api/meta").json()
     assert meta["storage"] == "sqlite"
     assert meta["embed_model"] == "hashing"
+
+
+def test_review_key_gates_mutations(client, monkeypatch):
+    monkeypatch.setenv("PAPER_TRAIL_API_KEY", "s3cret")
+    assert client.post("/api/candidates/1/reject").status_code == 401
+    assert client.post(
+        "/api/candidates/1/reject",
+        headers={"authorization": "Bearer s3cret"},
+    ).status_code in (200, 404)
+    # reads stay open without a key
+    assert client.get("/api/candidates").status_code == 200
 
 
 def test_candidate_review_flow(client, state):

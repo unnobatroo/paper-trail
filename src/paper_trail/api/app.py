@@ -4,8 +4,8 @@ Run locally:
 
     uv run uvicorn paper_trail.api.app:app --app-dir src --reload
 
-Same services as the Streamlit UI via `bootstrap.build_state`; evidence
-discovery and ingestion run as background jobs — poll GET /api/jobs/{id}.
+Services are assembled in `bootstrap.build_state`; evidence discovery
+and ingestion run as background jobs — poll GET /api/jobs/{id}.
 OpenAPI docs at /docs.
 """
 

@@ -6,10 +6,11 @@ repo root (see .env.example). Unknown keys are ignored.
 Environment overrides:
   PAPER_TRAIL_DB            SQLite path (default data/processed/paper_trail.db)
   PAPER_TRAIL_EMBED_MODEL   fastembed model name
-                            (default intfloat/multilingual-e5-large;
+                            (default paraphrase-multilingual-MiniLM-L12-v2;
                             "hashing" for fully offline runs)
-  PAPER_TRAIL_RERANKER      cross-encoder model name or "none"
-                            (default jina-reranker-v2-base-multilingual)
+  PAPER_TRAIL_RERANKER      "auto" (default — hosted Jina when JINA_API_KEY
+                            is set, else none), "none", "jina", or a local
+                            cross-encoder model name
   PAPER_TRAIL_RERANK_K      candidates sent to the reranker (default 20)
   PAPER_TRAIL_MAX_DOC_CHARS emergency document bound (default 4_000_000;
                             hitting it truncates and warns, never silently)
@@ -20,11 +21,15 @@ Environment overrides:
   SUPABASE_URL + SUPABASE_KEY
                           when both are set, the app stores state in
                           Supabase/Postgres instead of the local SQLite file
-  JINA_API_KEY              hosted embeddings/reranking — set
-                          PAPER_TRAIL_EMBED_MODEL=jina and
-                          PAPER_TRAIL_RERANKER=jina to use it
+  JINA_API_KEY              enables the hosted Jina reranker under the
+                            default "auto" mode; set
+                            PAPER_TRAIL_EMBED_MODEL=jina to also use
+                            Jina for embeddings
   HF_TOKEN                  enables Hungarian→English machine translation
                             in the UI (Helsinki-NLP/opus-mt-hu-en)
+  PAPER_TRAIL_API_KEY       shared review key — when set, mutating
+                            endpoints require "Authorization: Bearer <key>"
+                            (reads stay open; unset = open, for dev)
   PAPER_TRAIL_STORAGE_BUCKET
                             Supabase Storage bucket for source PDFs
                             (default "source-documents")
@@ -40,7 +45,6 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..ml.embeddings import DEFAULT_EMBED_MODEL
-from ..ml.rerank import DEFAULT_RERANKER
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -57,8 +61,9 @@ class Settings(BaseSettings):
         validation_alias="PAPER_TRAIL_DB")
     embed_model: str = Field(
         default=DEFAULT_EMBED_MODEL, validation_alias="PAPER_TRAIL_EMBED_MODEL")
+    # "auto" = hosted Jina when JINA_API_KEY is set, else embedding-only
     reranker_model: str = Field(
-        default=DEFAULT_RERANKER, validation_alias="PAPER_TRAIL_RERANKER")
+        default="auto", validation_alias="PAPER_TRAIL_RERANKER")
     rerank_candidates: int = Field(
         default=20, validation_alias="PAPER_TRAIL_RERANK_K")
     max_doc_chars: int = Field(
@@ -89,6 +94,10 @@ class Settings(BaseSettings):
     api_origins_raw: str = Field(
         default="http://localhost:3000",
         validation_alias="PAPER_TRAIL_API_ORIGINS")
+    # Shared review key — guards every mutating endpoint when set. Reads
+    # stay open: the trail is public data. Unset = open access (dev).
+    api_key: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_API_KEY")
 
     @property
     def llm_configured(self) -> bool:

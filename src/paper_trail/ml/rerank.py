@@ -6,13 +6,12 @@ sentence-transformers provider for the benchmarked bge-reranker-v2-m3,
 and "none" to disable reranking entirely (embedding order is kept).
 
 Selection: PAPER_TRAIL_RERANKER
-    unset        -> BAAI/bge-reranker-v2-m3 (benchmarked best on the
-                    production pipeline), falling back to the fastembed
-                    jina multilingual reranker when sentence-transformers
-                    is not installed
+    unset/"auto" -> hosted Jina reranker when JINA_API_KEY is set,
+                    else no reranker (embedding order is kept)
     "none"       -> no reranker
-    a model name -> fastembed provider if supported there, else
-                    sentence-transformers
+    "jina"       -> hosted Jina reranker (errors to none without a key)
+    a model name -> local cross-encoder via fastembed if supported there,
+                    else sentence-transformers
 """
 
 from __future__ import annotations
@@ -113,13 +112,29 @@ _FASTEMBED_MODELS = {
 
 def get_reranker(name: str | None = None,
                  cache_dir: str | None = None) -> Reranker | None:
-    """Build the configured reranker; None means 'keep embedding order'."""
+    """Build the configured reranker; None means 'keep embedding order'.
+
+    "auto"/unset resolves to the hosted Jina reranker when JINA_API_KEY
+    is set — it's small, fast, and needs no local model — and to no
+    reranker otherwise. Naming a local model opts into downloading it;
+    "none" disables reranking outright."""
     name = name if name is not None else os.environ.get(
-        "PAPER_TRAIL_RERANKER", DEFAULT_RERANKER)
-    if name.lower() in ("none", "off", ""):
+        "PAPER_TRAIL_RERANKER", "")
+    lowered = name.lower()
+    if lowered in ("none", "off"):
+        return None
+    if lowered in ("", "auto"):
+        if os.environ.get("JINA_API_KEY"):
+            return JinaReranker()
+        log.info("no reranker configured — set JINA_API_KEY for the "
+                 "hosted one, or PAPER_TRAIL_RERANKER for a local model")
         return None
     if name == "jina" or name.startswith("jina-reranker"):
-        return JinaReranker(name if name != "jina" else JINA_RERANKER)
+        try:
+            return JinaReranker(name if name != "jina" else JINA_RERANKER)
+        except ValueError as exc:
+            log.warning("%s — reranking disabled", exc)
+            return None
 
     builds = ((FastembedReranker, SentenceTransformerReranker)
               if name in _FASTEMBED_MODELS

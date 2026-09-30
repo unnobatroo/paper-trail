@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.models import SourceDocument
-from ..deps import get_jobs, get_state
+from ..deps import get_jobs, get_state, require_key
 from ..jobs import JobRunner
 from ..schemas import IngestRequest, JobOut
 
@@ -32,7 +32,8 @@ def available(state: AppState = Depends(get_state)) -> list[str]:
 @router.post("/ingest", status_code=202)
 def ingest(req: IngestRequest,
            state: AppState = Depends(get_state),
-           jobs: JobRunner = Depends(get_jobs)) -> JobOut:
+           jobs: JobRunner = Depends(get_jobs),
+           _: None = Depends(require_key)) -> JobOut:
     # fail fast if the PDF isn't in the store — the job itself re-reads
     # it by name so the payload stays portable data
     if state.docs.read(req.name) is None:
