@@ -31,8 +31,13 @@ from .routers import (
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    yield
     from .deps import get_jobs
+    # Build the durable runner at boot so queued jobs orphaned by a
+    # restart get claimed — otherwise they wait for the first request.
+    # Cheap now that the embedder lazy-loads.
+    if load().supabase_configured:
+        get_jobs()
+    yield
     if get_jobs.cache_info().currsize:  # only if a runner was ever built
         get_jobs().shutdown()
 
