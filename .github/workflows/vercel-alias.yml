@@ -3,8 +3,8 @@ name: Re-alias production domain
 # paper-trail.vercel.app is claimed as a deployment alias (another team
 # holds the project-domain record), so it doesn't follow new deploys on
 # its own. This workflow re-points it after every successful production
-# deployment. Requires a VERCEL_TOKEN secret — create one at
-# https://vercel.com/account/tokens
+# deployment. Requires a VERCEL secret holding a Vercel access token
+# scoped to the mashincar team (vercel.com/account/tokens).
 
 on:
   deployment_status:
@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Point paper-trail.vercel.app at the new deployment
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL }}
           PROJECT_ID: prj_lqNrgCmKlUzo4p4snhNSYNSU17Lc
           TEAM_ID: team_92HtIdnyTnVtduxORyV3Vq3K
         run: |

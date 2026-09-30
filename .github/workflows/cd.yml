@@ -1,0 +1,42 @@
+name: CD
+
+# Deploys the API to Azure App Service when backend code lands on main.
+# The frontend deploys itself — Vercel watches the repo — and
+# vercel-alias.yml re-points the public domain afterwards.
+# Needs an AZURE_PUBLISH_PROFILE secret (the app's publish profile XML).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/**
+      - requirements.txt
+      - Dockerfile
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/cd.yml
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package the source
+        run: git archive --format=zip -o deploy.zip HEAD
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: paper-trail-api
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          package: deploy.zip
+
+      - name: Wait for a healthy API
+        run: |
+          for i in $(seq 1 20); do
+            sleep 15
+            if curl -sf https://paper-trail-api.azurewebsites.net/healthz; then
+              exit 0
+            fi
+          done
+          echo "API did not come up healthy"; exit 1
