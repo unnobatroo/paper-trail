@@ -1,10 +1,19 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { useQueryState, parseAsString } from "nuqs";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Link2, Link2Off } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { En } from "@/components/en";
+import { Chip } from "@/components/queue";
+import {
+  KIND_ICON,
+  KIND_TONE,
+  STATUS_ICON,
+  STATUS_TONE,
+  TONE_TEXT,
+  type Tone,
+} from "@/lib/tones";
 import type { Commitment, EvidenceItem, TrailRow } from "@/lib/api";
 import {
   BUDGET_LABEL,
@@ -20,7 +29,6 @@ import {
   useLinks,
   useTrail,
 } from "@/lib/hooks";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ToggleGroup,
@@ -203,7 +211,10 @@ function TrailPage() {
               const root = rootId ? byId.get(rootId)?.[0].commitment : null;
               return (
                 <div key={rootId ?? "other"}>
-                  <p className="text-sm font-semibold">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold">
+                    {root ? (
+                      <KIND_ICON.objective className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                    ) : null}
                     {root
                       ? `${root.code ? root.code + " · " : ""}${displayTitle(root.title)}`
                       : "Other commitments"}
@@ -227,7 +238,7 @@ function TrailPage() {
                         ...new Set(
                           g
                             .filter((r) => r.status !== "unknown")
-                            .map((r) => STATUS_LABEL[r.status]),
+                            .map((r) => r.status),
                         ),
                       ];
                       return (
@@ -244,7 +255,6 @@ function TrailPage() {
                           </span>
                           <span className="mt-0.5 block text-xs text-muted-foreground">
                             {[
-                              KIND_LABEL[com.kind].toUpperCase(),
                               com.source_page
                                 ? `p.${com.source_page}`
                                 : "Strategy",
@@ -258,13 +268,28 @@ function TrailPage() {
                               .filter(Boolean)
                               .join(" · ")}
                           </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {[
-                              sources.size
-                                ? `${sources.size} evidence source${sources.size === 1 ? "" : "s"}`
-                                : "No evidence yet",
-                              ...statuses,
-                            ].join(" · ")}
+                          <span className="mt-1 flex flex-wrap gap-1">
+                            <Chip
+                              label={
+                                sources.size
+                                  ? `${sources.size} evidence source${sources.size === 1 ? "" : "s"}`
+                                  : "No evidence yet"
+                              }
+                              tone={sources.size ? "green" : "gray"}
+                              icon={sources.size ? Link2 : Link2Off}
+                            />
+                            {statuses.map((s) => (
+                              <Chip
+                                key={s}
+                                label={STATUS_LABEL[s]}
+                                tone={STATUS_TONE[s]}
+                                icon={STATUS_ICON[s]}
+                              />
+                            ))}
+                            <Chip
+                              label={KIND_LABEL[com.kind]}
+                              tone={KIND_TONE[com.kind]}
+                            />
                           </span>
                         </button>
                       );
@@ -377,9 +402,13 @@ function TrailDetail({
           .join(" · ")}
       </p>
       {row.status !== "unknown" && (
-        <Badge variant="secondary">
-          Source says: {STATUS_LABEL[row.status]}
-        </Badge>
+        <div>
+          <Chip
+            label={`Source says: ${STATUS_LABEL[row.status]}`}
+            tone={STATUS_TONE[row.status]}
+            icon={STATUS_ICON[row.status]}
+          />
+        </div>
       )}
 
       <div>
@@ -402,9 +431,7 @@ function TrailDetail({
 
       {impl.length > 0 && (
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Implementation
-          </p>
+          <SectionLabel tone="green">Implementation</SectionLabel>
           {impl.map((ev) => (
             <EvidenceLine key={ev.id} ev={ev} />
           ))}
@@ -418,9 +445,7 @@ function TrailDetail({
 
       {support.length > 0 && (
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Supporting evidence
-          </p>
+          <SectionLabel tone="blue">Supporting evidence</SectionLabel>
           {support.map((ev) => (
             <EvidenceLine key={ev.id} ev={ev} />
           ))}
@@ -429,9 +454,7 @@ function TrailDetail({
 
       {(budgetItems.length > 0 || row.budgets.length > 0) && (
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Budget
-          </p>
+          <SectionLabel tone="purple">Budget</SectionLabel>
           {budgetItems.map((ev) => (
             <EvidenceLine key={ev.id} ev={ev} />
           ))}
@@ -460,9 +483,7 @@ function TrailDetail({
 
       {row.gaps.length > 0 && (
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Still missing
-          </p>
+          <SectionLabel tone="amber">Still missing</SectionLabel>
           <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             {row.gaps.map((g, i) => (
               <li key={i}>{g}</li>
@@ -471,6 +492,37 @@ function TrailDetail({
         </div>
       )}
     </div>
+  );
+}
+
+function SectionLabel({
+  tone,
+  children,
+}: {
+  tone: Tone;
+  children: ReactNode;
+}) {
+  return (
+    <p
+      className={cn(
+        "flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide",
+        TONE_TEXT[tone],
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block size-2 rounded-full",
+          tone === "green" && "bg-emerald-500",
+          tone === "blue" && "bg-sky-500",
+          tone === "teal" && "bg-teal-500",
+          tone === "amber" && "bg-amber-500",
+          tone === "purple" && "bg-violet-500",
+          tone === "red" && "bg-red-500",
+          tone === "gray" && "bg-muted-foreground",
+        )}
+      />
+      {children}
+    </p>
   );
 }
 

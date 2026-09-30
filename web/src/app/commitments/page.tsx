@@ -8,11 +8,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Check, X, Search, SquarePen } from "lucide-react";
+import { Check, X, Search, SquarePen, Clock, CircleHelp } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { En } from "@/components/en";
-import { QueueList, Pager, BatchBar, EmptyState } from "@/components/queue";
+import {
+  QueueList,
+  Pager,
+  BatchBar,
+  EmptyState,
+  Chip,
+  type RowChip,
+} from "@/components/queue";
 import { Kbd } from "@/components/ui/kbd";
+import { KIND_ICON, KIND_TONE } from "@/lib/tones";
 import {
   api,
   type CandidateType,
@@ -28,7 +36,6 @@ import {
 } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ToggleGroup,
@@ -62,6 +69,33 @@ function statusText(c: PolicyCandidate): string {
   if (c.review_status === "rejected") return "Rejected";
   return c.excerpt_on_page === false ? "Unclear" : "Needs review";
 }
+
+function statusChip(c: PolicyCandidate): RowChip {
+  if (c.review_status === "accepted")
+    return { label: "Confirmed", tone: "green", icon: Check };
+  if (c.review_status === "rejected")
+    return { label: "Rejected", tone: "red", icon: X };
+  if (c.excerpt_on_page === false)
+    return { label: "Unclear", tone: "gray", icon: CircleHelp };
+  return { label: "Needs review", tone: "amber", icon: Clock };
+}
+
+const KIND_ORDER: CandidateType[] = [
+  "objective",
+  "target",
+  "measure",
+  "indicator",
+  "background",
+  "unclear",
+];
+const KIND_SECTION: Record<CandidateType, string> = {
+  objective: "Objectives",
+  target: "Targets",
+  measure: "Measures",
+  indicator: "Indicators",
+  background: "Background text",
+  unclear: "Unclear",
+};
 
 function CommitmentsPage() {
   const { data: cands, isLoading } = useCandidates();
@@ -100,15 +134,18 @@ function CommitmentsPage() {
     return out;
   }, [cands, query, typeLabel, status]);
 
-  const groups = useMemo(
-    () =>
-      titleGroups(
-        visible,
-        (c) => c.normalized_title,
-        (c) => c.suggested_type,
-      ),
-    [visible],
-  );
+  const groups = useMemo(() => {
+    const gs = titleGroups(
+      visible,
+      (c) => c.normalized_title,
+      (c) => c.suggested_type,
+    );
+    return gs.sort(
+      (a, b) =>
+        KIND_ORDER.indexOf(a[0].suggested_type) -
+        KIND_ORDER.indexOf(b[0].suggested_type),
+    );
+  }, [visible]);
   const pages = Math.max(1, Math.ceil(groups.length / PAGE));
   const pageGroups = groups.slice((page - 1) * PAGE, page * PAGE);
   const clamped = Math.min(cursor, Math.max(0, pageGroups.length - 1));
@@ -301,9 +338,14 @@ function CommitmentsPage() {
                 rows={pageGroups.map((g) => ({
                   key: String(g[0].id),
                   title: displayTitle(g[0].normalized_title),
+                  section: KIND_SECTION[g[0].suggested_type],
+                  sectionIcon: KIND_ICON[g[0].suggested_type],
+                  chips: [
+                    ...new Map(
+                      g.map((c) => [statusText(c), statusChip(c)]),
+                    ).values(),
+                  ],
                   meta: [
-                    KIND_LABEL[g[0].suggested_type].toUpperCase(),
-                    [...new Set(g.map((c) => statusText(c)))].join("/"),
                     "p." +
                       [...new Set(g.map((c) => c.source_page))].join(", "),
                     ...(g.length > 1 ? [`${g.length} source mentions`] : []),
@@ -321,6 +363,16 @@ function CommitmentsPage() {
                     const next = new Set(prev);
                     if (on) next.add(Number(key));
                     else next.delete(Number(key));
+                    return next;
+                  })
+                }
+                onToggleAll={(keys, on) =>
+                  setSelected((prev) => {
+                    const next = new Set(prev);
+                    for (const k of keys) {
+                      if (on) next.add(Number(k));
+                      else next.delete(Number(k));
+                    }
                     return next;
                   })
                 }
@@ -443,9 +495,14 @@ function CandidateInspector({
       )}
 
       <div className="flex items-center gap-2">
-        <Badge variant="secondary">{statusText(cand)}</Badge>
+        <Chip {...statusChip(cand)} />
+        <Chip
+          label={KIND_LABEL[cand.suggested_type]}
+          tone={KIND_TONE[cand.suggested_type]}
+          icon={KIND_ICON[cand.suggested_type]}
+        />
         <span className="text-xs text-muted-foreground">
-          {KIND_LABEL[cand.suggested_type]} · Page {cand.source_page}
+          Page {cand.source_page}
         </span>
       </div>
 

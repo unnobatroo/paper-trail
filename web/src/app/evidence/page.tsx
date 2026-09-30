@@ -8,7 +8,21 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { Check, X, Search, Loader2, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { En } from "@/components/en";
-import { QueueList, Pager, BatchBar, EmptyState } from "@/components/queue";
+import {
+  QueueList,
+  Pager,
+  BatchBar,
+  EmptyState,
+  Chip,
+} from "@/components/queue";
+import {
+  KIND_ICON,
+  KIND_TONE,
+  REL_ICON,
+  REL_TONE,
+  STATUS_ICON,
+  STATUS_TONE,
+} from "@/lib/tones";
 import { Kbd } from "@/components/ui/kbd";
 import {
   api,
@@ -53,6 +67,12 @@ import {
 
 const EVIDENCE_KINDS = new Set(["objective", "measure", "target"]);
 const PAGE = 10;
+const KIND_ORDER = ["objective", "target", "measure"];
+const KIND_SECTION: Record<string, string> = {
+  objective: "Objectives",
+  target: "Targets",
+  measure: "Measures",
+};
 
 const editable = () =>
   ["INPUT", "TEXTAREA", "SELECT"].includes(
@@ -187,7 +207,10 @@ function PickList({
   );
   const unsearched = commitments.filter((c) => !linkedIds.has(c.id));
   const groups = useMemo(
-    () => titleGroups(unsearched, (c) => c.title, (c) => c.kind),
+    () =>
+      titleGroups(unsearched, (c) => c.title, (c) => c.kind).sort(
+        (a, b) => KIND_ORDER.indexOf(a[0].kind) - KIND_ORDER.indexOf(b[0].kind),
+      ),
     [unsearched],
   );
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -281,10 +304,18 @@ function PickList({
               rows={pageGroups.map((g) => ({
                 key: String(g[0].id),
                 title: displayTitle(g[0].title),
+                section: KIND_SECTION[g[0].kind] ?? g[0].kind,
+                sectionIcon: KIND_ICON[g[0].kind],
+                chips: [
+                  {
+                    label: KIND_LABEL[g[0].kind],
+                    tone: KIND_TONE[g[0].kind],
+                    icon: KIND_ICON[g[0].kind],
+                  },
+                  { label: "Not searched", tone: "gray" },
+                ],
                 meta: [
-                  KIND_LABEL[g[0].kind].toUpperCase(),
                   `p.${g[0].source_page}`,
-                  "Not searched",
                   ...(g.length > 1 ? [`${g.length} source mentions`] : []),
                 ],
               }))}
@@ -300,6 +331,16 @@ function PickList({
                   const next = new Set(prev);
                   if (on) next.add(Number(key));
                   else next.delete(Number(key));
+                  return next;
+                })
+              }
+              onToggleAll={(keys, on) =>
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  for (const k of keys) {
+                    if (on) next.add(Number(k));
+                    else next.delete(Number(k));
+                  }
                   return next;
                 })
               }
@@ -372,6 +413,20 @@ function ReviewMatches({
     [commitments],
   );
 
+  const orderedPending = useMemo(
+    () =>
+      [...pending].sort((a, b) => {
+        const ta = displayTitle(
+          comById.get(a.link.commitment_id)?.title ?? "",
+        );
+        const tb = displayTitle(
+          comById.get(b.link.commitment_id)?.title ?? "",
+        );
+        return ta.localeCompare(tb) || b.link.score - a.link.score;
+      }),
+    [pending, comById],
+  );
+
   const apply = useMutation({
     mutationFn: (accept: boolean) => {
       const ids = [...selected];
@@ -413,8 +468,8 @@ function ReviewMatches({
     onError: (e) => toast.error(String(e)),
   });
 
-  const pages = Math.max(1, Math.ceil(pending.length / PAGE));
-  const pageItems = pending.slice((page - 1) * PAGE, page * PAGE);
+  const pages = Math.max(1, Math.ceil(orderedPending.length / PAGE));
+  const pageItems = orderedPending.slice((page - 1) * PAGE, page * PAGE);
   const detail =
     pageItems[Math.min(cursor, Math.max(0, pageItems.length - 1))] ?? null;
 
@@ -466,14 +521,28 @@ function ReviewMatches({
               maxH="max-h-[55vh]"
               rows={pageItems.map((lv) => {
                 const com = comById.get(lv.link.commitment_id);
+                const rel = lv.link.suggested_relationship;
                 return {
                   key: String(lv.link.id),
                   title: displayTitle(lv.evidence?.title),
-                  sub: `For · ${displayTitle(com?.title ?? "")}`,
+                  section: `For · ${displayTitle(com?.title ?? "")}`,
+                  chips: lv.evidence
+                    ? [
+                        {
+                          label: STATUS_LABEL[lv.evidence.status_hint],
+                          tone: STATUS_TONE[lv.evidence.status_hint],
+                          icon: STATUS_ICON[lv.evidence.status_hint],
+                        },
+                        {
+                          label: `suggested: ${REL_LABEL[rel]}`,
+                          tone: REL_TONE[rel],
+                          icon: REL_ICON[rel],
+                        },
+                      ]
+                    : [],
                   meta: [
                     lv.evidence?.publisher ?? "Official source",
                     lv.evidence?.published_on ?? "Date unknown",
-                    lv.evidence ? STATUS_LABEL[lv.evidence.status_hint] : "",
                   ],
                 };
               })}
@@ -489,6 +558,16 @@ function ReviewMatches({
                   const next = new Set(prev);
                   if (on) next.add(Number(key));
                   else next.delete(Number(key));
+                  return next;
+                })
+              }
+              onToggleAll={(keys, on) =>
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  for (const k of keys) {
+                    if (on) next.add(Number(k));
+                    else next.delete(Number(k));
+                  }
                   return next;
                 })
               }
@@ -573,9 +652,13 @@ function LinkInspector({
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           What this source reports
         </p>
-        <Badge variant="secondary" className="mt-1">
-          {STATUS_LABEL[ev.status_hint]}
-        </Badge>
+        <div className="mt-1">
+          <Chip
+            label={STATUS_LABEL[ev.status_hint]}
+            tone={STATUS_TONE[ev.status_hint]}
+            icon={STATUS_ICON[ev.status_hint]}
+          />
+        </div>
         <p className="mt-1 text-sm">{STATUS_SENTENCE[ev.status_hint]}</p>
         {ev.status_excerpt && (
           <blockquote className="mt-1 border-l-2 pl-3 text-sm text-muted-foreground">
@@ -624,13 +707,22 @@ function LinkInspector({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(REL_LABEL).map(([k, l]) => (
-              <SelectItem key={k} value={k}>
-                {l}
-              </SelectItem>
-            ))}
+            {Object.entries(REL_LABEL).map(([k, l]) => {
+              const Icon = REL_ICON[k as RelationshipType];
+              return (
+                <SelectItem key={k} value={k}>
+                  <span className="flex items-center gap-1.5">
+                    <Icon className="size-3.5" />
+                    {l}
+                  </span>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
+        <div className="mt-1">
+          <Chip label={REL_LABEL[rel]} tone={REL_TONE[rel]} icon={REL_ICON[rel]} />
+        </div>
         <p className="text-xs text-muted-foreground">{REL_HELP[rel]}</p>
         <p className="text-xs text-muted-foreground">
           Applied when you confirm this selected match.
