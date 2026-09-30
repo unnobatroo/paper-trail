@@ -1,41 +1,39 @@
 # Security Policy
 
-## Supported versions
+## Reporting a problem
 
-The `main` branch is supported. The project is pre-1.0; security fixes
-land on `main` and are noted in the release notes.
+Please don't open a public issue for security problems — use GitHub's
+private reporting instead:
 
-## Reporting a vulnerability
+<https://github.com/unnobatroo/paper-trail/security/advisories/new>
 
-**Please do not open a public issue for security problems.**
+Tell us what you found, how to trigger it, and what you think it could
+lead to. We'll acknowledge it within a few days, and you'll be credited
+in the advisory when the fix ships.
 
-Report privately via GitHub's private vulnerability reporting:
+`main` is the only supported branch — the project is pre-1.0 and fixes
+land there.
 
-- <https://github.com/unnobatroo/paper-trail/security/advisories/new>
+## What we care about most
 
-Include: what you found, how to reproduce it, and the impact you see.
-You will get an acknowledgement within a few days and a credited advisory
-when the fix ships.
+- **Leaked secrets.** The Supabase service key and any API tokens must
+  never end up in the browser, in logs, or in git. If you find a path
+  where they could, that's a reportable bug.
+- **Escaped fetching.** The app only ever fetches allowlisted official
+  domains (jozsefvaros.hu, rev8.hu, budapest.hu). Anything that lets
+  untrusted input widen that list or send requests elsewhere is
+  reportable.
+- **Untrusted content.** Fetched pages and PDF text flow into the UI
+  and the database — XSS or injection through crafted content is
+  reportable.
+- **Skipped review.** Any route that lets pipeline output become part
+  of the record without a human approving it breaks the project's core
+  promise, and we want to know immediately.
 
-## Scope notes
+## What's probably not a security issue
 
-Things that matter most for this project:
-
-- **Secrets handling.** The Supabase service key, Jina and HF tokens must
-  never reach the browser, logs, or git. If you find a path where they
-  could leak, that is a reportable bug.
-- **Outbound fetching.** The app fetches URLs from an allowlist
-  (jozsefvaros.hu, rev8.hu, budapest.hu). A bug that lets untrusted input
-  widen the allowlist or smuggle requests elsewhere (SSRF) is reportable.
-- **Untrusted content.** Fetched HTML/PDF text and LLM output flow into
-  the UI and database — injection paths (XSS in rendered pages, SQL via
-  crafted text) are reportable.
-- **Data integrity.** Routes that bypass human review of
-  `review_status` would violate the project's core guarantee.
-
-## Out of scope
-
-- Vulnerabilities in upstream dependencies without a demonstrated exploit
-  path through Paper Trail (do open a regular issue to bump the dep).
-- Content disagreements (e.g. a commitment's status hint) — those are
-  domain decisions for reviewers, not security bugs.
+- Vulnerabilities in dependencies without a demonstrated exploit path
+  through Paper Trail — a regular issue asking us to bump the dep is
+  fine.
+- Disagreement with a status hint or a suggested relationship. Those are
+  review decisions, and a human always has the final say anyway.

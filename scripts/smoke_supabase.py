@@ -17,7 +17,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from paper_trail.bootstrap import build_state
-from paper_trail.domain.enums import CandidateType, ReviewStatus
+from paper_trail.domain.enums import (
+    BudgetKind,
+    CandidateType,
+    RelationshipType,
+    ReviewStatus,
+    Status,
+)
 from paper_trail.domain.models import (
     BudgetRecord,
     Commitment,
@@ -27,7 +33,6 @@ from paper_trail.domain.models import (
     PolicyCandidate,
     SourceDocument,
 )
-from paper_trail.domain.enums import BudgetKind, RelationshipType, Status
 from paper_trail.infrastructure.settings import load
 from paper_trail.ml.embeddings import HashingProvider
 from paper_trail.sources.fetch import FetchedPage

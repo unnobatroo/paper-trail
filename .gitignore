@@ -31,9 +31,6 @@ coverage.xml
 .env.*
 !.env.example
 !.env.*.example
-.streamlit/secrets.toml
-.streamlit/secrets.*.toml
-!.streamlit/secrets.example.toml
 
 # Runtime data and downloaded models — nothing under data/ is source;
 # documents and benchmark files sync via scripts/push_data.py / pull_data.py

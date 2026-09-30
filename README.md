@@ -1,132 +1,77 @@
 # Paper Trail
 
-**From policy text to implementation evidence.**
+**Did they actually do what they promised?**
 
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](tests/)
+Paper Trail started with a simple frustration: councils publish big,
+ambitious climate strategies, and a few years later nobody can say which
+of those promises turned into anything real. The evidence is out there —
+in annual reports, procurement notices, budget resolutions — but it's
+scattered across official websites in PDFs and news posts that nobody has
+time to cross-reference by hand.
 
-Paper Trail reads a real municipal climate strategy — the Józsefváros
-(Budapest District VIII) strategy PDF — extracts the commitments it
-contains, searches official municipal sources for evidence that each one
-was actually implemented, and lets a **human reviewer** decide what enters
-the permanent record:
+So Paper Trail does the tedious part for you. It reads the Józsefváros
+(Budapest District VIII) climate strategy, pulls out every commitment it
+finds, then searches the district's official websites for pages and
+documents that look like follow-through. It ranks the best candidates,
+quotes the passages it thinks matter, and lays it all out for review.
 
-> What did the district say it would do, what measurable targets exist,
-> what implementation evidence was found, and what is still missing?
+And here's the part we care about most: **the software only ever
+suggests.** Nothing enters the public record until a person clicks
+Confirm. Every suggestion comes with its receipts — the page number, the
+verbatim quote, the source URL — so you can always check where a claim
+came from. If nothing was found, the tool shows a gap instead of
+pretending otherwise.
 
-Nothing reaches the tracker without a person clicking **Confirm**. The
-software proposes; the human disposes. It never estimates budgets, never
-infers completion, and never judges whether a policy is good.
+See it live at [paper-trail.vercel.app](https://paper-trail.vercel.app).
 
-## Why this exists
-
-Councils publish ambitious strategies; years later, nobody can tell which
-promises became real. Implementation evidence does exist — procurement
-notices, annual reports, budget resolutions — but it is scattered across
-official websites in PDFs and news posts. Paper Trail automates the
-tedious part (finding and ranking candidate evidence) while keeping the
-accountable part (deciding what counts) human.
-
-## The workflow
-
-```text
-strategy PDF
-  → extract candidate commitments (page + verbatim excerpt required)
-  → human reviews them (Confirm / Edit / Reject)
-  → search official sources: jozsefvaros.hu, rev8.hu, budapest.hu
-  → chunk documents → embed → top-20 semantic match → rerank → top-5
-  → human reviews proposed links
-  → confirmed records appear in the Paper Trail, with explicit gaps
-```
-
-Every record carries its provenance: the page number, the verbatim
-excerpt, the source URL, the matched passage — so a claim can always be
-traced back to the document that made it.
-
-## Quickstart
+## Run it yourself
 
 ```bash
 git clone https://github.com/unnobatroo/paper-trail
 cd paper-trail
-uv sync                          # or: pip install -e .
-uv run uvicorn paper_trail.api.app:app --app-dir src   # API → :8000
-cd web && npm install && npm run dev                  # UI → :3000
+uv sync                                                # install the backend
+uv run uvicorn paper_trail.api.app:app --app-dir src   # API on :8000
+
+cd web
+npm install && npm run dev                             # interface on :3000
 ```
 
-The product UI is the Next.js app in [`web/`](web/) (React + shadcn/ui +
-Tailwind, all open source). In the sidebar click **Read the strategy**,
-then walk the three steps:
-**Check commitments → Find evidence → Paper trail**.
+Open http://localhost:3000 and walk the three steps in the sidebar:
+check the extracted commitments, find evidence for them, then read the
+resulting trail. Everything works offline with stub providers — the
+first real search downloads a ~220 MB open-source embedding model, and
+that's the only heavyweight thing the app ever does.
 
-Everything works offline except fetching pages from the official sites:
-the test suite and the `fixture`/`hashing` providers need no keys and no
-network. First real run downloads ~2 GB of local models (or set
-`JINA_API_KEY` for hosted inference and download nothing).
+## Where things stand
 
-The API is also usable directly — OpenAPI docs at
-`http://localhost:8000/docs`.
+The production stack is boring on purpose: a Next.js frontend on Vercel,
+a FastAPI service on Azure, and Supabase holding Postgres, pgvector
+embeddings, and the source PDFs. Evidence searches run as durable
+background jobs, so a busy or restarted server never loses your work.
 
-## Documentation
+## Read more
 
-Full docs with UML diagrams live in the
-[project wiki](https://github.com/unnobatroo/paper-trail/wiki):
+The [project wiki](https://github.com/unnobatroo/paper-trail/wiki) is
+where the detail lives — how the pieces fit together, how evidence is
+actually ranked, what the database looks like, and how to deploy your
+own:
 
-| Page | What it covers |
-|---|---|
-| [Architecture](https://github.com/unnobatroo/paper-trail/wiki/Architecture) | How the pieces fit — layers, interfaces, wiring |
-| [Ranking Pipeline](https://github.com/unnobatroo/paper-trail/wiki/Ranking-Pipeline) | Search → fetch → chunk → embed → rerank → review, stage by stage |
-| [Machine Learning](https://github.com/unnobatroo/paper-trail/wiki/Machine-Learning) | Models (embeddings, reranker, extraction, translation) and how to swap them |
-| [Data Layer](https://github.com/unnobatroo/paper-trail/wiki/Data-Layer) | Schema, pgvector caches, storage buckets |
-| [API Reference](https://github.com/unnobatroo/paper-trail/wiki/API-Reference) | Every REST endpoint |
-| [Development](https://github.com/unnobatroo/paper-trail/wiki/Development) | Setup, tests, conventions |
-| [Deployment](https://github.com/unnobatroo/paper-trail/wiki/Deployment) | Supabase, containers, Streamlit Cloud |
-
-## Configuration
-
-Everything has an offline-friendly default; a gitignored `.env` at the
-repo root holds real values (see [.env.example](.env.example)):
-
-| env var | default | meaning |
-|---|---|---|
-| `SUPABASE_URL` / `SUPABASE_KEY` | unset | set both → Postgres + pgvector + Storage instead of SQLite/files (run `supabase/migrations/` 001–003 once; use the service_role key) |
-| `PAPER_TRAIL_STORAGE_BUCKET` | `source-documents` | Supabase Storage bucket holding source PDFs |
-| `PAPER_TRAIL_API_ORIGINS` | `http://localhost:3000` | comma-separated CORS origins for the REST API |
-| `JINA_API_KEY` | unset | hosted inference — with `PAPER_TRAIL_EMBED_MODEL=jina` + `PAPER_TRAIL_RERANKER=jina` no models are downloaded |
-| `HF_TOKEN` | unset | enables HU→EN machine translation |
-| `PAPER_TRAIL_DB` | `data/processed/paper_trail.db` | SQLite path (local backend) |
-| `PAPER_TRAIL_EMBED_MODEL` | `paraphrase-multilingual-MiniLM-L12-v2` | embedder (`jina` = hosted, `hashing` = offline stub, or any fastembed model — e5-large needs ~2 GB) |
-| `PAPER_TRAIL_RERANKER` | `BAAI/bge-reranker-v2-m3` | cross-encoder (`jina`, `none`, or a local model) |
-| `PAPER_TRAIL_RERANK_K` | `20` | chunks sent to the reranker |
-| `PAPER_TRAIL_SEARCH` | `ddgs` | `ddgs` (DuckDuckGo) or `fixture` (offline replay) |
-| `PAPER_TRAIL_MODEL_CACHE` | `data/models` | local model files |
-| `PAPER_TRAIL_MAX_DOC_CHARS` | `4000000` | emergency document bound — truncates and warns, never silently |
-| `PAPER_TRAIL_LLM_BASE_URL` / `_API_KEY` / `_MODEL` | unset | optional OpenAI-compatible extraction endpoint |
-
-## The honesty rules
-
-These are the product, not an afterthought:
-
-- no claim without a page number and a verbatim excerpt (re-verified
-  against the page text)
-- money stays typed — estimated cost / approved allocation / reported
-  expenditure — never merged, never estimated; only figures near the
-  matched excerpt are kept
-- source status comes from cue phrases quoted from the matched excerpt
-  (announced → completed / budget / background / unclear), never from dates
-- missing evidence shows as a gap, not a score
-- English text is machine translation, always labelled as such
+- [Architecture](https://github.com/unnobatroo/paper-trail/wiki/Architecture) — the moving parts and why they look this way
+- [Ranking Pipeline](https://github.com/unnobatroo/paper-trail/wiki/Ranking-Pipeline) — how a commitment becomes evidence suggestions
+- [Machine Learning](https://github.com/unnobatroo/paper-trail/wiki/Machine-Learning) — the models involved, and how to swap them
+- [Data Layer](https://github.com/unnobatroo/paper-trail/wiki/Data-Layer) — what's stored where
+- [API Reference](https://github.com/unnobatroo/paper-trail/wiki/API-Reference) — every endpoint
+- [Development](https://github.com/unnobatroo/paper-trail/wiki/Development) and [Deployment](https://github.com/unnobatroo/paper-trail/wiki/Deployment) — working on it and shipping it
 
 ## Contributing
 
-Bug reports and pull requests welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see
-[SECURITY.md](SECURITY.md). Everyone participating is covered by the
+Bug reports and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md)
+has the ground rules (the short version: nothing may bypass human
+review, and every claim needs a quotable source). Security issues go to
+[SECURITY.md](SECURITY.md), and everyone is covered by the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-Copyright © 2026 Paper Trail contributors.
-
 [GPL-3.0](LICENSE) — free to use, study, share and improve; derivatives
-stay open.
+stay open. Copyright © 2026 Paper Trail contributors.
