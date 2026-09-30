@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import threading
 from abc import ABC, abstractmethod
 
 import requests
@@ -34,21 +35,30 @@ class FastEmbedProvider(EmbeddingProvider):
 
     def __init__(self, model: str, cache_dir: str | None = None,
                  providers: list[str] | None = None):
-        # hf_xet's shared blob store places a model's external ONNX data in
-        # a different directory than the .onnx file — onnxruntime rejects it.
+        # Lazy: TextEmbedding() downloads ~220MB and loads ONNX — too heavy
+        # to run at service-construction time on a 1GB free tier (it wedged
+        # every request). Load on first embed(), inside the worker thread.
         os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
-        from fastembed import TextEmbedding
-
         self.model_name = model
-        self._model = TextEmbedding(
-            model_name=model, cache_dir=cache_dir,
-            # e5-large on one core is far too slow for document batches,
-            # but max threads spikes memory — 4 is the safe middle
-            threads=min(4, os.cpu_count() or 1),
-            providers=providers or ["CPUExecutionProvider"],
-        )
+        self._cache_dir = cache_dir
+        self._providers = providers or ["CPUExecutionProvider"]
+        self._model = None
+        self._lock = threading.Lock()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
+        if self._model is None:
+            with self._lock:
+                if self._model is None:
+                    from fastembed import TextEmbedding
+                    self._model = TextEmbedding(
+                        model_name=self.model_name,
+                        cache_dir=self._cache_dir,
+                        # e5-large on one core is far too slow for document
+                        # batches, but max threads spikes memory — 4 is the
+                        # safe middle
+                        threads=min(4, os.cpu_count() or 1),
+                        providers=self._providers,
+                    )
         return [list(map(float, v)) for v in self._model.embed(texts)]
 
 
