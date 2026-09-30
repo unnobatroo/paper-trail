@@ -51,5 +51,9 @@ def get_jobs() -> JobRunner:
     if settings.supabase_configured:
         from .jobs import SupabaseJobRunner
         return SupabaseJobRunner(
-            settings.supabase_url, settings.supabase_key, _handlers())
+            settings.supabase_url, settings.supabase_key, _handlers(),
+            # 2 workers × ~6 fetch threads keeps outbound connections
+            # inside free-tier SNAT limits; more parallelism starves DNS
+            # and sockets on shared Azure instances.
+            max_workers=2)
     return JobRunner(_handlers())
