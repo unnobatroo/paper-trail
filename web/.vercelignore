@@ -1,0 +1,5 @@
+# local env files must not reach builds — Vercel env vars win
+.env*
+node_modules
+.next
+.vercel

@@ -41,8 +41,9 @@ def main() -> None:
                  for l in data.labels()}
 
     import pathlib
-    from sentence_transformers import SentenceTransformer, CrossEncoder
+
     import numpy as np
+    from sentence_transformers import CrossEncoder, SentenceTransformer
 
     st = SentenceTransformer(args.embed, device=common.device())
     qv = st.encode([f'{c["title"]} {c["text"]}' for c in coms],
