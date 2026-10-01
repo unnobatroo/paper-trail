@@ -63,8 +63,16 @@ def _read_pdf(url: str, content: bytes) -> FetchedPage | None:
 
 
 def _read_html(url: str, html: str) -> FetchedPage | None:
-    meta = trafilatura.extract_metadata(html)
-    text = trafilatura.extract(html) or ""
+    # htmldate can crash on malformed dates (e.g. a +25:00 UTC offset in a
+    # meta tag) — a bad date must not cost us the page
+    try:
+        meta = trafilatura.extract_metadata(html)
+    except Exception:
+        meta = None
+    try:
+        text = trafilatura.extract(html) or ""
+    except Exception:
+        return None
     if not text.strip():
         return None
     published = None
