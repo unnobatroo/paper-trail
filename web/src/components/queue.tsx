@@ -3,6 +3,7 @@
 /** Shared triage primitives — the list/inspector pattern both review
  * steps use. Items are grouped display rows; selection is per group. */
 
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { TONE_CHIP, type Tone } from "@/lib/tones";
@@ -110,8 +111,9 @@ export function QueueList({
                     aria-label={`Select ${r.title}`}
                   />
                 )}
-                <button
-                  className="min-w-0 flex-1 text-left"
+                <Button
+                  variant="ghost"
+                  className="block h-auto min-w-0 flex-1 whitespace-normal rounded-sm p-0 text-left hover:bg-transparent"
                   onClick={() => onInspect(r.key)}
                 >
                   <span className="block truncate text-sm font-medium hover:underline">
@@ -132,7 +134,7 @@ export function QueueList({
                   <span className="mt-0.5 block text-xs text-muted-foreground">
                     {r.meta.join(" · ")}
                   </span>
-                </button>
+                </Button>
               </div>
             </div>
           );
@@ -168,22 +170,15 @@ export function Pager({
 }) {
   if (pages <= 1) return null;
   return (
-    <div className="mt-2 flex gap-1">
-      {Array.from({ length: pages }, (_, i) => (
-        <button
-          key={i}
-          onClick={() => onPage(i + 1)}
-          className={cn(
-            "size-7 rounded-md border text-xs",
-            page === i + 1
-              ? "border-primary bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted",
-          )}
-        >
-          {i + 1}
-        </button>
-      ))}
-    </div>
+    <nav aria-label="Review pages" className="mt-3 flex flex-wrap items-center gap-2">
+      <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        Previous
+      </Button>
+      <span className="text-xs text-muted-foreground" aria-live="polite">Page {page} of {pages}</span>
+      <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+        Next
+      </Button>
+    </nav>
   );
 }
 
@@ -207,29 +202,26 @@ export function BatchBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs text-muted-foreground">{count} selected</span>
-      <button
-        className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[0.8rem] font-medium text-primary-foreground disabled:opacity-50"
+      <Button size="sm"
         disabled={!count || busy}
         onClick={onConfirm}
       >
         <Check className="size-3.5" />
         {confirmLabel}
-      </button>
-      <button
-        className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[0.8rem] font-medium disabled:opacity-50"
+      </Button>
+      <Button size="sm" variant="destructive"
         disabled={!count || busy}
         onClick={onReject}
       >
         <X className="size-3.5" />
         {rejectLabel}
-      </button>
+      </Button>
       {count > 0 && onClear && (
-        <button
-          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+        <Button size="sm" variant="ghost"
           onClick={onClear}
         >
           Clear
-        </button>
+        </Button>
       )}
     </div>
   );

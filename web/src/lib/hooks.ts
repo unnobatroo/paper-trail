@@ -2,6 +2,7 @@
 
 /** Shared TanStack Query hooks + query keys for the Paper Trail API. */
 
+import { useCallback } from "react";
 import {
   useQueries,
   useQuery,
@@ -59,13 +60,13 @@ export function useTrail() {
 /** Invalidate every domain list after a review mutation. */
 export function useInvalidateDomain() {
   const qc = useQueryClient();
-  return () =>
+  return useCallback(() =>
     qc.invalidateQueries({
       predicate: (q) =>
-        ["candidates", "commitments", "links", "trail", "documents"].includes(
+        ["candidates", "commitments", "links", "link", "trail", "documents"].includes(
           q.queryKey[0] as string,
         ),
-    });
+    }), [qc]);
 }
 
 /** Poll a set of durable jobs until all reach done/failed. */
@@ -87,5 +88,12 @@ export function useJobs(jobIds: string[]) {
   const running = jobs.some(
     (j) => j.status === "queued" || j.status === "running",
   );
-  return { jobs, running, settled: jobIds.length > 0 && !running };
+  return {
+    jobs,
+    running,
+    error: results.find((r) => r.error)?.error ?? null,
+    retry: () => Promise.all(results.map((r) => r.refetch())),
+    settled: jobIds.length > 0 && results.every((r) =>
+      r.isSuccess && (r.data.status === "done" || r.data.status === "failed")),
+  };
 }

@@ -77,7 +77,7 @@ export default function Dashboard() {
           };
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
+    <div className="mx-auto max-w-4xl p-4 sm:p-8">
       <h1 className="text-2xl font-semibold tracking-tight">Paper Trail</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Check a municipality&apos;s climate promises against evidence from its

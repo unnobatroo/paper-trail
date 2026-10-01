@@ -5,7 +5,7 @@ import { Providers } from "@/components/providers";
 import { TranslateProvider } from "@/components/en";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/command-menu";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +35,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <TranslateProvider>
             <SidebarProvider>
               <AppSidebar />
-              <SidebarInset className="overflow-y-auto">
+              <SidebarInset className="min-w-0 overflow-y-auto">
+                <header className="flex items-center gap-2 border-b px-4 py-3 md:hidden">
+                  <SidebarTrigger aria-label="Open navigation" />
+                  <span className="text-sm font-semibold">Paper Trail</span>
+                </header>
                 {children}
               </SidebarInset>
               <CommandMenu />

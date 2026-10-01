@@ -3,6 +3,7 @@
 import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { ExternalLink, Link2, Link2Off } from "lucide-react";
+import { QueryError } from "@/components/query-error";
 import { PageHeader } from "@/components/page-header";
 import { En } from "@/components/en";
 import { Chip } from "@/components/queue";
@@ -111,7 +112,7 @@ function objectiveGroups(groups: TrailRow[][]) {
 }
 
 function TrailPage() {
-  const { data: rows, isLoading } = useTrail();
+  const { data: rows, isLoading, error, refetch } = useTrail();
   const { data: commitments } = useCommitments();
   const { data: links } = useLinks();
   const { data: candidates } = useCandidates();
@@ -141,9 +142,11 @@ function TrailPage() {
     [grouped],
   );
 
+  if (error) return <div className="p-4 sm:p-8"><QueryError error={error} retry={refetch} /></div>;
+
   if (isLoading)
     return (
-      <div className="p-8">
+      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="mt-6 h-96 w-full" />
       </div>
@@ -151,7 +154,7 @@ function TrailPage() {
 
   if (!rows?.length)
     return (
-      <div className="p-8">
+      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
         <PageHeader title="Paper trail" guide="trail" />
         <p className="mt-8 text-sm text-muted-foreground">
           Nothing here yet — confirm some commitments and matches first.
@@ -176,7 +179,7 @@ function TrailPage() {
     : null;
 
   return (
-    <div className="p-8">
+    <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
       <PageHeader title="Paper trail" guide="trail" />
       <p className="mt-2 text-xs text-muted-foreground">
         {groups.length} commitments · {withEvidence} with evidence · Read-only

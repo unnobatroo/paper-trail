@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -27,6 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,7 @@ const STEPS = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
   const qc = useQueryClient();
   const { data: meta, isError: metaError } = useMeta();
   const { data: documents } = useDocuments();
@@ -75,8 +77,11 @@ export function AppSidebar() {
   const [jobIds, setJobIds] = useState<string[]>([]);
   const { jobs, settled } = useJobs(jobIds);
 
-  if (settled) {
-    setJobIds([]);
+  const notifiedBatch = useRef<string>("");
+  useEffect(() => {
+    const batch = jobIds.join(",");
+    if (!settled || notifiedBatch.current === batch) return;
+    notifiedBatch.current = batch;
     qc.invalidateQueries({ queryKey: keys.documents });
     qc.invalidateQueries({ queryKey: keys.candidates });
     const failed = jobs.filter((j) => j.status === "failed");
@@ -88,14 +93,14 @@ export function AppSidebar() {
         .flatMap((j) => j.result?.warnings ?? [])
         .forEach((w) => toast.warning(w));
     }
-  }
+  }, [settled, jobs, jobIds, qc]);
 
   const hasDocs = (documents?.length ?? 0) > 0;
 
   return (
     <Sidebar>
       <SidebarHeader className="px-4 pt-4">
-        <Link href="/" className="flex items-baseline gap-2">
+        <Link href="/" onClick={() => setOpenMobile(false)} className="flex items-baseline gap-2">
           <span className="text-lg font-semibold tracking-tight">
             Paper Trail
           </span>
@@ -116,7 +121,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     isActive={pathname.startsWith(href)}
-                    render={<Link href={href} />}
+                    render={<Link href={href} onClick={() => setOpenMobile(false)} />}
                   >
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px]">
                       {n}
@@ -171,7 +176,7 @@ export function AppSidebar() {
         </p>
         {meta && !meta.translation && (
           <p className="text-[10px] text-muted-foreground">
-            Translation off — HF_TOKEN unset on the API.
+            English translation is unavailable.
           </p>
         )}
 
@@ -231,7 +236,7 @@ function IngestCard({ onJob }: { onJob: (ids: string[]) => void }) {
       toast.error(`Ingest failed: ${e instanceof Error ? e.message : e}`),
   });
 
-  const name = form.watch("name") || names?.[0] || "";
+  const name = useWatch({ control: form.control, name: "name" });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

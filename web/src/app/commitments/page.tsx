@@ -4,11 +4,12 @@ import { Suspense, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Check, X, Search, SquarePen, Clock, CircleHelp } from "lucide-react";
+import { QueryError } from "@/components/query-error";
 import { PageHeader } from "@/components/page-header";
 import { En } from "@/components/en";
 import {
@@ -98,7 +99,7 @@ const KIND_SECTION: Record<CandidateType, string> = {
 };
 
 function CommitmentsPage() {
-  const { data: cands, isLoading } = useCandidates();
+  const { data: cands, isLoading, error, refetch } = useCandidates();
   const { data: commitments } = useCommitments();
   const { data: documents } = useDocuments();
   const invalidate = useInvalidateDomain();
@@ -113,7 +114,7 @@ function CommitmentsPage() {
     "status",
     parseAsString.withDefault("Needs review"),
   );
-  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
+  const [requestedPage, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -147,6 +148,7 @@ function CommitmentsPage() {
     );
   }, [visible]);
   const pages = Math.max(1, Math.ceil(groups.length / PAGE));
+  const page = Math.max(1, Math.min(requestedPage, pages));
   const pageGroups = groups.slice((page - 1) * PAGE, page * PAGE);
   const clamped = Math.min(cursor, Math.max(0, pageGroups.length - 1));
   const detail = pageGroups[clamped] ?? null;
@@ -213,9 +215,11 @@ function CommitmentsPage() {
     searchRef.current?.focus();
   }, []);
 
+  if (error) return <div className="p-4 sm:p-8"><QueryError error={error} retry={refetch} /></div>;
+
   if (isLoading)
     return (
-      <div className="p-8">
+      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="mt-6 h-96 w-full" />
       </div>
@@ -223,7 +227,7 @@ function CommitmentsPage() {
 
   if (!cands?.length)
     return (
-      <div className="p-8">
+      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
         <PageHeader title="Check commitments" guide="commitments" />
         <EmptyState className="mt-8">
           Nothing to check yet — read the strategy from the sidebar.
@@ -236,7 +240,7 @@ function CommitmentsPage() {
   ).length;
 
   return (
-    <div className="p-8">
+    <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
       <PageHeader title="Check commitments" guide="commitments" />
       <p className="mt-2 text-xs text-muted-foreground">
         {cands.length} source mentions · {cands.length - remaining} reviewed ·{" "}
@@ -433,6 +437,8 @@ function CandidateInspector({
     },
   });
 
+  const [editKind, editParent] = useWatch({ control: form.control, name: ["kind", "parent_id"] });
+
   const decide = useMutation({
     mutationFn: async (action: "accept" | "reject" | "edit") => {
       if (action === "reject") {
@@ -597,7 +603,7 @@ function CandidateInspector({
               <div className="space-y-1.5">
                 <Label>Commitment type</Label>
                 <Select
-                  value={form.watch("kind")}
+                  value={editKind}
                   onValueChange={(v) => form.setValue("kind", v as string)}
                 >
                   <SelectTrigger className="w-full">
@@ -624,7 +630,7 @@ function CandidateInspector({
               <div className="space-y-1.5">
                 <Label>Part of</Label>
                 <Select
-                  value={form.watch("parent_id")}
+                  value={editParent}
                   onValueChange={(v) => form.setValue("parent_id", v as string)}
                 >
                   <SelectTrigger className="w-full">

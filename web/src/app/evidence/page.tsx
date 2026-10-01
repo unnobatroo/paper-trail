@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Check, X, Search, Loader2, ExternalLink } from "lucide-react";
+import { Search, Loader2, ExternalLink } from "lucide-react";
+import { QueryError } from "@/components/query-error";
 import { PageHeader } from "@/components/page-header";
 import { En } from "@/components/en";
 import {
@@ -81,12 +82,12 @@ const editable = () =>
   );
 
 function EvidencePage() {
-  const { data: commitments, isLoading } = useCommitments();
-  const { data: links } = useLinks();
+  const { data: commitments, isLoading, error, refetch } = useCommitments();
+  const { data: links, error: linksError, refetch: refetchLinks } = useLinks();
   const invalidate = useInvalidateDomain();
   const [phase, setPhase] = useQueryState("phase", parseAsString);
   const [jobIds, setJobIds] = useState<string[]>([]);
-  const { jobs, settled } = useJobs(jobIds);
+  const { jobs, settled, error: jobError, retry: retryJobs } = useJobs(jobIds);
 
   const searchable = (commitments ?? []).filter((c) =>
     EVIDENCE_KINDS.has(c.kind),
@@ -95,7 +96,11 @@ function EvidencePage() {
     (l) => l.link.review_status === "unreviewed" && l.evidence,
   );
 
-  if (settled) {
+  const notifiedBatch = useRef<string>("");
+  useEffect(() => {
+    const batch = jobIds.join(",");
+    if (!settled || notifiedBatch.current === batch) return;
+    notifiedBatch.current = batch;
     const total = jobs.reduce((acc, j) => acc + (j.result?.links ?? 0), 0);
     const failed = jobs.filter((j) => j.status === "failed");
     if (failed.length)
@@ -111,16 +116,18 @@ function EvidencePage() {
     jobs
       .flatMap((j) => j.result?.warnings ?? [])
       .forEach((w) => toast.warning(w));
-    setJobIds([]);
     invalidate();
-    setPhase("review");
-  }
+  }, [settled, jobs, jobIds, invalidate]);
 
-  const activePhase = phase ?? (pendingLinks.length ? "review" : "choose");
+  const activePhase = settled ? "review" : phase ?? (pendingLinks.length ? "review" : "choose");
+
+  if (linksError) return <div className="p-4 sm:p-8"><QueryError error={linksError} retry={refetchLinks} /></div>;
+
+  if (error) return <div className="p-4 sm:p-8"><QueryError error={error} retry={refetch} /></div>;
 
   if (isLoading)
     return (
-      <div className="p-8">
+      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="mt-6 h-96 w-full" />
       </div>
@@ -128,7 +135,7 @@ function EvidencePage() {
 
   if (!searchable.length)
     return (
-      <div className="p-8">
+      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
         <PageHeader title="Find evidence" guide="evidence" />
         <EmptyState className="mt-8">
           Nothing to check yet — confirm some commitments first.
@@ -137,17 +144,23 @@ function EvidencePage() {
     );
 
   return (
-    <div className="p-8">
+    <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
       <PageHeader title="Find evidence" guide="evidence" />
 
-      {jobIds.length > 0 && (
+      {jobIds.length > 0 && !settled && (
         <div className="mt-4 rounded-md border p-4">
           <div className="flex items-center gap-2 text-sm font-medium">
             <Loader2 className="size-4 animate-spin" />
             Finding evidence ({jobIds.length} job
             {jobIds.length > 1 ? "s" : ""})
           </div>
-          <div className="mt-2 space-y-1">
+          {jobError && (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              Cannot check search progress. Your search may still be running.
+              <Button variant="outline" size="sm" className="ml-2" onClick={() => retryJobs()}>Retry</Button>
+            </p>
+          )}
+          <div className="mt-2 space-y-1" role="status" aria-live="polite">
             {jobs
               .filter((j) => j.progress)
               .map((j) => (
@@ -159,10 +172,11 @@ function EvidencePage() {
         </div>
       )}
 
+      {(jobIds.length === 0 || settled) && <>
       <ToggleGroup
         className="mt-4"
         value={[activePhase]}
-        onValueChange={(v) => v[0] && setPhase(v[0])}
+        onValueChange={(v) => { if (v[0]) { setJobIds([]); setPhase(v[0]); } }}
         variant="outline"
         size="sm"
       >
@@ -186,6 +200,7 @@ function EvidencePage() {
       ) : (
         <ReviewMatches pending={pendingLinks} commitments={searchable} />
       )}
+      </>}
     </div>
   );
 }
@@ -216,14 +231,19 @@ function PickList({
   );
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [cursor, setCursor] = useState(0);
-  const [page, setPage] = useQueryState("spage", parseAsInteger.withDefault(1));
+  const [requestedPage, setPage] = useQueryState("spage", parseAsInteger.withDefault(1));
 
   const search = useMutation({
     mutationFn: async (ids: number[]) => {
       const jobIds: string[] = [];
       for (const id of ids) {
-        const job = await api.findEvidence(id);
-        jobIds.push(job.id);
+        try {
+          const job = await api.findEvidence(id);
+          jobIds.push(job.id);
+        } catch (error) {
+          toast.error(`Could not start search: ${String(error)}`);
+          break;
+        }
       }
       return jobIds;
     },
@@ -245,6 +265,7 @@ function PickList({
     );
 
   const pages = Math.max(1, Math.ceil(groups.length / PAGE));
+  const page = Math.max(1, Math.min(requestedPage, pages));
   const pageGroups = groups.slice((page - 1) * PAGE, page * PAGE);
   const detail = pageGroups[Math.min(cursor, pageGroups.length - 1)] ?? null;
   const detailCandidates = detail
@@ -407,7 +428,7 @@ function ReviewMatches({
   const [relChoice, setRelChoice] = useState<Map<number, RelationshipType>>(
     new Map(),
   );
-  const [page, setPage] = useQueryState("epage", parseAsInteger.withDefault(1));
+  const [requestedPage, setPage] = useQueryState("epage", parseAsInteger.withDefault(1));
 
   const comById = useMemo(
     () => new Map(commitments.map((c) => [c.id, c])),
@@ -454,7 +475,7 @@ function ReviewMatches({
 
   const single = useMutation({
     mutationFn: async (accept: boolean) => {
-      const link = pageItems[cursor]?.link;
+      const link = detail?.link;
       if (!link) return;
       await api.decideLink(
         link.id,
@@ -470,6 +491,7 @@ function ReviewMatches({
   });
 
   const pages = Math.max(1, Math.ceil(orderedPending.length / PAGE));
+  const page = Math.max(1, Math.min(requestedPage, pages));
   const pageItems = orderedPending.slice((page - 1) * PAGE, page * PAGE);
   const detail =
     pageItems[Math.min(cursor, Math.max(0, pageItems.length - 1))] ?? null;
