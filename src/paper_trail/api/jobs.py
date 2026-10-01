@@ -26,10 +26,11 @@ import os
 import socket
 import threading
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 Handler = Callable[[dict, Callable[[str], None]], Any]
 
@@ -46,7 +47,7 @@ class Job:
     result: Any = None
     error: str | None = None
     created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat())
+        default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 def _dedupe_key(kind: str, payload: dict) -> str:
@@ -206,7 +207,7 @@ class SupabaseJobRunner:
                 pass  # transient DB errors mustn't kill the poller
 
     def _sweep_stale(self) -> None:
-        cutoff = (datetime.now(timezone.utc) - self.STALE_AFTER).isoformat()
+        cutoff = (datetime.now(UTC) - self.STALE_AFTER).isoformat()
         self._db.table("jobs").update({
             "status": "failed",
             "error": "worker lost mid-run — resubmit to retry",
@@ -223,4 +224,4 @@ class SupabaseJobRunner:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

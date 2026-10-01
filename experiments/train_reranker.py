@@ -16,7 +16,7 @@ import argparse
 import sys
 
 sys.path.insert(0, ".")
-from experiments import common, data, metrics  # noqa: E402
+from experiments import common, data, metrics
 
 BASE = "BAAI/bge-reranker-v2-m3"
 

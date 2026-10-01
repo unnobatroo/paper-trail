@@ -1,22 +1,28 @@
-"""HU→EN machine translation — always labelled, never authoritative."""
+"""Source-language→English machine translation — always labelled, never
+authoritative."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from ...services.translation import MT_DISCLAIMER, get_translator
+from ...bootstrap import AppState
+from ...ml.lang import get_profile
+from ...services.translation import get_translator
+from ..deps import get_state
 from ..schemas import TranslateRequest
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
 
 @router.post("")
-def translate(req: TranslateRequest) -> dict:
-    translator = get_translator()
+def translate(req: TranslateRequest,
+              state: AppState = Depends(get_state)) -> dict:
+    translator = get_translator(get_profile(state.settings.language),
+                                model=state.settings.mt_model)
     if translator is None:
         raise HTTPException(
             503, "machine translation is unavailable (HF_TOKEN unset)")
     return {
         "translations": [translator.translate(t) for t in req.texts],
-        "disclaimer": MT_DISCLAIMER,
+        "disclaimer": translator.disclaimer,
     }

@@ -2,6 +2,7 @@
 
 from paper_trail.domain.enums import CandidateType, RelationshipType
 from paper_trail.domain.models import Commitment, EvidenceItem
+from paper_trail.ml.lang import HU
 from paper_trail.ml.matching import compute_features, score, suggest_relationship
 
 COM = Commitment(
@@ -22,7 +23,7 @@ def _ev(**kw) -> EvidenceItem:
 def test_features_pick_up_shared_entities():
     ev = _ev(organisations=["RÉV8 Zrt."], locations=["Bérkocsis utcában"],
              dates_mentioned=["2030"])
-    f = compute_features(COM, ev, similarity=0.8)
+    f = compute_features(COM, ev, 0.8, HU)
     assert f.shared_organisations
     assert f.shared_locations
     assert f.shared_dates == ["2030"]
@@ -31,13 +32,13 @@ def test_features_pick_up_shared_entities():
 
 def test_strong_match_with_shared_org_is_direct():
     ev = _ev(organisations=["RÉV8"], locations=[])
-    f = compute_features(COM, ev, similarity=0.85)
+    f = compute_features(COM, ev, 0.85, HU)
     rel, reasons = suggest_relationship(f, has_budget=False)
     assert rel == RelationshipType.DIRECT_IMPLEMENTATION
     assert reasons
 
 
 def test_low_similarity_is_unrelated():
-    f = compute_features(COM, _ev(), similarity=0.1)
+    f = compute_features(COM, _ev(), 0.1, HU)
     rel, _ = suggest_relationship(f, has_budget=False)
     assert rel == RelationshipType.UNRELATED

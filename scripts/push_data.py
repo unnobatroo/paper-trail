@@ -1,8 +1,9 @@
 """Push local data into Supabase Storage — the repo carries no data files.
 
 Uploads:
-  data/source_documents/*.pdf   →  <bucket>/<name>
-  data/benchmark/*.jsonl        →  <bucket>/benchmark/<name>
+  data/source_documents/*       →  <bucket>/<name>   (any document type)
+  data/benchmark/* + raw/       →  <bucket>/benchmark/<name>
+    (generated *.jsonl plus the authored spec.json)
 
 Usage:  uv run python scripts/push_data.py
 Needs SUPABASE_URL + SUPABASE_KEY (service_role) in the environment or the
@@ -33,21 +34,28 @@ def main() -> int:
         bucket=settings.storage_bucket)
 
     uploaded = 0
-    for p in sorted(settings.seed_dir.glob("*.pdf")):
+    for p in sorted(settings.seed_dir.iterdir()):
+        if not p.is_file():
+            continue
         store.write(p.name, p.read_bytes())
         print(f"{p.name} → {settings.storage_bucket}/{p.name} "
               f"({p.stat().st_size // 1024} KB)")
         uploaded += 1
 
     bench = ROOT / "data" / "benchmark"
-    for p in sorted(bench.glob("*.jsonl")):
-        store.write(f"benchmark/{p.name}", p.read_bytes())
-        print(f"{p.name} → {settings.storage_bucket}/benchmark/{p.name}")
+    for p in sorted(bench.iterdir()) + sorted(
+            (bench / "raw").glob("*.txt") if (bench / "raw").exists() else []):
+        if not p.is_file():
+            continue
+        key = f"benchmark/raw/{p.name}" if p.parent.name == "raw" \
+            else f"benchmark/{p.name}"
+        store.write(key, p.read_bytes())
+        print(f"{key} → {settings.storage_bucket}/{key}")
         uploaded += 1
 
     if not uploaded:
-        print("Nothing to push — no PDFs in data/source_documents/ and no "
-              "JSONL in data/benchmark/.")
+        print("Nothing to push — no PDFs in data/source_documents/ and "
+              "nothing in data/benchmark/.")
         return 1
     return 0
 

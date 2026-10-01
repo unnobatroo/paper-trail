@@ -35,11 +35,10 @@ async def _lifespan(_app: FastAPI):
     # Build the durable runner at boot so queued jobs orphaned by a
     # restart get claimed — otherwise they wait for the first request.
     # Cheap now that the embedder lazy-loads.
-    if load().supabase_configured:
-        get_jobs()
+    jobs = get_jobs() if load().supabase_configured else None
     yield
-    if get_jobs.cache_info().currsize:  # only if a runner was ever built
-        get_jobs().shutdown()
+    if jobs is not None:
+        jobs.shutdown()
 
 
 def create_app() -> FastAPI:

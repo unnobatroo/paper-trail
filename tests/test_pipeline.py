@@ -13,6 +13,7 @@ from paper_trail.domain.enums import (
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
 from paper_trail.ml.embeddings import HashingProvider
 from paper_trail.ml.extraction import Extractor
+from paper_trail.ml.lang import HU
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.metrics_service import MetricsService
@@ -84,7 +85,8 @@ def test_full_pipeline(policy: PolicyRepository, evidence: EvidenceRepository,
     _seed_fetch_cache(cache, EVIDENCE_URL, EVIDENCE_TEXT)
     svc = EvidenceService(evidence, _fixture_search(tmp_path),
                           HashingProvider(), cache_dir=cache,
-                          fetcher=lambda url: None)
+                          fetcher=lambda url, d=None: None,
+                          profile=HU, allowed_domains=("rev8.hu",))
     links = svc.find_evidence(com)
     assert links  # proposed at least one link
     assert all(evidence.evidence(l.evidence_id).url == EVIDENCE_URL

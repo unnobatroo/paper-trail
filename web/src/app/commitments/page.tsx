@@ -536,7 +536,7 @@ function CandidateInspector({
 
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Official Hungarian text
+          Official source text
         </p>
         <blockquote className="mt-1 border-l-2 pl-3 text-sm text-muted-foreground">
           {cand.source_excerpt}
@@ -568,7 +568,7 @@ function CandidateInspector({
         </Button>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Source · Józsefváros Climate Strategy · page {cand.source_page}
+          Source · page {cand.source_page}
         </p>
       )}
 

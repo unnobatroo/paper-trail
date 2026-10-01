@@ -1,54 +1,96 @@
-"""Deterministic parsing of Hungarian municipal text.
+"""Deterministic parsing of municipal text — language-agnostic engine.
 
-Orgs, locations, dates and money are extracted with patterns — a language model
-is not needed for this and would be harder to verify. Every returned mention
-keeps the verbatim text it came from.
+Orgs, locations, dates and money are extracted with patterns compiled from
+a `LanguageProfile` (see `lang.py`) — a language model is not needed for
+this and would be harder to verify. Every returned mention keeps the
+verbatim text it came from.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 from ..domain.enums import BudgetKind, Status
+from .lang import LanguageProfile
 
 # ---------------------------------------------------------------------------
 # Money
 
 _AMOUNT = r"(\d[\d\s.,]*)"
-_MONEY_RE = re.compile(
-    _AMOUNT + r"\s*(milliárd|millió|ezer|Mrd|mrd|M)?\s*(Ft|forint)\b",
-    re.IGNORECASE,
-)
-
-# Cue words deciding the budget kind. Only explicit wording counts — an
-# ambiguous figure stays unclassified rather than being guessed.
-_CUES = {
-    BudgetKind.ESTIMATED_COST: [
-        "becsült", "várható költség", "tervezett költség", "előirányzat",
-    ],
-    BudgetKind.APPROVED_ALLOCATION: [
-        "támogatást nyert", "támogatást kap", "elnyert", "nyert összeg",
-        "költségkeret", "keretösszeg", "keretből", "pályázati keret",
-        "támogatási szerződés", "forint támogatás", "forintra",
-        "igényelhető", "megállapított", "jóváhagyott", "különített el",
-        "forintot különít",
-    ],
-    BudgetKind.REPORTED_EXPENDITURE: [
-        "kifizetés", "kifizetésre került", "költöttek", "elköltött",
-        "elszámolt", "felmerült költség", "került sor",
-    ],
-}
-
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
-_HU_MONTHS = (
-    "január|február|március|április|május|június|július|augusztus|"
-    "szeptember|október|november|december"
-)
-_DATE_RE = re.compile(
-    r"\b(20\d{2})[.\s]+(" + _HU_MONTHS + r")[a-z]*\.?\s*(\d{1,2})?",
-    re.IGNORECASE,
-)
+
+
+@lru_cache(maxsize=8)
+def _compiled(profile: LanguageProfile):
+    """All regexes a profile needs, built once per profile."""
+    cur = "|".join(re.escape(c) for c in profile.currency_words) or r"(?!)"
+    mult = ("|".join(re.escape(m) for m in profile.multiplier_words)
+            or r"(?!)")
+    money = re.compile(
+        _AMOUNT + rf"\s*({mult})?\s*({cur})\b", re.IGNORECASE)
+
+    date = None
+    if profile.months_re:
+        date = re.compile(
+            rf"\b(20\d{{2}})[.\s]+({profile.months_re})[a-z]*\.?\s*"
+            r"(\d{1,2})?", re.IGNORECASE)
+
+    org = None
+    if profile.org_suffixes_re or profile.org_names_re:
+        parts = []
+        if profile.org_suffixes_re:
+            up, low = profile.upper_chars, profile.lower_chars
+            parts.append(
+                rf"[{up}][\w{low}.-]*(?:\s+[{up}{low}][\w{low}.-]*){{0,4}}"
+                rf"\s(?:{profile.org_suffixes_re})")
+        if profile.org_names_re:
+            parts.append(profile.org_names_re)
+        org = re.compile(r"\b(" + "|".join(parts) + r")")
+
+    place = None
+    if profile.place_words_re:
+        up = profile.upper_chars
+        place = re.compile(
+            rf"\b([{up}][\w{profile.lower_chars}.]+"
+            rf"(?:\s+[{up}][\w{profile.lower_chars}.]+){{0,2}})"
+            rf"\s*({profile.place_words_re})\b")
+
+    intent = (re.compile(profile.intent_re, re.IGNORECASE)
+              if profile.intent_re else None)
+
+    value = None
+    if profile.units_re:
+        value = re.compile(
+            rf"(\d[\d\s]*(?:[.,]\d+)?)\s*({profile.units_re})")
+
+    return money, date, org, place, intent, value
+
+
+def _to_number(profile: LanguageProfile, number: str,
+               multiplier_word: str | None) -> int | None:
+    """Locale-aware amount normalisation: '300.000 Ft' is 300 000 with a
+    decimal-comma profile, '2,5 milliárd' is 2.5 billion."""
+    raw = number.replace(" ", "").replace("\u00a0", "")
+    if profile.decimal_comma:
+        raw = raw.replace(".", "").replace(",", ".")
+    else:
+        raw = raw.replace(",", "")
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    value *= profile.multiplier_words.get((multiplier_word or "").lower(),
+                                          1)
+    return int(value)
+
+
+def _sentence_around(text: str, start: int, end: int) -> str:
+    left = max(text.rfind(". ", 0, start), text.rfind("\n", 0, start)) + 1
+    right = text.find(". ", end)
+    right = len(text) if right == -1 else right + 1
+    return " ".join(text[left:right].split())
 
 
 @dataclass
@@ -60,44 +102,21 @@ class BudgetMention:
     year: int | None
 
 
-def _to_huf(number: str, multiplier_word: str | None) -> int | None:
-    # Hungarian convention: '.' and ' ' are thousand separators, ',' is the
-    # decimal mark — '300.000 Ft' is 300 000, '2,5 milliárd' is 2.5 billion.
-    raw = (number.replace(" ", "").replace("\u00a0", "")
-           .replace(".", "").replace(",", "."))
-    try:
-        value = float(raw)
-    except ValueError:
-        return None
-    word = (multiplier_word or "").lower()
-    if word in ("milliárd", "mrd"):
-        value *= 1_000_000_000
-    elif word == "millió":
-        value *= 1_000_000
-    elif word == "ezer":
-        value *= 1_000
-    return int(value)
-
-
-def _sentence_around(text: str, start: int, end: int) -> str:
-    left = max(text.rfind(". ", 0, start), text.rfind("\n", 0, start)) + 1
-    right = text.find(". ", end)
-    right = len(text) if right == -1 else right + 1
-    return " ".join(text[left:right].split())
-
-
-def extract_money(text: str) -> list[BudgetMention]:
+def extract_money(text: str,
+                  profile: LanguageProfile) -> list[BudgetMention]:
+    money_re, _, _, _, _, _ = _compiled(profile)
     mentions: list[BudgetMention] = []
-    for m in _MONEY_RE.finditer(text):
+    for m in money_re.finditer(text):
         sentence = _sentence_around(text, m.start(), m.end())
         kind = next(
-            (k for k, cues in _CUES.items() if any(c in sentence.lower() for c in cues)),
+            (k for k, cues in profile.budget_cues.items()
+             if any(c in sentence.lower() for c in cues)),
             None,
         )
         y = _YEAR_RE.search(sentence)
         mentions.append(
             BudgetMention(
-                amount_huf=_to_huf(m.group(1), m.group(2)),
+                amount_huf=_to_number(profile, m.group(1), m.group(2)),
                 amount_raw=" ".join(m.group(0).split()),
                 kind=kind,
                 sentence=sentence,
@@ -110,11 +129,13 @@ def extract_money(text: str) -> list[BudgetMention]:
 # ---------------------------------------------------------------------------
 # Dates
 
-
-def extract_dates(text: str) -> list[str]:
+def extract_dates(text: str, profile: LanguageProfile) -> list[str]:
     """Verbatim date mentions: full dates like '2024. március 15.' and
     bare years like '2030-ra' / '2024-ben'."""
-    found = [" ".join(m.group(0).split()) for m in _DATE_RE.finditer(text)]
+    _, date_re, _, _, _, _ = _compiled(profile)
+    found = []
+    if date_re is not None:
+        found += [" ".join(m.group(0).split()) for m in date_re.finditer(text)]
     found += [m.group(0) for m in _YEAR_RE.finditer(text)]
     seen, out = set(), []
     for d in found:
@@ -127,26 +148,11 @@ def extract_dates(text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Organisations and locations
 
-_ORG_RE = re.compile(
-    r"\b([A-ZÁÉÍÓÖŐÚÜŰ][\wáéíóöőúüű.-]*(?:\s+[A-ZÁÉÍÓÖŐÚÜŰa-záéíóöőúüű.-]*){0,4}"
-    r"\s(?:Zrt\.?|Kft\.?|Önkormányzat[a-záéíóöőúüű]*|Iroda|Központ|Egyesület|"
-    r"Alapítvány|Hivatal[a-záéíóöőúüű]*)|"
-    r"RÉV8|Rév8|JGK|FŐKERT|Főkert|BKV|BKK|Józsefvárosi Önkormányzat|"
-    r"Budapest Főváros Önkormányzat[a-záéíóöőúüű]*)"
-)
-
-_PLACE_RE = re.compile(
-    r"\b([A-ZÁÉÍÓÖŐÚÜŰ][\wáéíóöőúüű.]+(?:\s+[A-ZÁÉÍÓÖŐÚÜŰ][\wáéíóöőúüű.]+){0,2})"
-    r"\s*(tér|tere|téren|téri|utca|utcában|utcába|utcáján|utcai|út|úton|köz|"
-    r"sétány|sétányt|park|parkja|kert|kertje|lakótelep)\b"
-)
-
-
-def _norm_place(raw: str) -> str:
+def _norm_place(raw: str, profile: LanguageProfile) -> str:
     """Rough base form for matching: 'Losonci téren' → 'losonci tér'."""
     words = raw.lower().split()
     last = words[-1]
-    for suffix in ("ban", "ba", "ján", "ja", "én", "re", "n", "t", "i", "e"):
+    for suffix in profile.place_drop_suffixes:
         if last.endswith(suffix) and len(last) - len(suffix) >= 3:
             last = last[: -len(suffix)]
             break
@@ -154,9 +160,13 @@ def _norm_place(raw: str) -> str:
     return " ".join(words)
 
 
-def extract_organisations(text: str) -> list[str]:
+def extract_organisations(text: str,
+                          profile: LanguageProfile) -> list[str]:
+    _, _, org_re, _, _, _ = _compiled(profile)
+    if org_re is None:
+        return []
     seen, out = set(), []
-    for m in _ORG_RE.finditer(text):
+    for m in org_re.finditer(text):
         name = " ".join(m.group(0).split())
         key = name.lower()
         if key not in seen:
@@ -165,11 +175,15 @@ def extract_organisations(text: str) -> list[str]:
     return out
 
 
-def extract_locations(text: str) -> list[str]:
+def extract_locations(text: str,
+                      profile: LanguageProfile) -> list[str]:
+    _, _, _, place_re, _, _ = _compiled(profile)
+    if place_re is None:
+        return []
     seen, out = set(), []
-    for m in _PLACE_RE.finditer(text):
+    for m in place_re.finditer(text):
         raw = " ".join(m.group(0).split())
-        key = _norm_place(raw)
+        key = _norm_place(raw, profile)
         if key not in seen:
             seen.add(key)
             out.append(raw)
@@ -181,55 +195,16 @@ def extract_locations(text: str) -> list[str]:
 # never inferred. Evaluated on the retrieved chunk, not the whole document:
 # a 100-page report always contains every cue somewhere.
 
-# Broad planning documents vs concrete pages — used both for the "report vs
-# project" display label and for the background-only fallback below.
-_REPORT_CUES = (
-    ".pdf", "beszámoló", "secap", "stratégia", "akcióterv", "tanulmány",
-    "intézkedési terv", "koncepcio", "koncepció", "program 20", "program-",
-    "melleklet", "tervezet",
-)
-
-
-def is_report_doc(url: str, title: str) -> bool:
+def is_report_doc(url: str, title: str,
+                  profile: LanguageProfile) -> bool:
+    """Broad planning documents vs concrete pages — cues like file
+    extensions and report-type words from the profile."""
     blob = f"{url} {title}".lower()
-    return any(c in blob for c in _REPORT_CUES)
+    return any(c in blob for c in profile.report_cues)
 
 
-_STATUS_RULES: list[tuple[Status, list[str]]] = [
-    (Status.COMPLETED, [
-        "elkészült", "megvalósult", "átadták", "átadásra került", "megújult",
-        "fejeződtek be", "befejeződött", "ültettek el", "elültetésre került",
-        "elültették", "ültetésre került", "telepítettünk", "létesült",
-        "megnyílt", "jött létre", "létrejött", "megépült", "készült el",
-        "megvalósítottuk", "megnyitottuk", "átadtuk", "átadását",
-    ]),
-    (Status.IN_IMPLEMENTATION, [
-        "kivitelezés folyamatban", "kivitelezése folyamatban", "munkálatok",
-        "a munkák megkezdődtek", "munka megkezdődött", "felbontjuk",
-        "feltörjük", "megújítása zajlik", "felújítás zajlik", "építkezés",
-        "kivitelezés zajlik", "kivitelezését",
-    ]),
-    (Status.IN_PREPARATION, [
-        "tervezés folyamatban", "előkészítés", "tervezzük", "véleményezhetik",
-        "koncepcióterv", "lakossági fórum", "kiviteli terv", "engedélyeztetés",
-        "előkészítése folyamatban", "közösségi tervezés", "tervezik meg",
-        "egyeztetésre kerül", "társadalmi egyeztetés",
-    ]),
-    (Status.ANNOUNCED, [
-        "bejelentette", "bejelentés", "kiírjuk", "kiírásra kerül",
-        "meghirdette", "meghirdetésre kerül", "pályázatot indít",
-        "pályázatot hirdet", "indul a pályázat", "indul a program",
-        "pályázni lehet", "nyílt pályázat",
-    ]),
-    (Status.PLANNED, [
-        "tervezett", "tervei szerint", "nyertes ötlet", "javaslat",
-        "tervezik", "valósuljon meg", "megvalósításra kerül",
-        "megvalósítását tervezi",
-    ]),
-]
-
-
-def classify_status(text: str, *, is_report: bool = False,
+def classify_status(text: str, profile: LanguageProfile, *,
+                    is_report: bool = False,
                     has_money: bool = False) -> tuple[Status, str | None]:
     """What this excerpt itself supports.
 
@@ -239,7 +214,7 @@ def classify_status(text: str, *, is_report: bool = False,
     design — a missed status is better than a claimed one.
     """
     lower = text.lower()
-    for status, cues in _STATUS_RULES:
+    for status, cues in profile.status_rules:
         for cue in cues:
             idx = lower.find(cue)
             if idx != -1:

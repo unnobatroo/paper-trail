@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Callable
+from urllib.parse import urlsplit
 
 from ..domain.enums import Status
 from ..domain.models import (
@@ -23,9 +24,11 @@ from ..domain.models import (
     Commitment,
     EvidenceItem,
     EvidenceLink,
+    OfficialSource,
 )
 from ..ml import entities, matching
 from ..ml.embeddings import EmbeddingProvider
+from ..ml.lang import LanguageProfile
 from ..ml.rerank import Reranker
 from ..repositories.cache import (
     FilePageStore,
@@ -36,8 +39,7 @@ from ..repositories.cache import (
 from ..repositories.store import EvidenceRepository
 from ..sources import fetch as fetching
 from ..sources.fetch import FetchedPage
-from ..sources.official_docs import OFFICIAL_DOCS
-from ..sources.web_search import ALLOWED_DOMAINS, SearchProvider
+from ..sources.web_search import SearchProvider, allowed
 
 TOP_K = 5
 _CHUNK = 2400  # evaluated: larger semantic units retrieve better
@@ -79,6 +81,8 @@ class EvidenceService:
         page_store: PageStore | None = None,
         vector_index: VectorIndex | None = None,
         baseline_year: int | None = None,
+        profile: LanguageProfile | None = None,
+        allowed_domains: tuple[str, ...] = (),
     ):
         self._repo = repo
         self._search = search
@@ -88,6 +92,10 @@ class EvidenceService:
         self._candidates = candidates
         self._max_doc_chars = max_doc_chars
         self._baseline_year = baseline_year
+        # language profile: every locale-specific cue list lives in lang.py
+        from ..ml.lang import get_profile
+        self._profile = profile or get_profile("")
+        self._extra_domains = {d.lower() for d in allowed_domains}
         # caches: explicit stores win (Supabase/pgvector); otherwise the
         # original on-disk layout under cache_dir
         if page_store is None or vector_index is None:
@@ -136,12 +144,22 @@ class EvidenceService:
 
     def _discover(self, commitment: Commitment) -> list[EvidenceLink]:
         self._say("Finding official sources…")
-        urls = self._collect_urls(commitment)
+        registry = self._repo.official_sources()
+        domains = self._allowed(registry)
+        if not domains:
+            self._warn("No evidence sources configured — the "
+                       "official_sources registry is empty and "
+                       "PAPER_TRAIL_ALLOWED_DOMAINS is unset.")
+        urls = self._collect_urls(commitment, registry, domains)
         self._say(f"Found {len(urls)} official pages to check — reading them…")
         # fetches are pure I/O waits — run them concurrently so a few slow
         # official servers don't stall the whole search
         with ThreadPoolExecutor(max_workers=6) as pool:
-            pages = [p for p in pool.map(self._fetch_page, urls) if p]
+            pages = [
+                p for p in pool.map(
+                    lambda u: self._fetch_page(u, registry, domains),
+                    urls) if p
+            ]
         self._say(f"Read {len(pages)} pages — indexing their text…")
         if not pages:
             return []
@@ -152,21 +170,25 @@ class EvidenceService:
                 commitment_id=commitment.id,
                 url=page.url,
                 title=page.title,
-                publisher=self._publisher(page.url),
+                publisher=self._publisher(page.url, registry),
                 published_on=page.published_on,
                 snippet=snippet,
-                organisations=entities.extract_organisations(page.text),
-                locations=entities.extract_locations(page.text),
-                dates_mentioned=entities.extract_dates(page.text),
+                organisations=entities.extract_organisations(
+                    page.text, self._profile),
+                locations=entities.extract_locations(
+                    page.text, self._profile),
+                dates_mentioned=entities.extract_dates(
+                    page.text, self._profile),
             )
             # status and money are judged on the matched excerpt, not the
             # whole document — a 100-page report always contains every cue
             # and dozens of unrelated figures somewhere
             mentions = self._relevant_money(snippet)
-            is_report = entities.is_report_doc(page.url, page.title)
+            is_report = entities.is_report_doc(page.url, page.title, self._profile)
             stale = self._predates_strategy(page)
             hint, excerpt = entities.classify_status(
-                snippet, is_report=is_report, has_money=bool(mentions))
+                snippet, self._profile,
+                is_report=is_report, has_money=bool(mentions))
             if stale:
                 hint, excerpt = Status.BACKGROUND, None
             ev.status_hint, ev.status_excerpt = hint, excerpt
@@ -183,7 +205,8 @@ class EvidenceService:
                     source_url=page.url,
                 ))
 
-            features = matching.compute_features(commitment, ev, sim)
+            features = matching.compute_features(commitment, ev, sim,
+                                             self._profile)
             has_budget = bool(self._repo.budgets_for_evidence(ev.id))
             rel, reasons = matching.suggest_relationship(features, has_budget)
             if stale:
@@ -204,43 +227,57 @@ class EvidenceService:
 
     # -- internals ----------------------------------------------------------
 
-    def _collect_urls(self, commitment: Commitment) -> list[str]:
+    def _allowed(self, registry: list[OfficialSource]) -> set[str]:
+        """The SSRF allowlist = configured domains ∪ every host in the
+        official-source registry. The registry is DB data, so the allowlist
+        follows the data, not the code."""
+        return self._extra_domains | {
+            urlsplit(d.url).netloc.lower() for d in registry
+            if urlsplit(d.url).netloc
+        }
+
+    def _collect_urls(self, commitment: Commitment,
+                      registry: list[OfficialSource],
+                      domains: set[str]) -> list[str]:
         urls: list[str] = []
         query = _key(commitment)
-        for domain in ALLOWED_DOMAINS:
+        for domain in sorted(domains):
             try:
                 hits = self._search.search(f"site:{domain} {query}", max_results=TOP_K)
             except Exception:
                 hits = []
             urls.extend(h.url for h in hits)
-        urls.extend(d.url for d in OFFICIAL_DOCS)
+        urls.extend(d.url for d in registry)
         # de-dupe, keep order, allowlist only
         seen, out = set(), []
         for u in urls:
             u = u.split("#")[0]
-            if u not in seen and fetching.allowed(u):
+            if u not in seen and allowed(u, domains):
                 seen.add(u)
                 out.append(u)
         return out
 
-    def _fetch_page(self, url: str) -> FetchedPage | None:
+    def _fetch_page(self, url: str, registry: list[OfficialSource],
+                    domains: set[str]) -> FetchedPage | None:
         """Fetch once; the page store caches text + title + date."""
         cached = self._pages.get(url)
         if cached is not None:
             return cached
-        page = self._fetch(url)
+        page = self._fetch(url, domains)
         if page is None:
             return None
-        page = FetchedPage(url, self._better_title(url, page.title),
+        page = FetchedPage(url, self._better_title(url, page.title, registry),
                            page.text, page.published_on)
         self._pages.put(page)
         return page
 
     @staticmethod
-    def _better_title(url: str, fetched: str) -> str:
-        """Registry docs have human titles; PDFs often only yield a filename."""
-        if fetched == url or fetched.endswith(".pdf"):
-            for d in OFFICIAL_DOCS:
+    def _better_title(url: str, fetched: str,
+                      registry: list[OfficialSource]) -> str:
+        """Registry docs have human titles; file downloads often only
+        yield a filename."""
+        if fetched == url or _FILENAME_RE.search(fetched):
+            for d in registry:
                 if d.url.split("?")[0] == url.split("?")[0]:
                     return d.title
         return fetched
@@ -253,12 +290,16 @@ class EvidenceService:
                 and page.published_on.year < self._baseline_year)
 
     @staticmethod
-    def _publisher(url: str) -> str:
-        if "rev8.hu" in url:
-            return "RÉV8 Zrt."
-        if "budapest.hu" in url:
-            return "Budapest Főváros Önkormányzata"
-        return "Józsefvárosi Önkormányzat"
+    def _publisher(url: str, registry: list[OfficialSource]) -> str:
+        """Publisher is registry data (the official_sources rows); a host
+        with no registry entry gets its own hostname — never a guess."""
+        host = urlsplit(url).netloc.lower()
+        for d in registry:
+            shost = urlsplit(d.url).netloc.lower()
+            if shost and (host == shost or host.endswith("." + shost)
+                          or shost.endswith("." + host)):
+                return d.publisher or host
+        return host
 
     # -- money ---------------------------------------------------------------
 
@@ -268,7 +309,7 @@ class EvidenceService:
         """Money figures from the matched excerpt only — explicit currency,
         plausible amount, deduplicated by (value, kind)."""
         out, seen = [], set()
-        for m in entities.extract_money(snippet):
+        for m in entities.extract_money(snippet, self._profile):
             if m.kind is None or m.amount_huf is None:
                 continue
             if m.amount_huf < self._MIN_AMOUNT_HUF:
@@ -324,7 +365,8 @@ class EvidenceService:
 
     def _rank(self, commitment: Commitment, pages: list[FetchedPage],
               ) -> list[tuple[FetchedPage, str, float]]:
-        """All chunks → cosine top-k → cross-encoder rerank → best per doc."""
+        """All chunks → hybrid (dense+lexical) top-k → cross-encoder
+        rerank → best per doc."""
         query_text = " ".join(
             [commitment.title, commitment.summary, commitment.code or ""]
         )
@@ -335,7 +377,8 @@ class EvidenceService:
                 f"Indexing page {i + 1}/{len(pages)} — {page.title[:60]}")
             self._ensure_indexed(page)
         top = self._index.match(
-            q, self._embed.model_name, _CHUNK, pages, self._candidates)
+            q, query_text, self._embed.model_name, _CHUNK, pages,
+            self._candidates)
 
         self._say("Ranking the best candidates…")
         if self._reranker is None:
@@ -352,6 +395,7 @@ class EvidenceService:
         seen, out = set(), []
         seen_texts: set[str] = set()
         kept_titles: list[set[str]] = []
+        stop = self._profile.title_stopwords
         for row in top:
             page = row[0]
             if page.url in seen:
@@ -359,7 +403,7 @@ class EvidenceService:
             text_key = hashlib.sha256(page.text.encode()).hexdigest()[:16]
             if text_key in seen_texts:
                 continue
-            title_tokens = _title_tokens(page.title)
+            title_tokens = _title_tokens(page.title, stop)
             if any(_titles_same_doc(title_tokens, t)
                    for t in kept_titles):
                 continue
@@ -370,13 +414,14 @@ class EvidenceService:
         return out
 
 
-_TITLE_STOP = {"a", "az", "egy", "és", "hogy", "the", "of", "es", "-",
-               "–", "pdf", "letoltes", "downloads"}
+# a "title" that is just a document filename — any office/archive type
+_FILENAME_RE = re.compile(
+    r"\.(pdf|docx?|xlsx?|pptx?|odt|ods|rtf|csv|txt|zip)$", re.I)
 
 
-def _title_tokens(title: str) -> set[str]:
-    return {t for t in re.sub(r"[^a-záéíóöőúüű0-9 ]", " ", title.lower())
-            .split() if t not in _TITLE_STOP and len(t) > 1}
+def _title_tokens(title: str, stopwords) -> set[str]:
+    return {t for t in re.sub(r"[\W_]+", " ", title.lower()).split()
+            if t not in stopwords and len(t) > 1}
 
 
 def _titles_same_doc(a: set[str], b: set[str]) -> bool:

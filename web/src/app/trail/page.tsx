@@ -54,10 +54,13 @@ import { cn } from "@/lib/utils";
 const FILTER_OPTS = ["All", "Has evidence", "Missing evidence", "Measurable target"];
 const MAX_BUDGET_LINES = 6;
 
+const measurable = (c: Commitment) =>
+  c.target_value != null && c.unit != null;
+
 function matches(row: TrailRow, flt: string): boolean {
   if (flt === "Has evidence") return row.evidence.length > 0;
   if (flt === "Missing evidence") return row.evidence.length === 0;
-  if (flt === "Measurable target") return !!row.commitment.is_measurable;
+  if (flt === "Measurable target") return measurable(row.commitment);
   return true;
 }
 
@@ -427,8 +430,8 @@ function TrailDetail({
               )
             : null,
           com.deadline_year ? `Deadline ${com.deadline_year}` : null,
-          com.is_measurable && com.target_value != null
-            ? `Target ${com.target_value} ${com.unit ?? ""}`
+          measurable(com)
+            ? `Target ${com.target_value} ${com.unit}`
             : null,
           com.responsible_org ? `who: ${com.responsible_org}` : null,
           mentions > 1 ? `${mentions} source mentions` : null,

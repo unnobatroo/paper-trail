@@ -16,12 +16,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from collections import defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, data, metrics  # noqa: E402
+from experiments import common, data, metrics
 
 EMBED = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 CE_BASE = "BAAI/bge-reranker-v2-m3"

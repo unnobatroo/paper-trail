@@ -11,8 +11,6 @@
 .env
 .env.*
 !.env.example
-.streamlit/secrets.toml
-.streamlit/secrets.*.toml
 
 # runtime data — production state lives in Supabase, not the image
 data/

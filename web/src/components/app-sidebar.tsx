@@ -103,9 +103,11 @@ export function AppSidebar() {
           <span className="text-lg font-semibold tracking-tight">
             Paper Trail
           </span>
-          <Badge variant="outline" className="text-[10px]">
-            Józsefváros
-          </Badge>
+          {meta?.deployment && (
+            <Badge variant="outline" className="text-[10px]">
+              {meta.deployment}
+            </Badge>
+          )}
         </Link>
         <p className="text-xs text-muted-foreground">
           Promise → evidence → status
@@ -212,8 +214,8 @@ function IngestCard({ onJob }: { onJob: (ids: string[]) => void }) {
     resolver: zodResolver(ingestSchema),
     defaultValues: {
       name: "",
-      title: "Józsefváros Climate Strategy 2021",
-      publisher: "Józsefváros Municipality",
+      title: "",
+      publisher: "",
       url: "",
     },
   });

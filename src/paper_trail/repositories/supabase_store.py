@@ -1,8 +1,8 @@
 """Supabase data access — same repository interface, PostgREST over HTTPS.
 
 The supabase-py client is stateless HTTP: there is no connection object to
-pin to a thread, so these repositories are safe inside Streamlit's cached
-app state by construction. The schema lives in
+pin to a thread, so these repositories are safe to share across the app's
+job-runner threads by construction. The schema lives in
 `supabase/migrations/001_schema.sql` — JSON list columns are stored as TEXT
 exactly like the SQLite backend, so the shared row mappers work unchanged.
 """
@@ -10,10 +10,9 @@ exactly like the SQLite backend, so the shared row mappers work unchanged.
 from __future__ import annotations
 
 import json
+import logging
 
 from supabase import Client
-
-from ..infrastructure.supabase_client import create as create_supabase
 
 from ..domain.enums import CandidateType, RelationshipType, ReviewStatus
 from ..domain.models import (
@@ -21,10 +20,14 @@ from ..domain.models import (
     Commitment,
     EvidenceItem,
     EvidenceLink,
+    OfficialSource,
     PolicyCandidate,
     SourceDocument,
 )
+from ..infrastructure.supabase_client import create as create_supabase
 from .store import _budget, _candidate, _commitment, _evidence, _link
+
+log = logging.getLogger(__name__)
 
 
 class _SupabaseRepo:
@@ -56,15 +59,12 @@ class SupabasePolicyRepository(_SupabaseRepo):
 
     # documents -----------------------------------------------------------
     def add_document(self, doc: SourceDocument) -> int:
-        # natural-key dedupe — a retried ingest returns the existing row
-        existing = (self._db.table("documents").select("id")
-                    .eq("title", doc.title).eq("publisher", doc.publisher)
-                    .eq("url", doc.url).limit(1).execute()).data
-        if existing:
-            return existing[0]["id"]
-        res = self._db.table("documents").insert(
-            {"title": doc.title, "publisher": doc.publisher, "url": doc.url}
-        ).execute()
+        # natural-key dedupe — upsert on the unique index keeps this atomic;
+        # a retried ingest returns the existing row instead of duplicating
+        # the document (and its candidate set)
+        res = self._db.table("documents").upsert(
+            {"title": doc.title, "publisher": doc.publisher, "url": doc.url},
+            on_conflict="title,publisher,url").execute()
         return res.data[0]["id"]
 
     def documents(self) -> list[SourceDocument]:
@@ -159,6 +159,29 @@ class SupabasePolicyRepository(_SupabaseRepo):
 
 class SupabaseEvidenceRepository(_SupabaseRepo):
     """Retrieved evidence, proposed links and extracted budget figures."""
+
+    # official_sources — the source catalogue the evidence search always
+    # checks. Rows are managed in the database (see migration 005).
+    def official_sources(self) -> list[OfficialSource]:
+        try:
+            rows = select_all(
+                self._db.table("official_sources").select("*")
+                .order("sort_order").order("id"))
+        except Exception as exc:
+            # PGRST205: table missing — migration 005 not applied yet.
+            # Degrade to search-only rather than breaking evidence runs.
+            if getattr(exc, "code", "") == "PGRST205":
+                log.warning("official_sources missing — run "
+                            "supabase/migrations/005_official_sources.sql")
+                return []
+            raise
+        return [OfficialSource(**r) for r in rows]
+
+    def upsert_official_source(self, src: OfficialSource) -> None:
+        self._db.table("official_sources").upsert(
+            {"url": src.url, "title": src.title, "publisher": src.publisher,
+             "sort_order": src.sort_order},
+            on_conflict="url").execute()
 
     def add_evidence(self, ev: EvidenceItem) -> int:
         res = self._db.table("evidence").upsert({

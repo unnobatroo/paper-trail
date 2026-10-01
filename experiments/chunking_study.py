@@ -21,9 +21,8 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, data, metrics  # noqa: E402
-from experiments.build_benchmark import SOURCES, JKIT, STRATEGY, RAW  # noqa: E402
-from paper_trail.sources.pdf import read_pages  # noqa: E402
+from experiments import common, data, metrics
+from experiments.build_benchmark import RAW, SOURCES, pdf_pages
 
 MODELS = [
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
@@ -77,16 +76,13 @@ CHUNKERS = {
 def _source_texts() -> dict[str, tuple[str, str]]:
     """source_key -> (normalized-ish raw text, url)."""
     from experiments.build_benchmark import _URLS
-    jkit = read_pages(JKIT)
-    strat = read_pages(STRATEGY)
     out = {}
     for key, kind, loc in SOURCES:
         if kind == "raw":
             out[key] = ((RAW / loc).read_text(encoding="utf-8"),
                         _URLS.get(key, ""))
         else:
-            pages = jkit if kind == "jkit" else strat
-            out[key] = (pages[loc - 1].text, "")
+            out[key] = (pdf_pages(kind)[loc - 1].text, "")
     return out
 
 
@@ -109,8 +105,8 @@ def main() -> None:
     coms = data.commitments()
     queries = [f'{c["title"]} {c["text"]}' for c in coms]
 
-    from sentence_transformers import SentenceTransformer
     import numpy as np
+    from sentence_transformers import SentenceTransformer
 
     models = {m: SentenceTransformer(m.strip(), device=common.device())
               for m in args.models.split(",") if m.strip()}

@@ -1,6 +1,4 @@
-/** Display helpers mirroring src/paper_trail/presentation/formatting.py
- * and guidance.py — same wording, same honesty semantics.
- */
+/** Display helpers — labels, phrasing and grouping for review UI. */
 import type {
   BudgetKind,
   CandidateType,
@@ -103,7 +101,7 @@ export function evidenceKind(url: string, title: string): string {
     : "Project / update";
 }
 
-/** Page guides — same copy as presentation/guidance.py. */
+/** Page guides — short explainer copy shown on each route. */
 export const PAGE_GUIDES: Record<
   string,
   { description: string; terms: [string, string][] }

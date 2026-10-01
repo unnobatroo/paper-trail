@@ -19,7 +19,7 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, data  # noqa: E402
+from experiments import common, data
 
 ROWS = json.loads((common.RESULTS / "pair_features.json")
                   .read_text())["rows"]

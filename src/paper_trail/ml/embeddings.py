@@ -8,13 +8,12 @@ implementing `embed()` against that service — nothing else changes.
 from __future__ import annotations
 
 import hashlib
-import math
 import os
 import threading
 from abc import ABC, abstractmethod
 
+import numpy as np
 import requests
-
 
 # Benchmarked stage-1 retriever (see experiments/), ~220MB ONNX —
 # small enough for free-tier hosts; e5-large is stronger but needs ~2GB.
@@ -120,9 +119,9 @@ class HashingProvider(EmbeddingProvider):
 
 
 def cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na, nb = math.sqrt(sum(x * x for x in a)), math.sqrt(sum(y * y for y in b))
-    return dot / (na * nb) if na and nb else 0.0
+    a_, b_ = np.asarray(a, dtype=np.float32), np.asarray(b, dtype=np.float32)
+    denom = np.linalg.norm(a_) * np.linalg.norm(b_)
+    return float(a_ @ b_ / denom) if denom else 0.0
 
 
 def get_provider(model: str | None = None,

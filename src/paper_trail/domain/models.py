@@ -29,6 +29,19 @@ class SourceDocument(BaseModel):
     url: str = ""
 
 
+class OfficialSource(BaseModel):
+    """A known official page the evidence search always checks.
+
+    Lives in the `official_sources` table — the registry is data, not code.
+    """
+
+    id: int | None = None
+    url: str
+    title: str = ""
+    publisher: str = ""
+    sort_order: int = 0
+
+
 class DocumentPage(BaseModel):
     page_number: int  # 1-based index within the PDF
     text: str
@@ -79,10 +92,6 @@ class Commitment(BaseModel):
     unit: str | None = None
     target_value: float | None = None
     source_page: int | None = None
-
-    @property
-    def is_measurable(self) -> bool:
-        return self.target_value is not None and self.unit is not None
 
 
 class EvidenceItem(BaseModel):

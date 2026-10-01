@@ -18,10 +18,9 @@ import argparse
 import pathlib
 import sys
 import time
-from collections import defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, corpus, data, metrics  # noqa: E402
+from experiments import common, corpus, data, metrics
 
 EMBED = "intfloat/multilingual-e5-large-instruct"
 CE_BASE = "BAAI/bge-reranker-v2-m3"
@@ -39,8 +38,8 @@ def main() -> None:
     ids = [c["id"] for c in chunks]
     texts = [c["text"] for c in chunks]
 
-    from sentence_transformers import SentenceTransformer, CrossEncoder
     import numpy as np
+    from sentence_transformers import CrossEncoder, SentenceTransformer
 
     st = SentenceTransformer(EMBED, device=common.device())
     qv = st.encode([f'{c["title"]} {c["text"]}' for c in coms],

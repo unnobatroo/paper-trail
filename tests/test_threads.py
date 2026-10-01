@@ -1,6 +1,6 @@
 """Regression: repositories hold the DB path, not a connection — a repo
-created on one thread must be usable from any other thread (Streamlit
-runs each interaction on a different execution thread)."""
+created on one thread must be usable from any other thread (the API runs
+background jobs on worker threads)."""
 
 import threading
 

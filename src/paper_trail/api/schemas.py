@@ -66,7 +66,7 @@ class TrailRowView(BaseModel):
     gaps: list[str]
 
     @classmethod
-    def from_row(cls, row: TrailRow) -> "TrailRowView":
+    def from_row(cls, row: TrailRow) -> TrailRowView:
         return cls(
             commitment=row.commitment,
             evidence=row.evidence,

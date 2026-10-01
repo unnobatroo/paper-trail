@@ -6,7 +6,7 @@ import json
 import random
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -65,7 +65,7 @@ def save_result(name: str, payload: dict) -> Path:
     RESULTS.mkdir(parents=True, exist_ok=True)
     payload = {
         "experiment": name,
-        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "at": datetime.now(UTC).isoformat(timespec="seconds"),
         "device": device(),
         "gpu": gpu_name(),
         "seed": SEED,

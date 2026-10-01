@@ -1,22 +1,22 @@
-"""Web search restricted to the official-source allowlist.
-
-Two providers behind one interface:
+"""Web search providers — one interface, two implementations:
 
 * `DdgSearch` — DuckDuckGo via the `ddgs` package, no API key needed.
 * `FixtureSearch` — reads cached JSONL results (offline runs and tests).
 
-Both return the same SearchHit objects; the pipeline treats them identically.
+Providers are dumb: they return whatever the engine found. The SSRF
+allowlist (`allowed()`) is enforced by the caller — the evidence service —
+which derives the domains from the official-source registry plus any
+configured extras, so the list follows data, not code.
 """
 
 from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
-
-ALLOWED_DOMAINS = ("jozsefvaros.hu", "rev8.hu", "budapest.hu")
 
 
 @dataclass
@@ -26,9 +26,10 @@ class SearchHit:
     snippet: str
 
 
-def allowed(url: str) -> bool:
+def allowed(url: str, domains: Collection[str]) -> bool:
+    """Is `url` on one of the allowed domains (or a subdomain)?"""
     host = urlparse(url).netloc.lower()
-    return any(host == d or host.endswith("." + d) for d in ALLOWED_DOMAINS)
+    return any(host == d or host.endswith("." + d) for d in domains)
 
 
 class SearchProvider(ABC):
@@ -43,17 +44,12 @@ class DdgSearch(SearchProvider):
 
         hits: list[SearchHit] = []
         with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=max_results * 2):
-                url = r.get("href", "")
-                if not allowed(url):
-                    continue
+            for r in ddgs.text(query, max_results=max_results):
                 hits.append(SearchHit(
-                    url=url,
+                    url=r.get("href", ""),
                     title=r.get("title", ""),
                     snippet=r.get("body", ""),
                 ))
-                if len(hits) >= max_results:
-                    break
         return hits
 
 
@@ -75,7 +71,7 @@ class FixtureSearch(SearchProvider):
         hits = [
             SearchHit(url=r["url"], title=r.get("title", ""), snippet=r.get("snippet", ""))
             for r in self._rows
-            if r["query_substring"].lower() in query.lower() and allowed(r["url"])
+            if r["query_substring"].lower() in query.lower()
         ]
         return hits[:max_results]
 

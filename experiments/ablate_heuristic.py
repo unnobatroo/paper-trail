@@ -22,9 +22,12 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, data, metrics  # noqa: E402
-from paper_trail.ml.matching import (  # noqa: E402
-    W_DATE, W_LOCATION, W_ORG, W_SIMILARITY,
+from experiments import common, data, metrics
+from paper_trail.ml.matching import (
+    W_DATE,
+    W_LOCATION,
+    W_ORG,
+    W_SIMILARITY,
 )
 
 ROWS = json.loads((common.RESULTS / "pair_features.json")

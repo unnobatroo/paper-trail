@@ -12,14 +12,15 @@ import hashlib
 import json
 
 from paper_trail.domain.enums import CandidateType, ReviewStatus, Status
-from paper_trail.domain.models import Commitment
+from paper_trail.domain.models import Commitment, OfficialSource
 from paper_trail.ml.embeddings import HashingProvider
+from paper_trail.ml.lang import HU
 from paper_trail.ml.rerank import Reranker
 from paper_trail.repositories.store import EvidenceRepository
 from paper_trail.services.evidence_service import (
-    EvidenceService,
     _CHUNK,
     _CHUNK_STRIDE,
+    EvidenceService,
 )
 from paper_trail.sources.fetch import FetchedPage
 from paper_trail.sources.web_search import SearchHit
@@ -64,10 +65,34 @@ def _svc(tmp_path, repo: EvidenceRepository, policy, text: str,
         json.dumps({"title": "Utcafásítás", "date": page_date}))
     svc = EvidenceService(repo, _Search(),
                           embedder or _CountingEmbedder(),
-                          cache_dir=cache, fetcher=lambda u: None, **kw)
+                          cache_dir=cache, fetcher=lambda u, d=None: None,
+                          profile=HU, allowed_domains=("rev8.hu",), **kw)
     cid = policy.add_commitment(
         Commitment(kind=CandidateType.MEASURE, title="Utcafásítás"))
     return svc, policy.commitment(cid)
+
+
+def test_source_catalogue_comes_from_db(policy, evidence, tmp_path):
+    """The official-source registry is data: the service reads it through
+    the repository — upserted rows drive both URL collection and the
+    human-title fallback."""
+    evidence.upsert_official_source(OfficialSource(
+        url="https://jozsefvaros.hu/registry-doc.pdf?ver=1",
+        title="Registry title", publisher="Józsefvárosi Önkormányzat"))
+    evidence.upsert_official_source(OfficialSource(
+        url="https://jozsefvaros.hu/registry-doc.pdf?ver=1",
+        title="Renamed", publisher="Józsefvárosi Önkormányzat"))
+    sources = evidence.official_sources()
+    assert len(sources) == 1  # upsert on url, not a second row
+    assert sources[0].title == "Renamed"
+
+    svc, com = _svc(tmp_path, evidence, policy, "fák " * 200)
+    registry = svc._repo.official_sources()
+    urls = svc._collect_urls(com, registry, svc._allowed(registry))
+    assert "https://jozsefvaros.hu/registry-doc.pdf?ver=1" in urls
+    assert svc._better_title(
+        "https://jozsefvaros.hu/registry-doc.pdf?ver=1",
+        "registry-doc.pdf", svc._repo.official_sources()) == "Renamed"
 
 
 def test_full_document_is_chunked(policy, evidence, tmp_path):

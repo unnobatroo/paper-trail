@@ -19,9 +19,10 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 BENCH = ROOT / "data" / "benchmark"
 
-TEST_SOURCES = {"rev8_magdolna-kert", "rev8_losonci-ter",
-                "reszvetel_2024", "jkit_p73"}
-VAL_SOURCES = {"rev8_danko-utca", "jkit_p13", "jkit_p14", "jkit_p15"}
+# Split assignment lives in the authored spec, not in code.
+_SPEC = json.loads((BENCH / "spec.json").read_text(encoding="utf-8"))
+TEST_SOURCES = set(_SPEC["splits"]["test"])
+VAL_SOURCES = set(_SPEC["splits"]["val"])
 
 
 def _load(name: str) -> list[dict]:

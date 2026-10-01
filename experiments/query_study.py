@@ -21,10 +21,11 @@ import sys
 
 sys.path.insert(0, ".")
 sys.path.insert(0, "src")
-from experiments import common, corpus, data, metrics  # noqa: E402
-from paper_trail.domain.enums import CandidateType  # noqa: E402
-from paper_trail.domain.models import Commitment  # noqa: E402
-from paper_trail.ml import matching  # noqa: E402
+from experiments import common, corpus, data, metrics
+from paper_trail.domain.enums import CandidateType
+from paper_trail.domain.models import Commitment
+from paper_trail.ml import matching
+from paper_trail.ml.lang import HU
 
 MODELS = [
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
@@ -44,7 +45,7 @@ def _queries(coms, variant: str) -> list[str]:
         elif variant == "full":
             com = Commitment(kind=CandidateType.MEASURE, title=c["title"],
                              summary=c["text"], code=c["code"])
-            ent = matching.commitment_entities(com)
+            ent = matching.commitment_entities(com, HU)
             extras = " ".join(sorted(ent["orgs"] | ent["locations"]
                                      | ent["dates"]))
             out.append(f'{c["title"]} {c["text"]} {extras}'.strip())
@@ -62,8 +63,8 @@ def main() -> None:
     ids = [c["id"] for c in chunks]
     texts = [c["text"] for c in chunks]
 
-    from sentence_transformers import SentenceTransformer
     import numpy as np
+    from sentence_transformers import SentenceTransformer
 
     report = {}
     for mname in [m.strip() for m in args.models.split(",") if m.strip()]:

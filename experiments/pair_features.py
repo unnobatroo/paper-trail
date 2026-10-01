@@ -26,11 +26,11 @@ import sys
 
 sys.path.insert(0, ".")
 sys.path.insert(0, "src")
-from experiments import common, data  # noqa: E402
-
-from paper_trail.domain.enums import CandidateType  # noqa: E402
-from paper_trail.domain.models import Commitment, EvidenceItem  # noqa: E402
-from paper_trail.ml import entities, matching  # noqa: E402
+from experiments import common, data
+from paper_trail.domain.enums import CandidateType
+from paper_trail.domain.models import Commitment, EvidenceItem
+from paper_trail.ml import entities, matching
+from paper_trail.ml.lang import HU
 
 OUT = common.RESULTS / "pair_features.json"
 EMBED = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -48,7 +48,7 @@ def main() -> None:
     pair_map = {(r["commitment_id"], r["passage_id"]): r
                 for r in data.pairs()}
 
-    from sentence_transformers import SentenceTransformer, CrossEncoder
+    from sentence_transformers import CrossEncoder, SentenceTransformer
 
     st = SentenceTransformer(EMBED, device=common.device())
     qv = {cid: st.encode([f'{c["title"]} {c["text"]}'],
@@ -80,12 +80,13 @@ def main() -> None:
             sim = float(qv[cid] @ pv[pid])
             ev = EvidenceItem(
                 commitment_id=0, url=p["url"], title=pid,
-                organisations=entities.extract_organisations(p["text"]),
-                locations=entities.extract_locations(p["text"]),
-                dates_mentioned=entities.extract_dates(p["text"]),
+                organisations=entities.extract_organisations(p["text"], HU),
+                locations=entities.extract_locations(p["text"], HU),
+                dates_mentioned=entities.extract_dates(p["text"], HU),
             )
-            feats = matching.compute_features(com, ev, sim)
-            has_budget = any(m.kind for m in entities.extract_money(p["text"]))
+            feats = matching.compute_features(com, ev, sim, HU)
+            has_budget = any(
+                m.kind for m in entities.extract_money(p["text"], HU))
             rel, _ = matching.suggest_relationship(feats, has_budget)
             lab = label_map.get((cid, pid))
             pr = pair_map.get((cid, pid))

@@ -16,7 +16,7 @@ import argparse
 import sys
 
 sys.path.insert(0, ".")
-from experiments import common, data, metrics  # noqa: E402
+from experiments import common, data, metrics
 
 DEFAULT_MODELS = [
     "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",  # current
@@ -39,8 +39,8 @@ def main() -> None:
     corpus = [p["text"] for p in psgs]
     pids = [p["id"] for p in psgs]
 
-    from sentence_transformers import SentenceTransformer
     import numpy as np
+    from sentence_transformers import SentenceTransformer
 
     for name in [m.strip() for m in args.models.split(",") if m.strip()]:
         with common.Timer() as t:

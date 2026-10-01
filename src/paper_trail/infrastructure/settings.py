@@ -25,8 +25,16 @@ Environment overrides:
                             default "auto" mode; set
                             PAPER_TRAIL_EMBED_MODEL=jina to also use
                             Jina for embeddings
-  HF_TOKEN                  enables Hungarian→English machine translation
-                            in the UI (Helsinki-NLP/opus-mt-hu-en)
+  HF_TOKEN                  enables machine translation in the UI
+                            (Helsinki-NLP opus-mt-{lang}-en)
+  PAPER_TRAIL_LANGUAGE      language profile for the deterministic parsers
+                            — money/date/status cues, stemming, extraction
+                            labels (default "hu"; profiles in ml/lang.py)
+  PAPER_TRAIL_ALLOWED_DOMAINS
+                            comma-separated extra evidence domains, on top
+                            of the official_sources registry hosts
+  PAPER_TRAIL_MT_MODEL      translation model (default derived from the
+                            language profile)
   PAPER_TRAIL_BASELINE_YEAR the year the tracked strategy was adopted —
                             evidence published earlier is forced to
                             background (default: derived from the document
@@ -97,6 +105,19 @@ class Settings(BaseSettings):
         validation_alias="PAPER_TRAIL_API_ORIGINS")
     baseline_year: int | None = Field(
         default=None, validation_alias="PAPER_TRAIL_BASELINE_YEAR")
+    language: str = Field(
+        default="hu", validation_alias="PAPER_TRAIL_LANGUAGE")
+    allowed_domains_raw: str = Field(
+        default="", validation_alias="PAPER_TRAIL_ALLOWED_DOMAINS")
+    mt_model: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_MT_MODEL")
+    deployment: str = Field(
+        default="", validation_alias="PAPER_TRAIL_DEPLOYMENT")
+
+    @property
+    def allowed_domains(self) -> tuple[str, ...]:
+        return tuple(d.strip().lower() for d in
+                     self.allowed_domains_raw.split(",") if d.strip())
 
     @property
     def llm_configured(self) -> bool:

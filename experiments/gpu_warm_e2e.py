@@ -15,10 +15,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from pathlib import Path
 
-from paper_trail.repositories.store import PolicyRepository, EvidenceRepository
-from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.ml.embeddings import SentenceTransformerProvider
 from paper_trail.ml.rerank import get_reranker
+from paper_trail.ml.lang import HU
+from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
+from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.sources.web_search import get_search_provider
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,7 @@ svc = EvidenceService(
     SentenceTransformerProvider("intfloat/multilingual-e5-large"),
     cache_dir=ROOT / "data/processed/fetched",
     reranker=get_reranker("BAAI/bge-reranker-v2-m3"),
+    profile=HU,
 )
 prog = lambda m: print("  …", m, flush=True)
 for com in policy.commitments():

@@ -1,38 +1,24 @@
-"""Ranking + classification metrics, no dependencies."""
+"""Experiment metrics via ranx + scikit-learn — no hand-rolled math.
+
+ranx's metrics are validated against trec_eval; `compare_runs` adds paired
+significance tests for model/reranker bake-offs.
+"""
 
 from __future__ import annotations
 
-import math
-from collections import Counter
+from ranx import Qrels, Run, evaluate
 
 
-def recall_at_k(ranked: list[str], gold: set[str], k: int) -> float:
-    if not gold:
-        return 0.0
-    return len(set(ranked[:k]) & gold) / len(gold)
+def _qrels(relevance: dict[tuple[str, str], int]) -> Qrels:
+    """{(commitment_id, passage_id): graded relevance} → ranx Qrels."""
+    return Qrels({q: dict(v) for q, v in _group(relevance).items()})
 
 
-def precision_at_k(ranked: list[str], gold: set[str], k: int) -> float:
-    if k == 0:
-        return 0.0
-    return len(set(ranked[:k]) & gold) / k
-
-
-def mrr(ranked: list[str], gold: set[str]) -> float:
-    for i, p in enumerate(ranked, start=1):
-        if p in gold:
-            return 1.0 / i
-    return 0.0
-
-
-def ndcg_at_k(ranked: list[str], gains: dict[str, int], k: int) -> float:
-    dcg = sum(
-        gains.get(p, 0) / math.log2(i + 1)
-        for i, p in enumerate(ranked[:k], start=1)
-    )
-    ideal = sorted(gains.values(), reverse=True)[:k]
-    idcg = sum(g / math.log2(i + 1) for i, g in enumerate(ideal, start=1))
-    return dcg / idcg if idcg else 0.0
+def _group(relevance: dict[tuple[str, str], int]) -> dict:
+    out: dict[str, dict[str, int]] = {}
+    for (q, p), rel in relevance.items():
+        out.setdefault(q, {})[p] = rel
+    return out
 
 
 def ranking_report(ranked_by_query: dict[str, list[str]],
@@ -42,46 +28,53 @@ def ranking_report(ranked_by_query: dict[str, list[str]],
 
     relevance: {(commitment_id, passage_id): graded relevance}
     """
-    out = {}
-    for k in k_list:
-        rs, ps = [], []
-        for q, ranked in ranked_by_query.items():
-            gold = {p for (c, p), r in relevance.items()
-                    if c == q and r >= 1}
-            rs.append(recall_at_k(ranked, gold, k))
-            ps.append(precision_at_k(ranked, gold, k))
-        out[f"recall@{k}"] = round(sum(rs) / len(rs), 4) if rs else 0
-        out[f"precision@{k}"] = round(sum(ps) / len(ps), 4) if ps else 0
-    mrrs, ndcgs = [], []
-    for q, ranked in ranked_by_query.items():
-        gold = {p for (c, p), r in relevance.items() if c == q and r >= 1}
-        gains = {p: r for (c, p), r in relevance.items() if c == q}
-        mrrs.append(mrr(ranked, gold))
-        ndcgs.append(ndcg_at_k(ranked, gains, 10))
-    out["mrr"] = round(sum(mrrs) / len(mrrs), 4) if mrrs else 0
-    out["ndcg@10"] = round(sum(ndcgs) / len(ndcgs), 4) if ndcgs else 0
-    return out
+    metrics = (
+        [f"recall@{k}" for k in k_list]
+        + [f"precision@{k}" for k in k_list]
+        + ["mrr", "ndcg@10"]
+    )
+    run = Run({q: {p: float(len(r) - i) for i, p in enumerate(r)}
+               for q, r in ranked_by_query.items()})
+    return evaluate(_qrels(relevance), run, metrics,
+                    return_mean=True, make_comparable=True)
+
+
+def compare_runs(relevance: dict[tuple[str, str], int],
+                 runs: dict[str, dict[str, list[str]]],
+                 metrics=("recall@5", "ndcg@10", "mrr@10")):
+    """Significance-tested comparison of named rankings.
+
+    runs: {name: {query_id: [ranked passage ids]}}
+    """
+    from ranx import compare
+    qrels = _qrels(relevance)
+    return compare(
+        qrels,
+        [Run({q: {p: float(len(r) - i) for i, p in enumerate(r)}
+              for q, r in ranked.items()}) for ranked in runs.values()],
+        list(metrics),
+    )
 
 
 def classification_report(y_true: list[str], y_pred: list[str]) -> dict:
+    from collections import Counter
+
+    from sklearn.metrics import accuracy_score
+    from sklearn.metrics import classification_report as _report
+
     labels = sorted(set(y_true) | set(y_pred))
-    per_class = {}
-    f1s = []
-    for lab in labels:
-        tp = sum(1 for t, p in zip(y_true, y_pred) if t == lab and p == lab)
-        fp = sum(1 for t, p in zip(y_true, y_pred) if t != lab and p == lab)
-        fn = sum(1 for t, p in zip(y_true, y_pred) if t == lab and p != lab)
-        prec = tp / (tp + fp) if tp + fp else 0.0
-        rec = tp / (tp + fn) if tp + fn else 0.0
-        f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
-        per_class[lab] = {"precision": round(prec, 3), "recall": round(rec, 3),
-                          "f1": round(f1, 3),
-                          "support": sum(1 for t in y_true if t == lab)}
-        f1s.append(f1)
-    acc = sum(1 for t, p in zip(y_true, y_pred) if t == p) / max(len(y_true), 1)
+    rep = _report(y_true, y_pred, labels=labels, output_dict=True,
+                  zero_division=0)
+    per_class = {
+        lab: {"precision": round(rep[lab]["precision"], 3),
+              "recall": round(rep[lab]["recall"], 3),
+              "f1": round(rep[lab]["f1-score"], 3),
+              "support": int(rep[lab]["support"])}
+        for lab in labels
+    }
     return {
-        "accuracy": round(acc, 4),
-        "macro_f1": round(sum(f1s) / len(f1s), 4),
+        "accuracy": round(accuracy_score(y_true, y_pred), 4),
+        "macro_f1": round(rep["macro avg"]["f1-score"], 4),
         "per_class": per_class,
         "confusion": {
             f"{t}>{p}": n

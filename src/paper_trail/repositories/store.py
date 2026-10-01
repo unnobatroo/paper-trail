@@ -1,18 +1,17 @@
 """Data access. Two small repositories; the only layer that speaks SQL.
 
 Repositories hold the database *path*, never a connection — a sqlite3
-connection is bound to the thread that created it and Streamlit runs each
-interaction on a different thread. Every operation opens, uses and closes
-its own connection via `_connect()`.
+connection is bound to the thread that created it and background jobs run
+on worker threads. Every operation opens, uses and closes its own
+connection via `_connect()`.
 """
 
 from __future__ import annotations
 
 import json
-import sqlite3
+from collections.abc import Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Mapping
 
 from ..domain.enums import (
     BudgetKind,
@@ -27,6 +26,7 @@ from ..domain.models import (
     EvidenceItem,
     EvidenceLink,
     MatchFeatures,
+    OfficialSource,
     PolicyCandidate,
     SourceDocument,
 )
@@ -153,17 +153,15 @@ class PolicyRepository(_Repo):
         # natural-key dedupe — a retried ingest returns the existing row
         # instead of duplicating the document (and its candidate set)
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT id FROM documents"
-                " WHERE title=? AND publisher=? AND url=?",
-                (doc.title, doc.publisher, doc.url)).fetchone()
-            if row:
-                return row["id"]
-            cur = conn.execute(
-                "INSERT INTO documents(title, publisher, url) VALUES (?,?,?)",
+            conn.execute(
+                "INSERT INTO documents(title, publisher, url) VALUES (?,?,?)"
+                " ON CONFLICT(title, publisher, url) DO NOTHING",
                 (doc.title, doc.publisher, doc.url),
             )
-            return cur.lastrowid
+            return conn.execute(
+                "SELECT id FROM documents"
+                " WHERE title=? AND publisher=? AND url=?",
+                (doc.title, doc.publisher, doc.url)).fetchone()["id"]
 
     def documents(self) -> list[SourceDocument]:
         with self._connect() as conn:
@@ -261,6 +259,29 @@ class PolicyRepository(_Repo):
 
 class EvidenceRepository(_Repo):
     """Retrieved evidence, proposed links and extracted budget figures."""
+
+    # official_sources — the source catalogue the evidence search always
+    # checks. Rows are managed in the database (see migration 005).
+    def official_sources(self) -> list[OfficialSource]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM official_sources ORDER BY sort_order, id"
+            ).fetchall()
+        return [
+            OfficialSource(id=r["id"], url=r["url"], title=r["title"],
+                           publisher=r["publisher"],
+                           sort_order=r["sort_order"])
+            for r in rows
+        ]
+
+    def upsert_official_source(self, src: OfficialSource) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO official_sources(url, title, publisher, sort_order)"
+                " VALUES(?,?,?,?) ON CONFLICT(url) DO UPDATE SET"
+                " title=excluded.title, publisher=excluded.publisher",
+                (src.url, src.title, src.publisher, src.sort_order),
+            )
 
     def add_evidence(self, ev: EvidenceItem) -> int:
         with self._connect() as conn:

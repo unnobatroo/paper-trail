@@ -1,57 +1,57 @@
-"""Hungarian → English machine translation at runtime.
+"""Source-language → English machine translation at runtime.
 
-The source documents are Hungarian; the UI keeps them verbatim for
-provenance and shows an optional machine translation underneath for
-orientation. Everything this module produces is labelled automatic
-translation — it is never presented as an official document.
+The source documents are verbatim for provenance; the UI shows an optional
+machine translation underneath for orientation. Everything this module
+produces is labelled automatic translation — it is never presented as an
+official document.
 
-Backend: Helsinki-NLP/opus-mt-hu-en on the Hugging Face Inference API.
-Needs HF_TOKEN; without one the UI simply shows no translation.
+Backend: a Helsinki-NLP opus-mt-*-en model on the Hugging Face Inference
+API. Needs HF_TOKEN; without one the UI simply shows no translation.
+The model defaults to opus-mt-<PAPER_TRAIL_LANGUAGE>-en and can be
+overridden with PAPER_TRAIL_MT_MODEL.
 """
 
 from __future__ import annotations
 
 import os
 
-import requests
+from ..ml.lang import LanguageProfile
 
-MT_MODEL = "Helsinki-NLP/opus-mt-hu-en"
 MT_DISCLAIMER = (
-    "English text below is automatic machine translation "
-    f"({MT_MODEL}) — for orientation only, not an official document."
+    "English text below is automatic machine translation ({model}) — "
+    "for orientation only, not an official document."
 )
-
-_ENDPOINT = "https://router.huggingface.co/hf-inference/models/"
 
 
 class Translator:
-    def __init__(self, api_key: str | None = None, model: str = MT_MODEL):
-        self.model = model
-        self._key = api_key or os.environ.get("HF_TOKEN", "")
-        self._url = _ENDPOINT + model
+    def __init__(self, profile: LanguageProfile, api_key: str | None = None,
+                 model: str | None = None):
+        from huggingface_hub import InferenceClient
+
+        self.model = (model
+                      or f"Helsinki-NLP/opus-mt-{profile.code}-en")
+        self.disclaimer = MT_DISCLAIMER.format(model=self.model)
+        self._client = InferenceClient(
+            api_key=api_key or os.environ.get("HF_TOKEN", ""),
+            timeout=60,
+        )
 
     def translate(self, text: str) -> str | None:
         """English rendering of `text`, or None when the service is
-        unavailable — the caller falls back to Hungarian only."""
+        unavailable — the caller falls back to the source language."""
         if not text.strip():
             return None
         try:
-            resp = requests.post(
-                self._url,
-                headers={"Authorization": f"Bearer {self._key}"},
-                json={"inputs": text[:4000]},
-                timeout=60,
-            )
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            if isinstance(data, list) and data:
-                return data[0].get("translation_text")
-            return data.get("translation_text") if isinstance(data, dict) else None
-        except requests.RequestException:
+            out = self._client.translation(
+                text[:4000], model=self.model)
+            return out.translation_text if out else None
+        except Exception:
             return None
 
 
-def get_translator() -> Translator | None:
+def get_translator(profile: LanguageProfile,
+                   model: str | None = None) -> Translator | None:
     """A translator when HF_TOKEN is configured, else None."""
-    return Translator() if os.environ.get("HF_TOKEN") else None
+    if not os.environ.get("HF_TOKEN"):
+        return None
+    return Translator(profile, model=model)

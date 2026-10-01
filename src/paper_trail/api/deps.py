@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from ..bootstrap import AppState, build_state
-from .jobs import JobRunner
+from .jobs import JobRunner, SupabaseJobRunner
 
 
 @lru_cache
@@ -44,12 +44,11 @@ def _handlers():
 
 
 @lru_cache
-def get_jobs() -> JobRunner:
+def get_jobs() -> JobRunner | SupabaseJobRunner:
     """Durable Postgres-backed queue when Supabase is configured —
     otherwise the in-process runner (dev/test only)."""
     settings = get_state().settings
     if settings.supabase_configured:
-        from .jobs import SupabaseJobRunner
         return SupabaseJobRunner(
             settings.supabase_url, settings.supabase_key, _handlers(),
             # 2 workers × ~6 fetch threads keeps outbound connections

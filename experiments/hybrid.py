@@ -23,7 +23,7 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, ".")
-from experiments import common, metrics  # noqa: E402
+from experiments import common, metrics
 
 ROWS = json.loads((common.RESULTS / "pair_features.json")
                   .read_text())["rows"]
@@ -69,9 +69,6 @@ def main() -> None:
     clf.fit([_X(r) for r in train], ytr_bin)
     hybrid = list(clf.predict([_X(r) for r in test]))
 
-    sims = [r["sim"] for r in ROWS if r["pair_relevance"] is not None]
-    labels_bin = [1 if r["pair_relevance"] >= 1 else 0
-                  for r in ROWS if r["pair_relevance"] is not None]
     # pick the sim threshold that best separates on train rows only
     tr_sims = [r["sim"] for r in train]
     thr = max(tr_sims, key=lambda t: sum(

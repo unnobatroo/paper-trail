@@ -2,12 +2,14 @@
 
 Not a crawler: given a URL already found by search (or listed in the official
 document registry), download once and return plain text. HTML goes through
-trafilatura, PDFs through pypdf.
+trafilatura, PDFs through pypdf. The allowlist is supplied by the caller —
+it derives from the source registry, not from code.
 """
 
 from __future__ import annotations
 
 import io
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 
@@ -29,9 +31,9 @@ class FetchedPage:
     published_on: date | None = None
 
 
-def fetch(url: str) -> FetchedPage | None:
+def fetch(url: str, allowed_domains: Collection[str]) -> FetchedPage | None:
     """Fetch one allow-listed URL. Returns None when unreadable/off-list."""
-    if not allowed(url):
+    if not allowed(url, allowed_domains):
         return None
     try:
         resp = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT)
@@ -40,7 +42,7 @@ def fetch(url: str) -> FetchedPage | None:
         return None
     # redirects are followed implicitly — re-check the allowlist on the
     # final URL so an on-list page can't point the fetcher off-list
-    if not allowed(resp.url):
+    if not allowed(resp.url, allowed_domains):
         return None
 
     if url.lower().endswith(".pdf") or resp.headers.get("content-type", "").startswith(

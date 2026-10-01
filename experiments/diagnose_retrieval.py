@@ -26,7 +26,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, data  # noqa: E402
+from experiments import common, data
 
 BEYOND_60KB = {"jkit_p48", "jkit_p53", "jkit_p64", "jkit_p66", "jkit_p73"}
 STRADDLES = {"jkit_p45"}

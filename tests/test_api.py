@@ -3,7 +3,6 @@ embeddings, fixture search, and a stubbed fetcher. Covers the review
 flow endpoints and the background evidence job."""
 
 import time
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,7 +34,7 @@ def state(tmp_path, monkeypatch):
     get_state.cache_clear()
     s = get_state()
     # never touch the network from tests
-    s.evidence_svc._fetch = lambda url: None
+    s.evidence_svc._fetch = lambda url, domains=None: None
     yield s
     get_state.cache_clear()
 
@@ -78,7 +77,10 @@ def test_candidate_review_flow(client, state):
 
 def test_find_evidence_job_and_link_review(client, state):
     from paper_trail.domain.enums import CandidateType
-    from paper_trail.domain.models import Commitment
+    from paper_trail.domain.models import Commitment, OfficialSource
+    # the source catalogue is data — register the URL in the DB, the way
+    # migration 005 seeds it in Postgres
+    state.evidence.upsert_official_source(OfficialSource(url=EVIDENCE_URL))
     # a fetched page is already in the (file) page store — no fetch needed
     state.evidence_svc._pages.put(FetchedPage(
         url=EVIDENCE_URL, title="Utcafásítás", text=EVIDENCE_TEXT))
@@ -107,13 +109,10 @@ def test_find_evidence_job_and_link_review(client, state):
     assert row["evidence"] and row["status"] != "unknown"
 
 
-def test_ingest_job_from_document_store(client, state):
-    """The checked-in strategy PDF ingests end-to-end, offline."""
-    pdf = Path("data/source_documents/jozsefvaros_klimastrategia_2021.pdf")
-    if not pdf.exists():
-        pytest.skip("strategy PDF not downloaded")
+def test_ingest_job_from_document_store(client, state, strategy_pdf):
+    """A synced source document ingests end-to-end, offline."""
     r = client.post("/api/documents/ingest", json={
-        "name": pdf.name, "title": "t", "publisher": "p"})
+        "name": strategy_pdf.name, "title": "t", "publisher": "p"})
     assert r.status_code == 202
     job_id = r.json()["id"]
     for _ in range(600):

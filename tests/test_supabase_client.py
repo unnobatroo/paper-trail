@@ -2,17 +2,18 @@
 
 import httpx
 import pytest
+from httpx_retries import RetryTransport
 
-from paper_trail.infrastructure.supabase_client import _BACKOFF, _RetryingClient
-
-
-def _client(handler) -> _RetryingClient:
-    c = _RetryingClient(transport=httpx.MockTransport(handler))
-    return c
+from paper_trail.infrastructure.supabase_client import RETRY
 
 
-def test_retries_transient_transport_errors(monkeypatch):
-    monkeypatch.setattr("time.sleep", lambda s: None)
+def _client(handler) -> httpx.Client:
+    return httpx.Client(
+        transport=RetryTransport(
+            transport=httpx.MockTransport(handler), retry=RETRY))
+
+
+def test_retries_transient_transport_errors():
     calls = []
 
     def handler(request):
@@ -26,8 +27,7 @@ def test_retries_transient_transport_errors(monkeypatch):
     assert len(calls) == 3
 
 
-def test_gives_up_after_backoff_budget(monkeypatch):
-    monkeypatch.setattr("time.sleep", lambda s: None)
+def test_gives_up_after_retry_budget():
     calls = []
 
     def handler(request):
@@ -36,11 +36,10 @@ def test_gives_up_after_backoff_budget(monkeypatch):
 
     with pytest.raises(httpx.ReadError):
         _client(handler).get("https://x.test/rest/v1/t")
-    assert len(calls) == len(_BACKOFF) + 1
+    assert len(calls) == RETRY.total + 1
 
 
-def test_non_transient_errors_not_retried(monkeypatch):
-    monkeypatch.setattr("time.sleep", lambda s: None)
+def test_non_transient_errors_not_retried():
     calls = []
 
     def handler(request):
@@ -52,14 +51,13 @@ def test_non_transient_errors_not_retried(monkeypatch):
     assert len(calls) == 1
 
 
-def test_http_errors_not_retried(monkeypatch):
-    monkeypatch.setattr("time.sleep", lambda s: None)
+def test_http_errors_not_retried():
     calls = []
 
     def handler(request):
         calls.append(request)
-        return httpx.Response(401, json={"message": "denied"})
+        return httpx.Response(500)
 
     resp = _client(handler).get("https://x.test/rest/v1/t")
-    assert resp.status_code == 401
+    assert resp.status_code == 500
     assert len(calls) == 1

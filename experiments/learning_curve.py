@@ -17,8 +17,8 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, metrics  # noqa: E402
-from experiments.hybrid import FEATURES, _X, _binary_report  # noqa: E402
+from experiments import common, metrics
+from experiments.hybrid import _X, _binary_report
 
 ROWS = json.loads((common.RESULTS / "pair_features.json")
                   .read_text())["rows"]

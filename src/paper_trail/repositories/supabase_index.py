@@ -12,15 +12,17 @@ the client is stateless HTTP and safe to share across threads.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 
 from supabase import Client
 
 from ..infrastructure.supabase_client import create as create_supabase
-
 from ..sources.fetch import FetchedPage
-from .cache import PageStore, VectorIndex, pad_vector
+from .cache import LEX_WEIGHT, PageStore, VectorIndex, pad_vector
 from .supabase_store import select_all
+
+log = logging.getLogger(__name__)
 
 # rows per insert batch — chunk rows carry ~20 KB of vector text each
 _BATCH = 200
@@ -71,8 +73,10 @@ class SupabasePageStore(PageStore):
 
 
 class SupabaseVectorIndex(VectorIndex):
-    def __init__(self, url: str, key: str, client: Client | None = None):
+    def __init__(self, url: str, key: str, client: Client | None = None,
+                 ts_config: str = "hungarian"):
         self._db = client or create_supabase(url, key)
+        self._ts_config = ts_config
         self._page_ids: dict[str, int] = {}
 
     def _page_id(self, url: str) -> int | None:
@@ -130,16 +134,34 @@ class SupabaseVectorIndex(VectorIndex):
                      on_conflict="page_id,embed_model,chunk_index")
              .execute())
 
-    def match(self, query: list[float], model: str, chunk_size: int,
-              pages: list[FetchedPage],
+    def match(self, query: list[float], query_text: str, model: str,
+              chunk_size: int, pages: list[FetchedPage],
               k: int) -> list[tuple[FetchedPage, str, float]]:
         by_url = {p.url: p for p in pages}
-        res = self._db.rpc("match_chunks", {
-            "query_embedding": _vec_literal(pad_vector(query)),
-            "model": model,
-            "match_count": k,
-            "page_urls": [p.url for p in pages],
-        }).execute()
+        try:
+            res = self._db.rpc("match_chunks_hybrid", {
+                "query_embedding": _vec_literal(pad_vector(query)),
+                "query_text": query_text,
+                "model": model,
+                "match_count": k,
+                "page_urls": [p.url for p in pages],
+                "lex_weight": LEX_WEIGHT,
+                "lex_config": self._ts_config,
+            }).execute()
+        except Exception as exc:
+            # PGRST202: function missing — migration 006 not applied yet.
+            # Degrade to dense-only rather than failing the evidence run.
+            if getattr(exc, "code", "") != "PGRST202":
+                raise
+            log.warning("match_chunks_hybrid missing — run "
+                        "supabase/migrations/006_hybrid_search.sql; "
+                        "falling back to dense-only match_chunks")
+            res = self._db.rpc("match_chunks", {
+                "query_embedding": _vec_literal(pad_vector(query)),
+                "model": model,
+                "match_count": k,
+                "page_urls": [p.url for p in pages],
+            }).execute()
         out = []
         for r in res.data:
             page = by_url.get(r["page_url"])

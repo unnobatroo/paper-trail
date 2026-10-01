@@ -12,8 +12,11 @@ time to cross-reference by hand.
 So Paper Trail does the tedious part for you. It reads the Józsefváros
 (Budapest District VIII) climate strategy, pulls out every commitment it
 finds, then searches the district's official websites for pages and
-documents that look like follow-through. It ranks the best candidates,
-quotes the passages it thinks matter, and lays it all out for review.
+documents that look like follow-through — the municipality's own site
+(jozsefvaros.hu, including the participatory-budget votes), the district
+developer RÉV8 (rev8.hu), and Budapest's city portal (budapest.hu). It
+ranks the best candidates, quotes the passages it thinks matter, and lays
+it all out for review.
 
 And here's the part we care about most: **the software only ever
 suggests.** Nothing enters the public record until a person clicks

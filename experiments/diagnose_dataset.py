@@ -18,7 +18,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, ".")
-from experiments import common, data  # noqa: E402
+from experiments import common, data
 
 
 def _tokens(text: str) -> set[str]:

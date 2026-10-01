@@ -16,16 +16,58 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from abc import ABC, abstractmethod
 from datetime import date
 from pathlib import Path
 
-from ..ml.embeddings import cosine
+import numpy as np
+from py_rust_stemmers import SnowballStemmer
+
 from ..sources.fetch import FetchedPage
 
 # pgvector column width — every provider's vectors are right-padded to
 # this length before storing. Zero-padding is cosine-neutral.
 VECTOR_DIM = 1024
+
+# Dense/lexical fusion weight — benchmark-measured optimum (see
+# migrations/006_hybrid_search.sql). Kept identical on both backends.
+LEX_WEIGHT = 0.5
+
+
+def stemmer_for(language: str):
+    """A word→stem callable for `language` (Snowball name)."""
+    st = SnowballStemmer(language)
+    return getattr(st, "stem_word", None) or st.stemWord
+
+
+def lexical_scores(query_text: str, texts: list[str],
+                   stem) -> np.ndarray:
+    """Stemmed tf-idf cosine per text — the file backend's counterpart to
+    the ts_rank side of `match_chunks_hybrid`. `stem` is a word→stem
+    callable (see `stemmer_for`)."""
+    docs = [[stem(w) for w in re.findall(r"\w+", t.lower())]
+            for t in texts]
+    q_terms = [stem(w) for w in re.findall(r"\w+", query_text.lower())]
+    if not docs or not q_terms or not any(docs):
+        return np.zeros(len(texts))
+    vocab = {w: i for i, w in enumerate(
+        {w for d in docs for w in d} | set(q_terms))}
+    tf = np.zeros((len(docs) + 1, len(vocab)))
+    for i, d in enumerate(docs + [q_terms]):
+        for w in d:
+            tf[i, vocab[w]] += 1.0
+    df = np.maximum((tf[:-1] > 0).sum(axis=0), 1.0)
+    tfidf = tf * (np.log((1 + len(docs)) / (1 + df)) + 1.0)
+    norms = np.linalg.norm(tfidf, axis=1)
+    norms[norms == 0] = 1.0
+    tfidf /= norms[:, None]
+    return tfidf[:-1] @ tfidf[-1]
+
+
+def _norm(s: np.ndarray) -> np.ndarray:
+    lo, hi = float(s.min()), float(s.max())
+    return (s - lo) / (hi - lo) if hi > lo else np.zeros_like(s)
 
 
 def pad_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
@@ -82,11 +124,13 @@ class VectorIndex(ABC):
         """Persist chunk vectors for a page under the given model."""
 
     @abstractmethod
-    def match(self, query: list[float], model: str, chunk_size: int,
-              pages: list[FetchedPage],
+    def match(self, query: list[float], query_text: str, model: str,
+              chunk_size: int, pages: list[FetchedPage],
               k: int) -> list[tuple[FetchedPage, str, float]]:
-        """Top-k (page, chunk_text, cosine_similarity) across `pages`,
-        ordered best-first. Pages without cached vectors are skipped."""
+        """Top-k (page, chunk_text, score) across `pages`, ordered
+        best-first — dense cosine fused with lexical matching
+        (min-max-normalized, LEX_WEIGHT lex / 1-LEX_WEIGHT dense). Pages
+        without cached vectors are skipped."""
 
 
 class FilePageStore(PageStore):
@@ -120,9 +164,10 @@ class FilePageStore(PageStore):
 class FileVectorIndex(VectorIndex):
     """`<cache>/embeddings/<content_hash>.json` — chunks + vectors."""
 
-    def __init__(self, cache_dir: Path):
+    def __init__(self, cache_dir: Path, stemmer_language: str = "hungarian"):
         self._dir = Path(cache_dir) / "embeddings"
         self._dir.mkdir(parents=True, exist_ok=True)
+        self._stem = stemmer_for(stemmer_language)
 
     def _file(self, page: FetchedPage, model: str,
               chunk_size: int) -> Path:
@@ -149,12 +194,26 @@ class FileVectorIndex(VectorIndex):
             "vectors": [v for _, v in pairs],
         }, ensure_ascii=False), encoding="utf-8")
 
-    def match(self, query: list[float], model: str, chunk_size: int,
-              pages: list[FetchedPage],
+    def match(self, query: list[float], query_text: str, model: str,
+              chunk_size: int, pages: list[FetchedPage],
               k: int) -> list[tuple[FetchedPage, str, float]]:
-        scored: list[tuple[FetchedPage, str, float]] = []
+        flat: list[tuple[FetchedPage, str]] = []
+        vecs: list[list[float]] = []
         for page in pages:
-            for chunk, vec in self.get(page, model, chunk_size) or []:
-                scored.append((page, chunk.strip(), cosine(query, vec)))
-        scored.sort(key=lambda r: r[2], reverse=True)
-        return scored[:k]
+            for chunk, vec in (self.get(page, model, chunk_size) or []):
+                flat.append((page, chunk))
+                vecs.append(vec)
+        q = np.asarray(query, dtype=np.float32)
+        qn = np.linalg.norm(q)
+        if not flat or not qn:
+            return []
+        pv = np.asarray(vecs, dtype=np.float32)
+        norms = np.linalg.norm(pv, axis=1)
+        norms[norms == 0] = 1.0
+        dense = pv @ q / (norms * qn)
+        lex = lexical_scores(query_text, [c for _, c in flat],
+                             self._stem)
+        fused = LEX_WEIGHT * _norm(lex) + (1 - LEX_WEIGHT) * _norm(dense)
+        order = np.argsort(-fused)[:k]
+        return [(flat[i][0], flat[i][1].strip(), float(fused[i]))
+                for i in order]

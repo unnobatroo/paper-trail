@@ -89,6 +89,22 @@ CREATE TABLE IF NOT EXISTS budgets (
     description TEXT DEFAULT '',
     source_url TEXT DEFAULT ''
 );
+
+-- The evidence-search source catalogue. Seeded in Postgres by migration
+-- 005; the local backend leaves it empty and search relies on the web
+-- provider alone.
+CREATE TABLE IF NOT EXISTS official_sources (
+    id INTEGER PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL DEFAULT '',
+    publisher TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+-- Enforce the natural key add_document dedupes on (also upgrades DBs
+-- created before this index existed).
+CREATE UNIQUE INDEX IF NOT EXISTS documents_natural_uq
+    ON documents(title, publisher, url);
 """
 
 
@@ -96,8 +112,9 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     """Open a fresh connection — callers must close it.
 
     Connections are deliberately short-lived: a sqlite3 object is bound to
-    the thread that created it, so nothing long-lived (like Streamlit's
-    cached app state) may retain one. Use `init_db` once for schema setup.
+    the thread that created it, so nothing long-lived (like app state
+    shared with worker threads) may retain one. Use `init_db` once for
+    schema setup.
     """
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)

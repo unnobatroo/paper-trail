@@ -4,7 +4,8 @@
         evaluated here through sentence-transformers — same weights,
         ONNX vs torch runtime may differ by a rounding hair)
     → 2400-char chunks (corpus_fixed_2400)
-    → top-20 cosine candidates
+    → hybrid top-20: dense cosine fused 50/50 with stemmed lexical
+      (same LEX_WEIGHT + lexical_scores as the production indexes)
     → cross-encoder rerank: jina-v2-base-multilingual (production
       default) vs BGE-reranker-v2-m3 (optional provider)
     → best chunk per source document
@@ -25,8 +26,10 @@ import sys
 import time
 from collections import defaultdict
 
+import numpy as np
+
 sys.path.insert(0, ".")
-from experiments import common, corpus, data, metrics  # noqa: E402
+from experiments import common, corpus, data, metrics
 
 EMBED = "intfloat/multilingual-e5-large"
 K_CANDIDATES = 20
@@ -35,6 +38,12 @@ RERANKERS = {
     "jinaai/jina-reranker-v2-base-multilingual": "fastembed",
     "BAAI/bge-reranker-v2-m3": "st",
 }
+
+
+def _minmax(v):
+    """Same normalization the match functions apply to each signal."""
+    lo, hi = float(v.min()), float(v.max())
+    return (v - lo) / (hi - lo) if hi > lo else np.zeros_like(v)
 
 
 def _load_ce(model: str, kind: str):
@@ -63,13 +72,27 @@ def main() -> None:
             src_gold[cid].add(src)
 
     from sentence_transformers import SentenceTransformer
-    import numpy as np
+
+    from paper_trail.ml.lang import HU
+    from paper_trail.repositories.cache import (
+        LEX_WEIGHT,
+        lexical_scores,
+        stemmer_for,
+    )
 
     st = SentenceTransformer(EMBED, device=common.device())
     qv = st.encode([f'{c["title"]} {c["text"]}' for c in coms],
                    normalize_embeddings=True)
     pv = st.encode(texts, normalize_embeddings=True)
-    sims = np.asarray(qv) @ np.asarray(pv).T
+    dense = np.asarray(qv) @ np.asarray(pv).T
+
+    # production retrieval: min-max-normalized dense + lexical fusion
+    fused = np.empty_like(dense)
+    stem = stemmer_for(HU.stemmer)
+    for qi, c in enumerate(coms):
+        lex = lexical_scores(f'{c["title"]} {c["text"]}', texts, stem)
+        fused[qi] = (LEX_WEIGHT * _minmax(lex)
+                     + (1 - LEX_WEIGHT) * _minmax(dense[qi]))
 
     report = {"embed": EMBED, "chunk": 2400, "candidates": K_CANDIDATES,
               "top_sources": TOP_SOURCES, "n_chunks": len(chunks),
@@ -81,7 +104,7 @@ def main() -> None:
         ranked_chunks, ranked_srcs = {}, {}
         for qi, c in enumerate(coms):
             q = f'{c["title"]} {c["text"]}'
-            top = list(np.argsort(-sims[qi])[:K_CANDIDATES])
+            top = list(np.argsort(-fused[qi])[:K_CANDIDATES])
             ce = score_fn(q, [texts[i] for i in top])
             order = [top[i] for i in
                      sorted(range(len(top)), key=lambda i: -ce[i])]

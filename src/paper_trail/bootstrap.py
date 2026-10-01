@@ -1,7 +1,7 @@
 """Shared application wiring — one `build_state` for every front door.
 
-The Streamlit app (app.py) and the FastAPI service (api/) both construct
-the same AppState from Settings:
+The FastAPI service (api/), scripts and tests all construct the same
+AppState from Settings:
 
 * repositories      — Supabase/Postgres when configured, SQLite otherwise
 * page/vector cache — Postgres `pages`/`chunks` + pgvector when
@@ -12,8 +12,8 @@ the same AppState from Settings:
 
 Nothing here may hold a live sqlite3 connection: the SQLite repos hold a
 path and open per-operation connections, the Supabase pieces hold a
-stateless HTTP client — safe inside Streamlit's cached state and inside
-a long-lived FastAPI process alike.
+stateless HTTP client — safe to share across the FastAPI process and its
+job-runner threads.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from pathlib import Path
 from .infrastructure.settings import Settings, load
 from .ml.embeddings import get_provider
 from .ml.extraction import get_extractor
+from .ml.lang import get_profile
 from .ml.rerank import get_reranker
 from .repositories.cache import FilePageStore, FileVectorIndex
 from .repositories.store import EvidenceRepository, PolicyRepository
@@ -68,6 +69,7 @@ def _baseline_year(settings: Settings, policy) -> int | None:
 
 def build_state(settings: Settings | None = None) -> AppState:
     settings = settings or load()
+    profile = get_profile(settings.language)
     if settings.supabase_configured:
         from .repositories.supabase_index import (
             SupabasePageStore,
@@ -79,7 +81,8 @@ def build_state(settings: Settings | None = None) -> AppState:
         policy = SupabasePolicyRepository(url, key)
         evidence = SupabaseEvidenceRepository(url, key)
         page_store = SupabasePageStore(url, key)
-        vector_index = SupabaseVectorIndex(url, key)
+        vector_index = SupabaseVectorIndex(
+            url, key, ts_config=profile.ts_config)
         docs: DocumentStore = StorageDocumentStore(
             url, key, bucket=settings.storage_bucket)
     else:
@@ -87,13 +90,15 @@ def build_state(settings: Settings | None = None) -> AppState:
         evidence = EvidenceRepository(settings.db_path)
         cache_dir = Path(settings.db_path).parent / "fetched"
         page_store = FilePageStore(cache_dir)
-        vector_index = FileVectorIndex(cache_dir)
+        vector_index = FileVectorIndex(
+            cache_dir, stemmer_language=profile.stemmer)
         docs = LocalDocumentStore(settings.seed_dir)
 
     embedder = get_provider(settings.embed_model,
                             cache_dir=str(settings.model_cache))
     extractor = get_extractor(
-        settings.llm_base_url, settings.llm_api_key, settings.llm_model)
+        settings.llm_base_url, settings.llm_api_key, settings.llm_model,
+        profile)
     search = get_search_provider(settings.search_provider,
                                  settings.fixture_dir)
     return AppState(
@@ -111,6 +116,8 @@ def build_state(settings: Settings | None = None) -> AppState:
             candidates=settings.rerank_candidates,
             max_doc_chars=settings.max_doc_chars,
             baseline_year=_baseline_year(settings, policy),
+            profile=profile,
+            allowed_domains=settings.allowed_domains,
         ),
         metrics=MetricsService(policy, evidence),
         docs=docs,

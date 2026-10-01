@@ -13,6 +13,7 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -38,7 +39,7 @@ from paper_trail.ml.embeddings import HashingProvider
 from paper_trail.sources.fetch import FetchedPage
 
 MARK = "SMOKE TEST — delete me"
-SMOKE_URL = "https://rev8.hu/__smoke-test__/"
+SMOKE_OBJ = "smoke-test.txt"
 MODEL = "hashing"
 
 _checks: list[str] = []
@@ -59,16 +60,26 @@ def main() -> int:
     db = state.policy._db  # same client every repo/store shares
     print(f"project: {settings.supabase_url}")
 
+    # the marker URL rides on whatever host the deployment's registry
+    # actually uses — no literals here, it follows the data
+    registry = state.evidence.official_sources()
+    host = urlsplit(registry[0].url).netloc if registry else "example.test"
+    smoke_url = f"https://{host}/__smoke-test__/"
+
     created = {"doc": None, "cand": None, "com": None,
                "ev": None, "link": None, "job": None}
     try:
         # -- document store --------------------------------------------------
-        names = store_list = state.docs.list()
-        assert any(n.endswith(".pdf") for n in names), "no PDFs in bucket"
+        names = state.docs.list()
         ok(f"Storage list ({len(names)} objects)")
-        pdf = state.docs.read("jozsefvaros_klimastrategia_2021.pdf")
-        assert pdf and len(pdf) > 100_000
-        ok(f"Storage read ({len(pdf) // 1024} KB PDF)")
+        state.docs.write(SMOKE_OBJ, MARK.encode())
+        try:
+            assert state.docs.read(SMOKE_OBJ) == MARK.encode()
+            ok("Storage write/read round-trip")
+        finally:
+            state.docs.delete(SMOKE_OBJ)
+        assert state.docs.read(SMOKE_OBJ) is None
+        ok("Storage delete")
 
         # -- policy repo -----------------------------------------------------
         created["doc"] = state.policy.add_document(
@@ -94,7 +105,7 @@ def main() -> int:
         ok("add_commitment dedupe (double-accept safe)")
 
         # -- evidence repo ---------------------------------------------------
-        ev = EvidenceItem(commitment_id=created["com"], url=SMOKE_URL,
+        ev = EvidenceItem(commitment_id=created["com"], url=smoke_url,
                           title=MARK, snippet="smoke",
                           status_hint=Status.UNKNOWN)
         created["ev"] = state.evidence.add_evidence(ev)
@@ -128,18 +139,19 @@ def main() -> int:
         ok("batch reads (evidence_many / budgets_many)")
 
         # -- page + vector index ---------------------------------------------
-        page = FetchedPage(url=SMOKE_URL, title=MARK, text="fák " * 100)
+        page = FetchedPage(url=smoke_url, title=MARK, text="fák " * 100)
         state.evidence_svc._pages.put(page)
-        assert state.evidence_svc._pages.get(SMOKE_URL).title == MARK
+        assert state.evidence_svc._pages.get(smoke_url).title == MARK
         ok("PageStore round-trip")
         idx = state.evidence_svc._index
         assert not idx.has(page, MODEL, 2400)
         pairs = [("chunk a fák", HashingProvider().embed(["fák"])[0])]
         idx.put(page, MODEL, 2400, pairs)
         assert idx.has(page, MODEL, 2400)
-        top = idx.match(pairs[0][1], MODEL, 2400, [page], k=1)
-        assert top and top[0][0].url == SMOKE_URL
-        ok("VectorIndex put + pgvector match RPC")
+        top = idx.match(pairs[0][1], "fák ültetés", MODEL, 2400, [page],
+                        k=1)
+        assert top and top[0][0].url == smoke_url
+        ok("VectorIndex put + hybrid match RPC (dense+tsvector)")
 
         # -- durable jobs ----------------------------------------------------
         from paper_trail.api.jobs import SupabaseJobRunner
@@ -187,7 +199,7 @@ def main() -> int:
             db.table("documents").delete().eq("id", created["doc"]).execute()
         if created["job"]:
             db.table("jobs").delete().eq("id", created["job"]).execute()
-        pid = db.table("pages").delete().eq("url", SMOKE_URL).execute()
+        pid = db.table("pages").delete().eq("url", smoke_url).execute()
         _ = pid  # chunks cascade via FK
         print("smoke rows deleted")
 

@@ -18,7 +18,7 @@ import argparse
 import sys
 
 sys.path.insert(0, ".")
-from experiments import common, data, metrics  # noqa: E402
+from experiments import common, data, metrics
 
 OUT = "experiments/checkpoints/classifier.joblib"
 
@@ -58,10 +58,10 @@ def main() -> None:
     test = [r for r in rows if r["split"] == "test"]
     print(f"pairs train={len(train)} val={len(val)} test={len(test)}")
 
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.pipeline import Pipeline
     import joblib
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
 
     st_model = None
     if args.features == "embed":

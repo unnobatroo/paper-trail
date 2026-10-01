@@ -20,6 +20,7 @@ from .entities import (
     extract_locations,
     extract_organisations,
 )
+from .lang import LanguageProfile
 
 W_SIMILARITY = 0.60
 W_ORG = 0.15
@@ -49,25 +50,29 @@ def _shared(a: set[str], b: set[str]) -> set[str]:
     return out
 
 
-def commitment_entities(commitment: Commitment) -> dict[str, set[str]]:
+def commitment_entities(commitment: Commitment,
+                        profile: LanguageProfile) -> dict[str, set[str]]:
     """Entities visible in the commitment text itself."""
     text = " ".join([commitment.title, commitment.summary])
-    orgs = _norm(extract_organisations(text))
+    orgs = _norm(extract_organisations(text, profile))
     if commitment.responsible_org:
         orgs |= _norm([commitment.responsible_org])
-    locs = {_norm_place(l) for l in extract_locations(text)}
+    locs = {_norm_place(l, profile)
+            for l in extract_locations(text, profile)}
     dates = {str(commitment.deadline_year)} if commitment.deadline_year else set()
     return {"orgs": orgs, "locations": locs, "dates": dates}
 
 
 def compute_features(commitment: Commitment, evidence: EvidenceItem,
-                     similarity: float) -> MatchFeatures:
-    ce = commitment_entities(commitment)
+                     similarity: float,
+                     profile: LanguageProfile) -> MatchFeatures:
+    ce = commitment_entities(commitment, profile)
     return MatchFeatures(
         semantic_similarity=round(similarity, 4),
         shared_organisations=sorted(_shared(ce["orgs"], _norm(evidence.organisations))),
         shared_locations=sorted(
-            _shared(ce["locations"], {_norm_place(l) for l in evidence.locations})
+            _shared(ce["locations"],
+                    {_norm_place(l, profile) for l in evidence.locations})
         ),
         shared_dates=sorted(ce["dates"] & set(evidence.dates_mentioned)),
     )

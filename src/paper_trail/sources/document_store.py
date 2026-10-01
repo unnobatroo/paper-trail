@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -32,6 +33,10 @@ class DocumentStore(ABC):
         """Store document bytes under `name` (overwrite is fine)."""
 
     @abstractmethod
+    def delete(self, name: str) -> None:
+        """Remove `name`; missing is fine."""
+
+    @abstractmethod
     def list(self, prefix: str = "") -> list[str]:
         """All names in the store under `prefix`."""
 
@@ -47,6 +52,9 @@ class LocalDocumentStore(DocumentStore):
     def write(self, name: str, data: bytes) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
         (self._root / name).write_bytes(data)
+
+    def delete(self, name: str) -> None:
+        (self._root / name).unlink(missing_ok=True)
 
     def list(self, prefix: str = "") -> list[str]:
         if not self._root.exists():
@@ -68,9 +76,16 @@ class StorageDocumentStore(DocumentStore):
             return None
 
     def write(self, name: str, data: bytes) -> None:
+        ctype = (mimetypes.guess_type(name)[0]
+                 or "application/octet-stream")
         self._files.upload(
-            name, data,
-            {"content-type": "application/pdf", "upsert": "true"})
+            name, data, {"content-type": ctype, "upsert": "true"})
+
+    def delete(self, name: str) -> None:
+        try:
+            self._files.remove([name])
+        except Exception as exc:
+            log.warning("storage remove %s failed: %s", name, exc)
 
     def list(self, prefix: str = "") -> list[str]:
         try:

@@ -24,7 +24,7 @@ export function useTranslate() {
   return useContext(TranslateCtx);
 }
 
-/** Renders the machine translation of Hungarian text when enabled —
+/** Renders the machine translation of the source text when enabled —
  * cached per-text forever via TanStack Query. */
 export function En({ text }: { text: string | null | undefined }) {
   const { on } = useTranslate();

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from paper_trail.domain.enums import CandidateType
 from paper_trail.domain.models import PolicyCandidate
 from paper_trail.ml.extraction import RuleBasedExtractor, excerpt_found
+from paper_trail.ml.lang import HU
 from paper_trail.sources.pdf import read_pages
 
 
@@ -25,7 +26,7 @@ def test_excerpt_found_normalises_whitespace():
 
 def test_rule_extractor_real_pdf(strategy_pdf):
     pages = read_pages(strategy_pdf)
-    candidates = RuleBasedExtractor().extract(pages)
+    candidates = RuleBasedExtractor(HU).extract(pages)
 
     assert len(candidates) >= 10
     # every candidate has a real page and a verbatim excerpt on it

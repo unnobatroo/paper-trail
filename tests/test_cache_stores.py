@@ -38,8 +38,18 @@ def test_vector_index_roundtrip_and_match(tmp_path):
     changed = FetchedPage(PAGE.url, PAGE.title, PAGE.text + " changed")
     assert index.get(changed, "hashing", 2400) is None
 
-    top = index.match([1.0, 0.0], "hashing", 2400, [PAGE], k=1)
+    top = index.match([1.0, 0.0], "fák", "hashing", 2400, [PAGE], k=1)
     assert len(top) == 1 and top[0][1] == "chunk a"
+
+    # lexical side can override dense rank: "ültetés" appears only in the
+    # middle chunk, whose dense score is second of three
+    index.put(PAGE, "hyb", 2400,
+              [("fák szakasz", [1.0, 0.0]),
+               ("ültetés szakasz", [0.9, 0.1]),
+               ("más szakasz", [0.0, 1.0])])
+    top = index.match([1.0, 0.0], "ültetés", "hyb", 2400, [PAGE], k=2)
+    assert top[0][1] == "ültetés szakasz"
+    assert top[1][1] == "fák szakasz"
 
 
 def test_pad_vector_is_cosine_neutral():

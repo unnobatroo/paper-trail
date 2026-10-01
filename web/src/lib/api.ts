@@ -49,7 +49,6 @@ export interface SourceDocument {
   title: string;
   publisher: string | null;
   url: string | null;
-  blob_path?: string | null;
 }
 
 export interface PolicyCandidate {
@@ -84,7 +83,6 @@ export interface Commitment {
   unit: string | null;
   target_value: number | null;
   source_page: number | null;
-  is_measurable?: boolean;
 }
 
 export interface EvidenceItem {
@@ -102,11 +100,18 @@ export interface EvidenceItem {
   status_excerpt: string | null;
 }
 
+export interface MatchFeatures {
+  semantic_similarity: number;
+  shared_organisations: string[];
+  shared_locations: string[];
+  shared_dates: string[];
+}
+
 export interface EvidenceLink {
   id: number;
   commitment_id: number;
   evidence_id: number;
-  features: Record<string, number>;
+  features: MatchFeatures;
   score: number;
   suggested_relationship: RelationshipType;
   reasons: string[];
@@ -156,6 +161,7 @@ export interface Job {
 }
 
 export interface Meta {
+  deployment: string;
   storage: "supabase" | "sqlite";
   embed_model: string;
   reranker: string;

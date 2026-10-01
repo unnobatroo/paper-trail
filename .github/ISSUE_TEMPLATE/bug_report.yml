@@ -21,7 +21,7 @@ body:
     attributes:
       label: Where?
       options:
-        - Streamlit UI
+        - Web UI
         - REST API
         - Extraction (PDF → candidates)
         - Evidence ranking
@@ -33,7 +33,7 @@ body:
     id: env
     attributes:
       label: Environment
-      description: "local / Streamlit Cloud / container; backend: sqlite or supabase; embed model + reranker settings"
+      description: "local / container / hosted; backend: sqlite or supabase; embed model + reranker settings"
   - type: checkboxes
     id: honesty
     attributes:

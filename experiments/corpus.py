@@ -19,24 +19,20 @@ from collections import defaultdict
 from pathlib import Path
 
 from experiments import common, data
-from experiments.build_benchmark import SOURCES, JKIT, STRATEGY, RAW, _URLS
-from experiments.chunking_study import CHUNKERS, _norm
-from paper_trail.sources.pdf import read_pages
+from experiments.build_benchmark import _URLS, RAW, SOURCES, pdf_pages
+from experiments.chunking_study import CHUNKERS
 
 CACHE = common.RESULTS
 
 
 def _source_texts() -> dict[str, tuple[str, str]]:
-    jkit = read_pages(JKIT)
-    strat = read_pages(STRATEGY)
     out = {}
     for key, kind, loc in SOURCES:
         if kind == "raw":
             out[key] = ((RAW / loc).read_text(encoding="utf-8"),
                         _URLS.get(key, ""))
         else:
-            pages = jkit if kind == "jkit" else strat
-            out[key] = (pages[loc - 1].text, "")
+            out[key] = (pdf_pages(kind)[loc - 1].text, "")
     return out
 
 
@@ -66,6 +62,7 @@ def build(name: str) -> Path:
                     if rel > relevance.get((cid, cid_), 0):
                         relevance[(cid, cid_)] = rel
 
+    CACHE.mkdir(parents=True, exist_ok=True)
     out = CACHE / f"corpus_{name}.json"
     out.write_text(json.dumps({
         "chunker": name,
