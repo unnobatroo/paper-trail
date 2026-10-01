@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from ...services.translation import MT_DISCLAIMER, get_translator
-from ..deps import require_key
 from ..schemas import TranslateRequest
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
 
 @router.post("")
-def translate(req: TranslateRequest,
-              _: None = Depends(require_key)) -> dict:
+def translate(req: TranslateRequest) -> dict:
     translator = get_translator()
     if translator is None:
         raise HTTPException(

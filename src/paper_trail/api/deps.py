@@ -3,29 +3,14 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from hmac import compare_digest
-
-from fastapi import Header, HTTPException
 
 from ..bootstrap import AppState, build_state
-from ..infrastructure.settings import load
 from .jobs import JobRunner
 
 
 @lru_cache
 def get_state() -> AppState:
     return build_state()
-
-
-def require_key(authorization: str | None = Header(default=None)) -> None:
-    """Bearer-key gate for mutating endpoints. Inert when
-    PAPER_TRAIL_API_KEY is unset, so local dev stays frictionless."""
-    key = load().api_key
-    if not key:
-        return
-    token = (authorization or "").removeprefix("Bearer ").strip()
-    if not token or not compare_digest(token, key):
-        raise HTTPException(401, "a valid review key is required")
 
 
 def _handlers():

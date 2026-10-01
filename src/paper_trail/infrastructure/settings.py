@@ -27,9 +27,6 @@ Environment overrides:
                             Jina for embeddings
   HF_TOKEN                  enables Hungarian→English machine translation
                             in the UI (Helsinki-NLP/opus-mt-hu-en)
-  PAPER_TRAIL_API_KEY       shared review key — when set, mutating
-                            endpoints require "Authorization: Bearer <key>"
-                            (reads stay open; unset = open, for dev)
   PAPER_TRAIL_BASELINE_YEAR the year the tracked strategy was adopted —
                             evidence published earlier is forced to
                             background (default: derived from the document
@@ -98,10 +95,6 @@ class Settings(BaseSettings):
     api_origins_raw: str = Field(
         default="http://localhost:3000",
         validation_alias="PAPER_TRAIL_API_ORIGINS")
-    # Shared review key — guards every mutating endpoint when set. Reads
-    # stay open: the trail is public data. Unset = open access (dev).
-    api_key: str | None = Field(
-        default=None, validation_alias="PAPER_TRAIL_API_KEY")
     baseline_year: int | None = Field(
         default=None, validation_alias="PAPER_TRAIL_BASELINE_YEAR")
 

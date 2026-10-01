@@ -176,29 +176,10 @@ export class ApiError extends Error {
   }
 }
 
-/** The review key, entered once in the UI and kept for the tab session.
- *  The API only requires it when PAPER_TRAIL_API_KEY is configured —
- *  mutating endpoints answer 401 without it, reads stay open. */
-const KEY_STORAGE = "pt_review_key";
-
-export function getReviewKey(): string {
-  if (typeof window === "undefined") return "";
-  return sessionStorage.getItem(KEY_STORAGE) ?? "";
-}
-
-export function setReviewKey(key: string) {
-  sessionStorage.setItem(KEY_STORAGE, key);
-}
-
-export function clearReviewKey() {
-  sessionStorage.removeItem(KEY_STORAGE);
-}
-
 async function req<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const key = getReviewKey();
   // The free-tier API idles out; a hung request should become a visible,
   // retryable error rather than an infinite spinner. 90s covers the worst
   // observed cold start (~60s) with headroom.
@@ -209,7 +190,6 @@ async function req<T>(
       signal: AbortSignal.timeout(90_000),
       headers: {
         "content-type": "application/json",
-        ...(key ? { authorization: `Bearer ${key}` } : {}),
         ...init?.headers,
       },
     });
@@ -233,10 +213,6 @@ async function req<T>(
       detail = body?.detail ?? detail;
     } catch {
       /* non-JSON error body */
-    }
-    if (res.status === 401) {
-      detail =
-        "Review key required — unlock via the lock icon in the sidebar.";
     }
     throw new ApiError(res.status, String(detail));
   }

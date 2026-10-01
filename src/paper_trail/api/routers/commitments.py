@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.models import Commitment
-from ..deps import get_jobs, get_state, require_key
+from ..deps import get_jobs, get_state
 from ..jobs import JobRunner
 from ..schemas import JobOut
 
@@ -25,8 +25,7 @@ def commitments(state: AppState = Depends(get_state)) -> list[Commitment]:
 @router.post("/{commitment_id}/find-evidence", status_code=202)
 def find_evidence(commitment_id: int,
                   state: AppState = Depends(get_state),
-                  jobs: JobRunner = Depends(get_jobs),
-                  _: None = Depends(require_key)) -> JobOut:
+                  jobs: JobRunner = Depends(get_jobs)) -> JobOut:
     if state.policy.commitment(commitment_id) is None:
         raise HTTPException(404, f"unknown commitment {commitment_id}")
 
