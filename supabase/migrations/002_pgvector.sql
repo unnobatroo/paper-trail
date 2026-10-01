@@ -59,6 +59,7 @@ create or replace function match_chunks(
 returns table(page_id bigint, page_url text,
               chunk_text text, similarity double precision)
 language sql stable
+set search_path = public
 as $$
     select c.page_id,
            p.url as page_url,
