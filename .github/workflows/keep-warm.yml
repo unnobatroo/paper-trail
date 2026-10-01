@@ -15,4 +15,12 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - run: curl -fsS --max-time 60 https://paper-trail-api.azurewebsites.net/healthz
+      # F1 cold starts can exceed 60 s — retry a few times before failing,
+      # so a single slow spin-up doesn't page a failure
+      - run: |
+          for i in 1 2 3; do
+            curl -fsS --max-time 120 \
+              https://paper-trail-api.azurewebsites.net/healthz && exit 0
+            sleep 30
+          done
+          exit 1
