@@ -1,0 +1,18 @@
+name: Keep API warm
+
+# Azure F1 idles out after ~20 min without traffic and Always On isn't
+# available on the free tier — the first request after idle eats a 30s+
+# cold start and the frontend just spins. A ping every 15 min keeps the
+# worker alive. Best-effort: GitHub can delay scheduled runs under load,
+# which is fine — the QueryError retry path covers the misses.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS --max-time 60 https://paper-trail-api.azurewebsites.net/healthz

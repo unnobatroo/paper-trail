@@ -199,14 +199,33 @@ async function req<T>(
   init?: RequestInit,
 ): Promise<T> {
   const key = getReviewKey();
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(key ? { authorization: `Bearer ${key}` } : {}),
-      ...init?.headers,
-    },
-  });
+  // The free-tier API idles out; a hung request should become a visible,
+  // retryable error rather than an infinite spinner. 90s covers the worst
+  // observed cold start (~60s) with headroom.
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      signal: AbortSignal.timeout(90_000),
+      headers: {
+        "content-type": "application/json",
+        ...(key ? { authorization: `Bearer ${key}` } : {}),
+        ...init?.headers,
+      },
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new ApiError(
+        0,
+        "The API took too long to answer — it may be waking up. Try again in a few seconds.",
+      );
+    }
+    if (e instanceof TypeError) {
+      // fetch() throws TypeError on network failure — unreadable as-is
+      throw new ApiError(0, "Cannot reach the API — it may be down or still waking up. Try again.");
+    }
+    throw e;
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
