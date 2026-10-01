@@ -269,9 +269,14 @@ function PickList({
   const pageGroups = groups.slice((page - 1) * PAGE, page * PAGE);
   const detail = pageGroups[Math.min(cursor, pageGroups.length - 1)] ?? null;
   const detailCandidates = detail
-    ? detail
-        .map((c) => candidates?.find((x) => x.id === c.candidate_id))
-        .filter((x): x is NonNullable<typeof x> => !!x)
+    ? [
+        ...new Map(
+          detail
+            .map((c) => candidates?.find((x) => x.id === c.candidate_id))
+            .filter((x): x is NonNullable<typeof x> => !!x)
+            .map((c) => [c.id, c] as const),
+        ).values(),
+      ]
     : [];
 
   return (
@@ -280,7 +285,7 @@ function PickList({
         {groups.length} commitments available to search · Click a title to
         inspect; check a box to select.
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -532,7 +537,7 @@ function ReviewMatches({
         {pending.length} matches waiting for review · Inspect the source before
         confirming a relationship.
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div>
           <BatchBar
             count={selected.size}
@@ -717,6 +722,7 @@ function LinkInspector({
       <Button
         variant="outline"
         size="sm"
+        nativeButton={false}
         render={
           <a href={ev.url} target="_blank" rel="noopener noreferrer" />
         }
@@ -728,7 +734,11 @@ function LinkInspector({
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Relationship
         </p>
-        <Select value={rel} onValueChange={(v) => onRel(v as RelationshipType)}>
+        <Select
+          value={rel}
+          onValueChange={(v) => onRel(v as RelationshipType)}
+          items={REL_LABEL}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>

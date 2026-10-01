@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState, type ReactNode } from "react";
+import { Fragment, Suspense, useMemo, useState, type ReactNode } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { ExternalLink, Link2, Link2Off } from "lucide-react";
 import { QueryError } from "@/components/query-error";
@@ -27,6 +27,7 @@ import {
 import {
   useCandidates,
   useCommitments,
+  useDocuments,
   useLinks,
   useTrail,
 } from "@/lib/hooks";
@@ -116,6 +117,7 @@ function TrailPage() {
   const { data: commitments } = useCommitments();
   const { data: links } = useLinks();
   const { data: candidates } = useCandidates();
+  const { data: documents } = useDocuments();
   const [flt, setFlt] = useQueryState(
     "show",
     parseAsString.withDefault("All"),
@@ -204,7 +206,7 @@ function TrailPage() {
           Nothing matches this filter.
         </p>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             {ordered.map(([rootId, children]) => {
               const visible = children.filter((g) =>
@@ -318,6 +320,15 @@ function TrailPage() {
                     (c) => c.id === selRow.commitment.candidate_id,
                   )?.source_excerpt ?? selRow.commitment.summary
                 }
+                docUrl={
+                  documents?.find(
+                    (d) =>
+                      d.id ===
+                      candidates?.find(
+                        (c) => c.id === selRow.commitment.candidate_id,
+                      )?.document_id,
+                  )?.url
+                }
               />
             )}
           </div>
@@ -336,6 +347,7 @@ function TrailDetail({
   mentionValue,
   onMention,
   promise,
+  docUrl,
 }: {
   row: TrailRow;
   mentions: number;
@@ -343,6 +355,7 @@ function TrailDetail({
   mentionValue?: number;
   onMention: (id: number) => void;
   promise?: string | null;
+  docUrl?: string | null;
 }) {
   const com = row.commitment;
 
@@ -374,6 +387,12 @@ function TrailDetail({
         <Select
           value={String(mentionValue ?? com.id)}
           onValueChange={(v) => onMention(Number(v))}
+          items={Object.fromEntries(
+            group.map((r) => [
+              String(r.commitment.id),
+              `p.${r.commitment.source_page} · ${r.evidence.length} evidence source${r.evidence.length === 1 ? "" : "s"} · mention ${r.commitment.id}`,
+            ]),
+          )}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -393,7 +412,20 @@ function TrailDetail({
       <p className="text-xs text-muted-foreground">
         {[
           KIND_LABEL[com.kind].toUpperCase(),
-          com.source_page ? `Strategy · p.${com.source_page}` : null,
+          com.source_page
+            ? docUrl ? (
+                <a
+                  href={`${docUrl.split("#")[0]}#page=${com.source_page}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Strategy · p.{com.source_page}
+                </a>
+              ) : (
+                `Strategy · p.${com.source_page}`
+              )
+            : null,
           com.deadline_year ? `Deadline ${com.deadline_year}` : null,
           com.is_measurable && com.target_value != null
             ? `Target ${com.target_value} ${com.unit ?? ""}`
@@ -402,7 +434,12 @@ function TrailDetail({
           mentions > 1 ? `${mentions} source mentions` : null,
         ]
           .filter(Boolean)
-          .join(" · ")}
+          .map((part, i) => (
+            <Fragment key={i}>
+              {i > 0 ? " · " : ""}
+              {part}
+            </Fragment>
+          ))}
       </p>
       {row.status !== "unknown" && (
         <div>

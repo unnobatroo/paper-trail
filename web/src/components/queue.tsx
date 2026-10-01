@@ -153,8 +153,8 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center gap-1.5 border-b bg-muted/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-      {Icon && <Icon className="size-3.5" />}
-      {label}
+      {Icon && <Icon className="size-3.5 shrink-0" />}
+      <span className="min-w-0 truncate" title={label}>{label}</span>
     </div>
   );
 }

@@ -266,7 +266,7 @@ function CommitmentsPage() {
           </div>
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -486,6 +486,12 @@ function CandidateInspector({
         <Select
           value={String(cand.id)}
           onValueChange={(v) => setMentionId(Number(v))}
+          items={Object.fromEntries(
+            group.map((c) => [
+              String(c.id),
+              `p.${c.source_page} · ${statusText(c)} · mention ${c.id}`,
+            ]),
+          )}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -549,6 +555,7 @@ function CandidateInspector({
         <Button
           variant="outline"
           size="sm"
+          nativeButton={false}
           render={
             <a
               href={`${docUrl.split("#")[0]}#page=${cand.source_page}`}
@@ -605,6 +612,7 @@ function CandidateInspector({
                 <Select
                   value={editKind}
                   onValueChange={(v) => form.setValue("kind", v as string)}
+                  items={KIND_LABEL}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -632,6 +640,15 @@ function CandidateInspector({
                 <Select
                   value={editParent}
                   onValueChange={(v) => form.setValue("parent_id", v as string)}
+                  items={{
+                    none: "— on its own —",
+                    ...Object.fromEntries(
+                      commitments.map((c) => [
+                        String(c.id),
+                        `${c.code ? c.code + " · " : ""}${displayTitle(c.title)} [${c.id}]`,
+                      ]),
+                    ),
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
