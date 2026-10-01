@@ -67,8 +67,9 @@ wiki page covers the layout and the conventions in more depth.
 Match the file you're in. The codebase is compact and comments explain
 *why* something is done, not what the line does — keep that balance.
 Code and comments are in English; Hungarian stays in fixtures and domain
-strings. And please don't pull in a new dependency for something a few
-lines of code can do.
+strings. Reuse existing components and utilities instead of building
+parallel versions. And please don't pull in a new dependency for
+something a few lines of code can do.
 
 By contributing, you agree your work is licensed under the project's
 [GPL-3.0 license](LICENSE).
