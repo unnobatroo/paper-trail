@@ -18,6 +18,7 @@ a long-lived FastAPI process alike.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -49,6 +50,20 @@ class AppState:
     evidence_svc: EvidenceService
     metrics: MetricsService
     docs: DocumentStore
+
+
+def _baseline_year(settings: Settings, policy) -> int | None:
+    """The year the tracked strategy was adopted: PAPER_TRAIL_BASELINE_YEAR
+    wins, else the earliest /YYYY/MM/ segment in a document URL (uploads sit
+    under dated folders on the official site)."""
+    if settings.baseline_year:
+        return settings.baseline_year
+    years = [
+        int(m.group(1))
+        for d in policy.documents()
+        if (m := re.search(r"/(20\d{2})/\d{2}/", d.url or ""))
+    ]
+    return min(years) if years else None
 
 
 def build_state(settings: Settings | None = None) -> AppState:
@@ -95,6 +110,7 @@ def build_state(settings: Settings | None = None) -> AppState:
                                   cache_dir=str(settings.model_cache)),
             candidates=settings.rerank_candidates,
             max_doc_chars=settings.max_doc_chars,
+            baseline_year=_baseline_year(settings, policy),
         ),
         metrics=MetricsService(policy, evidence),
         docs=docs,

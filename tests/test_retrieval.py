@@ -11,7 +11,7 @@
 import hashlib
 import json
 
-from paper_trail.domain.enums import CandidateType, ReviewStatus
+from paper_trail.domain.enums import CandidateType, ReviewStatus, Status
 from paper_trail.domain.models import Commitment
 from paper_trail.ml.embeddings import HashingProvider
 from paper_trail.ml.rerank import Reranker
@@ -54,13 +54,14 @@ class _Search:
 
 
 def _svc(tmp_path, repo: EvidenceRepository, policy, text: str,
-         embedder=None, **kw) -> tuple[EvidenceService, Commitment]:
+         embedder=None, page_date=None, **kw
+         ) -> tuple[EvidenceService, Commitment]:
     cache = tmp_path / "fetched"
     cache.mkdir(exist_ok=True)
     key = hashlib.sha256(URL.encode()).hexdigest()[:16]
     (cache / f"{key}.txt").write_text(text, encoding="utf-8")
     (cache / f"{key}.json").write_text(
-        json.dumps({"title": "Utcafásítás", "date": None}))
+        json.dumps({"title": "Utcafásítás", "date": page_date}))
     svc = EvidenceService(repo, _Search(),
                           embedder or _CountingEmbedder(),
                           cache_dir=cache, fetcher=lambda u: None, **kw)
@@ -125,3 +126,42 @@ def test_links_unreviewed_and_provenance(policy, evidence, tmp_path):
     ev = evidence.evidence(links[0].evidence_id)
     assert ev.url == URL and ev.title == "Utcafásítás"
     assert ev.snippet  # the winning chunk, verbatim
+
+
+def test_pre_strategy_evidence_forced_background(policy, evidence, tmp_path):
+    """Published before the strategy year → 'completed' cues describe older
+    work, never progress on this commitment: hint forced to BACKGROUND and
+    the link reasons say why."""
+    svc, com = _svc(
+        tmp_path, evidence, policy,
+        "A munkálatok elkészültek. " * 50,
+        page_date="2019-05-01", baseline_year=2022)
+    links = svc.find_evidence(com)
+    assert links
+    ev = evidence.evidence(links[0].evidence_id)
+    assert ev.status_hint == Status.BACKGROUND
+    assert ev.status_excerpt is None
+    assert any("predates the strategy" in r for r in links[0].reasons)
+
+
+def test_post_strategy_evidence_keeps_hint(policy, evidence, tmp_path):
+    svc, com = _svc(
+        tmp_path, evidence, policy,
+        "A munkálatok elkészültek. " * 50,
+        page_date="2024-05-01", baseline_year=2022)
+    links = svc.find_evidence(com)
+    assert links
+    ev = evidence.evidence(links[0].evidence_id)
+    assert ev.status_hint == Status.COMPLETED
+
+
+def test_no_baseline_keeps_hint(policy, evidence, tmp_path):
+    """No baseline configured → the guard stays off."""
+    svc, com = _svc(
+        tmp_path, evidence, policy,
+        "A munkálatok elkészültek. " * 50,
+        page_date="2019-05-01")
+    links = svc.find_evidence(com)
+    assert links
+    ev = evidence.evidence(links[0].evidence_id)
+    assert ev.status_hint == Status.COMPLETED

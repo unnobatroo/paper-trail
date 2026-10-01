@@ -17,6 +17,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Callable
 
+from ..domain.enums import Status
 from ..domain.models import (
     BudgetRecord,
     Commitment,
@@ -77,6 +78,7 @@ class EvidenceService:
         max_doc_chars: int = _DEFAULT_MAX_DOC_CHARS,
         page_store: PageStore | None = None,
         vector_index: VectorIndex | None = None,
+        baseline_year: int | None = None,
     ):
         self._repo = repo
         self._search = search
@@ -85,6 +87,7 @@ class EvidenceService:
         self._reranker = reranker
         self._candidates = candidates
         self._max_doc_chars = max_doc_chars
+        self._baseline_year = baseline_year
         # caches: explicit stores win (Supabase/pgvector); otherwise the
         # original on-disk layout under cache_dir
         if page_store is None or vector_index is None:
@@ -161,8 +164,11 @@ class EvidenceService:
             # and dozens of unrelated figures somewhere
             mentions = self._relevant_money(snippet)
             is_report = entities.is_report_doc(page.url, page.title)
+            stale = self._predates_strategy(page)
             hint, excerpt = entities.classify_status(
                 snippet, is_report=is_report, has_money=bool(mentions))
+            if stale:
+                hint, excerpt = Status.BACKGROUND, None
             ev.status_hint, ev.status_excerpt = hint, excerpt
             ev.id = self._repo.add_evidence(ev)
 
@@ -180,6 +186,10 @@ class EvidenceService:
             features = matching.compute_features(commitment, ev, sim)
             has_budget = bool(self._repo.budgets_for_evidence(ev.id))
             rel, reasons = matching.suggest_relationship(features, has_budget)
+            if stale:
+                reasons.append(
+                    f"published {page.published_on.year} — predates the "
+                    "strategy, so it can only be context")
             link = EvidenceLink(
                 commitment_id=commitment.id,
                 evidence_id=ev.id,
@@ -234,6 +244,13 @@ class EvidenceService:
                 if d.url.split("?")[0] == url.split("?")[0]:
                     return d.title
         return fetched
+
+    def _predates_strategy(self, page: FetchedPage) -> bool:
+        """Published before the tracked strategy existed — it can provide
+        context, but its 'completed/under way' cues can't be progress."""
+        return (self._baseline_year is not None
+                and page.published_on is not None
+                and page.published_on.year < self._baseline_year)
 
     @staticmethod
     def _publisher(url: str) -> str:

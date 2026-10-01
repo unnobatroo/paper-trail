@@ -30,6 +30,10 @@ Environment overrides:
   PAPER_TRAIL_API_KEY       shared review key — when set, mutating
                             endpoints require "Authorization: Bearer <key>"
                             (reads stay open; unset = open, for dev)
+  PAPER_TRAIL_BASELINE_YEAR the year the tracked strategy was adopted —
+                            evidence published earlier is forced to
+                            background (default: derived from the document
+                            URL's /YYYY/MM/ segment, else off)
   PAPER_TRAIL_STORAGE_BUCKET
                             Supabase Storage bucket for source PDFs
                             (default "source-documents")
@@ -98,6 +102,8 @@ class Settings(BaseSettings):
     # stay open: the trail is public data. Unset = open access (dev).
     api_key: str | None = Field(
         default=None, validation_alias="PAPER_TRAIL_API_KEY")
+    baseline_year: int | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_BASELINE_YEAR")
 
     @property
     def llm_configured(self) -> bool:
