@@ -17,6 +17,7 @@ Both must produce PolicyCandidate objects that carry page + verbatim excerpt.
 
 from __future__ import annotations
 
+import logging
 import re
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -27,6 +28,8 @@ from pydantic import BaseModel, ValidationError
 from ..domain.enums import CandidateType
 from ..domain.models import DocumentPage, PolicyCandidate
 from .lang import LanguageProfile
+
+log = logging.getLogger(__name__)
 
 
 def _squash(text: str) -> str:
@@ -284,50 +287,65 @@ class LLMExtractor(Extractor):
         self._model = model
         self._profile = profile
 
+    def _ask(self, pages: list[DocumentPage]) -> _LLMResponse | None:
+        """One /chat/completions call; None when the reply isn't valid
+        JSON for the schema (HTTP errors still raise — the job fails)."""
+        body = "\n\n".join(
+            f"--- page {p.page_number} ---\n{p.text[:6000]}" for p in pages)
+        resp = requests.post(
+            self._url,
+            headers={"Authorization": f"Bearer {self._key}"},
+            json={
+                "model": self._model,
+                "messages": [{"role": "user", "content": _PROMPT.format(
+                    language=self._profile.name, pages=body)}],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=120,
+        )
+        resp.raise_for_status()
+        raw = resp.json()["choices"][0]["message"]["content"]
+        try:
+            return _LLMResponse.model_validate_json(raw)
+        except ValidationError:
+            return None
+
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
         candidates: list[PolicyCandidate] = []
         page_text = {p.page_number: p.text for p in pages}
         for i in range(0, len(pages), 4):
             window = pages[i: i + 4]
-            body = "\n\n".join(
-                f"--- page {p.page_number} ---\n{p.text[:6000]}" for p in window
-            )
-            resp = requests.post(
-                self._url,
-                headers={"Authorization": f"Bearer {self._key}"},
-                json={
-                    "model": self._model,
-                    "messages": [{"role": "user", "content": _PROMPT.format(
-                        language=self._profile.name, pages=body)}],
-                    "temperature": 0,
-                    "response_format": {"type": "json_object"},
-                },
-                timeout=120,
-            )
-            resp.raise_for_status()
-            raw = resp.json()["choices"][0]["message"]["content"]
-            try:
-                parsed = _LLMResponse.model_validate_json(raw)
-            except ValidationError:
-                continue
-            for item in parsed.items:
-                try:
-                    ctype = CandidateType(item.type)
-                except ValueError:
-                    ctype = CandidateType.UNCLEAR
-                if ctype not in (
-                    CandidateType.OBJECTIVE, CandidateType.MEASURE,
-                    CandidateType.TARGET, CandidateType.INDICATOR,
-                ):
+            # (pages asked, response) pairs — a malformed window reply is
+            # retried per page so one bad answer can't lose four pages
+            responses = [(window, self._ask(window))]
+            if responses[0][1] is None and len(window) > 1:
+                responses = [([p], self._ask([p])) for p in window]
+            for scope, parsed in responses:
+                if parsed is None:
+                    log.warning(
+                        "invalid LLM JSON for pages %s — skipped",
+                        [p.page_number for p in scope])
                     continue
-                excerpt = _squash(item.excerpt)
-                on_page = excerpt_found(page_text.get(item.page, ""), excerpt)
-                candidates.append(PolicyCandidate(
-                    document_id=0, suggested_type=ctype,
-                    text=item.text, normalized_title=item.normalized_title,
-                    source_page=item.page, source_excerpt=excerpt,
-                    excerpt_on_page=on_page,
-                ))
+                for item in parsed.items:
+                    try:
+                        ctype = CandidateType(item.type)
+                    except ValueError:
+                        ctype = CandidateType.UNCLEAR
+                    if ctype not in (
+                        CandidateType.OBJECTIVE, CandidateType.MEASURE,
+                        CandidateType.TARGET, CandidateType.INDICATOR,
+                    ):
+                        continue
+                    excerpt = _squash(item.excerpt)
+                    on_page = excerpt_found(
+                        page_text.get(item.page, ""), excerpt)
+                    candidates.append(PolicyCandidate(
+                        document_id=0, suggested_type=ctype,
+                        text=item.text, normalized_title=item.normalized_title,
+                        source_page=item.page, source_excerpt=excerpt,
+                        excerpt_on_page=on_page,
+                    ))
         return candidates
 
 

@@ -52,6 +52,13 @@ a FastAPI service on Azure, and Supabase holding Postgres, pgvector
 embeddings, and the source PDFs. Evidence searches run as durable
 background jobs, so a busy or restarted server never loses your work.
 
+Review writes are open by default — convenient for a local run. For a
+deployment where strangers shouldn't click Confirm, set
+`PAPER_TRAIL_REVIEW_KEY` on the API: every mutating endpoint then
+requires the `X-Review-Key` header, and the web UI asks reviewers for
+the key once and keeps it in their browser. (For a private UI,
+`NEXT_PUBLIC_REVIEW_KEY` bakes it into the bundle instead.)
+
 ## Read more
 
 The [project wiki](https://github.com/unnobatroo/paper-trail/wiki) is
@@ -59,12 +66,9 @@ where the detail lives — how the pieces fit together, how evidence is
 actually ranked, what the database looks like, and how to deploy your
 own:
 
-- [Architecture](https://github.com/unnobatroo/paper-trail/wiki/Architecture) — the moving parts and why they look this way
-- [Ranking Pipeline](https://github.com/unnobatroo/paper-trail/wiki/Ranking-Pipeline) — how a commitment becomes evidence suggestions
-- [Machine Learning](https://github.com/unnobatroo/paper-trail/wiki/Machine-Learning) — the models involved, and how to swap them
-- [Data Layer](https://github.com/unnobatroo/paper-trail/wiki/Data-Layer) — what's stored where
-- [API Reference](https://github.com/unnobatroo/paper-trail/wiki/API-Reference) — every endpoint
-- [Development](https://github.com/unnobatroo/paper-trail/wiki/Development) and [Deployment](https://github.com/unnobatroo/paper-trail/wiki/Deployment) — working on it and shipping it
+- [How It Works](https://github.com/unnobatroo/paper-trail/wiki/How-It-Works) — the pipeline from PDF to reviewed trail, step by step
+- [Reference](https://github.com/unnobatroo/paper-trail/wiki/Reference) — the schema, every endpoint, every env var
+- [Running](https://github.com/unnobatroo/paper-trail/wiki/Running) — local setup, offline mode, and deployment
 
 ## Contributing
 

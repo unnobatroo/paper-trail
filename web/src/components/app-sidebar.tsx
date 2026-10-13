@@ -14,6 +14,7 @@ import {
   Route,
   Languages,
   FileText,
+  KeyRound,
   Loader2,
 } from "lucide-react";
 import {
@@ -49,7 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { api } from "@/lib/api";
+import { api, getReviewKey, setReviewKey } from "@/lib/api";
 import { ThemeToggle } from "./theme-toggle";
 import {
   keys,
@@ -169,6 +170,7 @@ export function AppSidebar() {
           <Languages className="size-4" />
           {translateOn ? "Hide English" : "Show English"}
         </Button>
+        {meta?.review_required && <ReviewKeyDialog />}
         <ThemeToggle />
         <p className="text-[10px] text-muted-foreground">
           Press <kbd className="rounded border px-1">⌘K</kbd> for the command
@@ -191,6 +193,61 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function ReviewKeyDialog() {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) setValue(getReviewKey());
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2" />
+        }
+      >
+        <KeyRound className="size-4" />
+        Review key
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Review key</DialogTitle>
+          <DialogDescription>
+            This deployment requires a key to confirm or reject items. It
+            is stored only in this browser.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="review-key">Key</Label>
+          <Input
+            id="review-key"
+            type="password"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={() => {
+              setReviewKey(value.trim());
+              setOpen(false);
+              toast.success(
+                value.trim() ? "Review key saved" : "Review key cleared",
+              );
+            }}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

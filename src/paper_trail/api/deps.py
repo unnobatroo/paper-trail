@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from fastapi import Depends, HTTPException, Request
+
 from ..bootstrap import AppState, build_state
 from .jobs import JobRunner, SupabaseJobRunner
 
@@ -11,6 +13,18 @@ from .jobs import JobRunner, SupabaseJobRunner
 @lru_cache
 def get_state() -> AppState:
     return build_state()
+
+
+def require_review_key(request: Request,
+                     state: AppState = Depends(get_state)) -> None:
+    """Write gate — only active when PAPER_TRAIL_REVIEW_KEY is set.
+
+    A shared secret, not real auth: it stops casual visitors and bots
+    from mutating the record. Reads stay open either way."""
+    key = state.settings.review_key
+    if key and request.headers.get("x-review-key") != key:
+        raise HTTPException(
+            403, "this deployment requires a review key for changes")
 
 
 def _handlers():
@@ -27,7 +41,16 @@ def _handlers():
         doc_id, n = state.ingestion.ingest(
             pdf, payload["title"], payload["publisher"],
             payload.get("url", ""))
-        return {"document_id": doc_id, "candidates": n}
+        result: dict = {"document_id": doc_id, "candidates": n}
+        if n == 0:
+            # an empty review queue with no explanation reads as a bug —
+            # say why the document yielded nothing
+            result["warnings"] = [
+                "no commitments were extracted — the layout may not "
+                "match the rule parser; try an LLM extractor "
+                "(PAPER_TRAIL_LLM_*) or extend the language profile",
+            ]
+        return result
 
     def find_evidence(payload: dict, progress) -> dict:
         state = get_state()

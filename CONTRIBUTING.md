@@ -29,11 +29,11 @@ can talk about it — there might be a way to do both.
 
 ```bash
 uv sync
-uv run pytest        # ~33 tests, all offline, should pass in seconds
+uv run pytest        # ~40 tests, all offline, should pass in seconds
 ```
 
-The [Development](https://github.com/unnobatroo/paper-trail/wiki/Development)
-wiki page covers the layout and the conventions in more depth.
+The [Running](https://github.com/unnobatroo/paper-trail/wiki/Running)
+wiki page covers the setup and conventions in more depth.
 
 ## How changes land
 

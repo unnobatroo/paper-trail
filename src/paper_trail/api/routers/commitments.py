@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.models import Commitment
-from ..deps import get_jobs, get_state
+from ..deps import get_jobs, get_state, require_review_key
 from ..jobs import JobRunner
 from ..schemas import JobOut
 
@@ -22,7 +22,8 @@ def commitments(state: AppState = Depends(get_state)) -> list[Commitment]:
     return state.policy.commitments()
 
 
-@router.post("/{commitment_id}/find-evidence", status_code=202)
+@router.post("/{commitment_id}/find-evidence", status_code=202,
+             dependencies=[Depends(require_review_key)])
 def find_evidence(commitment_id: int,
                   state: AppState = Depends(get_state),
                   jobs: JobRunner = Depends(get_jobs)) -> JobOut:

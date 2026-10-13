@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.models import SourceDocument
-from ..deps import get_jobs, get_state
+from ..deps import get_jobs, get_state, require_review_key
 from ..jobs import JobRunner
 from ..schemas import IngestRequest, JobOut
 
@@ -29,7 +29,8 @@ def available(state: AppState = Depends(get_state)) -> list[str]:
     return state.docs.list()
 
 
-@router.post("/ingest", status_code=202)
+@router.post("/ingest", status_code=202,
+             dependencies=[Depends(require_review_key)])
 def ingest(req: IngestRequest,
            state: AppState = Depends(get_state),
            jobs: JobRunner = Depends(get_jobs)) -> JobOut:

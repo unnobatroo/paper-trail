@@ -124,6 +124,23 @@ def test_ingest_job_from_document_store(client, state, strategy_pdf):
     assert job["result"]["candidates"] > 0
 
 
+def test_review_key_gates_mutations(client, state):
+    """With PAPER_TRAIL_REVIEW_KEY set, POSTs need the header; GETs stay
+    open. Empty key = the open-review mode the deployment defaults to."""
+    state.settings.review_key = "k"
+    assert client.post("/api/candidates/1/reject").status_code == 403
+    assert client.post(
+        "/api/candidates/1/reject", headers={"x-review-key": "wrong"}
+    ).status_code == 403
+    # right key passes the gate — 404 here because candidate 1 is unknown
+    assert client.post(
+        "/api/candidates/1/reject", headers={"x-review-key": "k"}
+    ).status_code == 404
+    assert client.get("/api/candidates").status_code == 200
+    assert client.get("/api/meta").json()["review_required"] is True
+    state.settings.review_key = ""
+
+
 def test_unknown_ids_404(client):
     assert client.get("/api/jobs/nope").status_code == 404
     assert client.post("/api/candidates/999/reject").status_code == 404

@@ -4,6 +4,7 @@ strategy PDFs (the PDF-dependent tests skip without them).
 
   <bucket>/<doc>            →  data/source_documents/   (any file type)
   <bucket>/benchmark/*      →  data/benchmark/   (spec.json + *.jsonl + raw/)
+  official_sources table    →  SQLite (the evidence-search catalogue)
 
 Usage:  uv run python scripts/pull_data.py
 Needs SUPABASE_URL + SUPABASE_KEY (service_role) in the environment or
@@ -60,6 +61,24 @@ def main() -> int:
                 (raw_dir / name).write_bytes(data)
                 print(f"benchmark/raw/{name} → {raw_dir}/")
     bench = bench or raw
+
+    # the official-source catalogue is DB data — mirror it into the local
+    # SQLite so offline evidence searches check the same registry as prod
+    from paper_trail.domain.models import OfficialSource
+    from paper_trail.infrastructure.supabase_client import create
+    from paper_trail.repositories.store import EvidenceRepository
+
+    rows = (create(settings.supabase_url, settings.supabase_key)
+            .table("official_sources").select("*")
+            .order("sort_order").execute()).data
+    if rows:
+        repo = EvidenceRepository(settings.db_path)
+        for r in rows:
+            repo.upsert_official_source(OfficialSource(
+                url=r["url"], title=r.get("title", ""),
+                publisher=r.get("publisher", ""),
+                sort_order=r.get("sort_order", 0)))
+        print(f"{len(rows)} official_sources → {settings.db_path}")
 
     if not docs and not bench:
         print("Bucket is empty — run scripts/push_data.py first.")

@@ -29,6 +29,11 @@ land there.
 - **Skipped review.** Any route that lets pipeline output become part
   of the record without a human approving it breaks the project's core
   promise, and we want to know immediately.
+- **Write-gate bypass.** When `PAPER_TRAIL_REVIEW_KEY` is set, every
+  mutating endpoint must require the `X-Review-Key` header — a route
+  that skips the check is reportable. The key is a shared secret, not
+  authentication; treat it accordingly. With the variable unset, open
+  review is the documented default, not a bug.
 
 ## What's probably not a security issue
 

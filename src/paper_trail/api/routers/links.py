@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
-from ..deps import get_state
+from ..deps import get_state, require_review_key
 from ..schemas import BulkLinksRequest, LinkDecisionRequest, LinkView
 
 router = APIRouter(prefix="/api/links", tags=["links"])
@@ -57,7 +57,8 @@ def link(link_id: int,
     return _views(state, [row])[0]
 
 
-@router.post("/{link_id}/decide")
+@router.post("/{link_id}/decide",
+             dependencies=[Depends(require_review_key)])
 def decide(link_id: int, req: LinkDecisionRequest,
            state: AppState = Depends(get_state)) -> dict:
     if state.evidence.link(link_id) is None:
@@ -69,7 +70,7 @@ def decide(link_id: int, req: LinkDecisionRequest,
     return {"ok": True}
 
 
-@router.post("/bulk")
+@router.post("/bulk", dependencies=[Depends(require_review_key)])
 def bulk(req: BulkLinksRequest,
          state: AppState = Depends(get_state)) -> dict:
     return {

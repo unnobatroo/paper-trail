@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
 from ...domain.models import PolicyCandidate
-from ..deps import get_state
+from ..deps import get_state, require_review_key
 from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
@@ -20,7 +20,8 @@ def candidates(status: ReviewStatus | None = None,
     return state.policy.candidates(status)
 
 
-@router.post("/{candidate_id}/accept")
+@router.post("/{candidate_id}/accept",
+             dependencies=[Depends(require_review_key)])
 def accept(candidate_id: int, req: AcceptCandidateRequest | None = None,
            state: AppState = Depends(get_state)) -> dict:
     req = req or AcceptCandidateRequest()
@@ -33,7 +34,8 @@ def accept(candidate_id: int, req: AcceptCandidateRequest | None = None,
     return {"commitment_id": cid}
 
 
-@router.post("/{candidate_id}/reject")
+@router.post("/{candidate_id}/reject",
+             dependencies=[Depends(require_review_key)])
 def reject(candidate_id: int,
            state: AppState = Depends(get_state)) -> dict:
     if state.policy.candidate(candidate_id) is None:
@@ -42,7 +44,7 @@ def reject(candidate_id: int,
     return {"ok": True}
 
 
-@router.post("/bulk")
+@router.post("/bulk", dependencies=[Depends(require_review_key)])
 def bulk(req: BulkCandidatesRequest,
          state: AppState = Depends(get_state)) -> dict:
     accepted = state.review.confirm_candidates(req.accept)

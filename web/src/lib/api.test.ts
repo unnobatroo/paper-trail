@@ -1,0 +1,82 @@
+// @vitest-environment jsdom
+/** Error mapping + review-key plumbing of the API client — the parts
+ * where silent wrongness would hang the UI or drop a gate. */
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api, getReviewKey, setReviewKey } from "./api";
+
+const okJson = (body: unknown = {}) =>
+  new Response(JSON.stringify(body), { status: 200 });
+
+describe("api client", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it("maps HTTP errors to ApiError with the server's detail", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ detail: "unknown link 9" }), {
+          status: 404,
+        }),
+      ),
+    );
+    await expect(api.documents()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 404,
+      message: "unknown link 9",
+    });
+  });
+
+  it("turns a timeout into a wake-up message instead of a spinner", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("timed out", "TimeoutError");
+      }),
+    );
+    await expect(api.meta()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 0,
+      message: expect.stringContaining("waking up"),
+    });
+  });
+
+  it("turns a network failure into a reachability message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    await expect(api.meta()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 0,
+      message: expect.stringContaining("Cannot reach"),
+    });
+  });
+
+  it("sends X-Review-Key once a key is stored", async () => {
+    setReviewKey("sekret");
+    expect(getReviewKey()).toBe("sekret");
+    const fetchMock = vi.fn<typeof fetch>(async () => okJson([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.documents();
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      "x-review-key": "sekret",
+    });
+  });
+
+  it("omits the header with no key, and after clearing", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => okJson([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.documents();
+    expect(fetchMock.mock.calls[0][1]?.headers).not.toHaveProperty(
+      "x-review-key",
+    );
+    setReviewKey("k");
+    setReviewKey("");
+    expect(getReviewKey()).toBe("");
+  });
+});

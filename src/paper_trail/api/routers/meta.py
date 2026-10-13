@@ -27,6 +27,7 @@ def meta(state: AppState = Depends(get_state)) -> dict:
         "reranker": s.reranker_model,
         "search_provider": s.search_provider,
         "llm_extraction": s.llm_configured,
+        "review_required": bool(s.review_key),
         "translation": get_translator(
             get_profile(s.language)) is not None,
     }

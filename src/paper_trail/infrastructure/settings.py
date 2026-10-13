@@ -44,6 +44,10 @@ Environment overrides:
                             (default "source-documents")
   PAPER_TRAIL_API_ORIGINS   comma-separated CORS origins for the API
                             (default http://localhost:3000)
+  PAPER_TRAIL_REVIEW_KEY    when set, mutating endpoints require the
+                            X-Review-Key header — a shared secret for
+                            deployments where strangers shouldn't click
+                            Confirm (unset = open review)
 """
 
 from __future__ import annotations
@@ -113,6 +117,8 @@ class Settings(BaseSettings):
         default=None, validation_alias="PAPER_TRAIL_MT_MODEL")
     deployment: str = Field(
         default="", validation_alias="PAPER_TRAIL_DEPLOYMENT")
+    review_key: str = Field(
+        default="", validation_alias="PAPER_TRAIL_REVIEW_KEY")
 
     @property
     def allowed_domains(self) -> tuple[str, ...]:

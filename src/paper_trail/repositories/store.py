@@ -279,7 +279,8 @@ class EvidenceRepository(_Repo):
             conn.execute(
                 "INSERT INTO official_sources(url, title, publisher, sort_order)"
                 " VALUES(?,?,?,?) ON CONFLICT(url) DO UPDATE SET"
-                " title=excluded.title, publisher=excluded.publisher",
+                " title=excluded.title, publisher=excluded.publisher,"
+                " sort_order=excluded.sort_order",
                 (src.url, src.title, src.publisher, src.sort_order),
             )
 

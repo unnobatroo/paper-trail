@@ -12,6 +12,7 @@ configured extras, so the list follows data, not code.
 from __future__ import annotations
 
 import json
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -39,18 +40,29 @@ class SearchProvider(ABC):
 
 
 class DdgSearch(SearchProvider):
+    """DuckDuckGo via `ddgs` — no API key. Transient blips (rate limits,
+    TLS resets) get two retries with backoff; a total failure still
+    propagates so the caller can degrade to no hits for that domain."""
+
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
         from ddgs import DDGS
 
-        hits: list[SearchHit] = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=max_results):
-                hits.append(SearchHit(
-                    url=r.get("href", ""),
-                    title=r.get("title", ""),
-                    snippet=r.get("body", ""),
-                ))
-        return hits
+        for attempt in range(3):
+            try:
+                hits: list[SearchHit] = []
+                with DDGS() as ddgs:
+                    for r in ddgs.text(query, max_results=max_results):
+                        hits.append(SearchHit(
+                            url=r.get("href", ""),
+                            title=r.get("title", ""),
+                            snippet=r.get("body", ""),
+                        ))
+                return hits
+            except Exception:
+                if attempt == 2:
+                    raise
+                time.sleep(1.5 * (attempt + 1))
+        return []  # unreachable — the last attempt re-raises
 
 
 class FixtureSearch(SearchProvider):

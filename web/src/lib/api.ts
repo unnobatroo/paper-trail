@@ -1,12 +1,33 @@
 /** Typed client for the Paper Trail FastAPI backend.
  *
  * Mirrors src/paper_trail/api/schemas.py + domain/enums.py.
- * The backend speaks from NEXT_PUBLIC_API_URL (browser-visible only —
- * never put secrets here).
+ * The backend speaks from NEXT_PUBLIC_API_URL. Nothing here is secret:
+ * NEXT_PUBLIC_* values ship in the bundle — NEXT_PUBLIC_REVIEW_KEY is
+ * for private deployments only (public ones use the browser-stored key).
  */
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+// ---- review key ---------------------------------------------------------------
+// Sent as X-Review-Key on every request; the API only checks it on
+// mutations, and only when the deployment sets PAPER_TRAIL_REVIEW_KEY.
+// NEXT_PUBLIC_REVIEW_KEY bakes it in for private deployments (visible in
+// the bundle); otherwise the sidebar dialog stores it in this browser.
+
+const ENV_REVIEW_KEY = process.env.NEXT_PUBLIC_REVIEW_KEY ?? "";
+const LS_REVIEW_KEY = "pt-review-key";
+
+export function getReviewKey(): string {
+  if (ENV_REVIEW_KEY) return ENV_REVIEW_KEY;
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(LS_REVIEW_KEY) ?? "";
+}
+
+export function setReviewKey(key: string) {
+  if (key) localStorage.setItem(LS_REVIEW_KEY, key);
+  else localStorage.removeItem(LS_REVIEW_KEY);
+}
 
 // ---- enums (string values match Python exactly) ------------------------------
 
@@ -168,6 +189,8 @@ export interface Meta {
   search_provider: string;
   llm_extraction: boolean;
   translation: boolean;
+  /** True when the API requires X-Review-Key on mutations. */
+  review_required: boolean;
 }
 
 // ---- client ------------------------------------------------------------------
@@ -191,11 +214,13 @@ async function req<T>(
   // observed cold start (~60s) with headroom.
   let res: Response;
   try {
+    const reviewKey = getReviewKey();
     res = await fetch(`${API_URL}${path}`, {
       ...init,
       signal: AbortSignal.timeout(90_000),
       headers: {
         "content-type": "application/json",
+        ...(reviewKey ? { "x-review-key": reviewKey } : {}),
         ...init?.headers,
       },
     });
