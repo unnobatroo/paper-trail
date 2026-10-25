@@ -140,6 +140,21 @@ def test_reranker_sees_bounded_candidates(policy, evidence, tmp_path):
     assert reranker.seen and max(reranker.seen) <= 20
 
 
+class _DownReranker(Reranker):
+    name = "down"
+
+    def score(self, query, passages):
+        raise ConnectionError("429 from the hosted reranker")
+
+
+def test_reranker_outage_falls_back_to_retrieval_order(policy, evidence, tmp_path):
+    svc, com = _svc(tmp_path, evidence, policy, "fák és zöldfelületek " * 400,
+                    reranker=_DownReranker(), candidates=20)
+    warnings: list[str] = []
+    assert svc.find_evidence(com, warnings=warnings)  # still produces links
+    assert any("Reranker failed" in w for w in warnings)
+
+
 def test_links_unreviewed_and_provenance(policy, evidence, tmp_path):
     svc, com = _svc(
         tmp_path, evidence, policy,

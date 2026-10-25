@@ -7,7 +7,9 @@ request bodies, the link+evidence joined view, and the trail row.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
 
 from ..domain.enums import CandidateType, RelationshipType
 from ..domain.models import (
@@ -79,7 +81,9 @@ class TrailRowView(BaseModel):
 
 
 class TranslateRequest(BaseModel):
-    texts: list[str]
+    # the endpoint is open (reads stay public), so it's bounded instead:
+    # one page of ui strings, not a free translation api
+    texts: list[Annotated[str, StringConstraints(max_length=4000)]] = Field(max_length=50)
 
 
 class JobOut(BaseModel):

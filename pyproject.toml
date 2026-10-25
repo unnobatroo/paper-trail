@@ -26,6 +26,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.14.0",
 ]
 ml = [
     "ranx>=0.3.21",
@@ -42,3 +43,13 @@ packages = ["src/paper_trail"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["experiments"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# B008: fastapi's Depends() in defaults is the idiom. E741: `l` for link reads fine here
+ignore = ["B008", "E741"]

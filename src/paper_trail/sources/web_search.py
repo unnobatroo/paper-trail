@@ -29,7 +29,8 @@ class SearchHit:
 
 def allowed(url: str, domains: Collection[str]) -> bool:
     """Is `url` on one of the allowed domains (or a subdomain)?"""
-    host = urlparse(url).netloc.lower()
+    # hostname, not netloc: "user@evil.test" or ":443" must not pass
+    host = (urlparse(url).hostname or "").lower()
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
