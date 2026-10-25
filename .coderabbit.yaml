@@ -1,0 +1,45 @@
+version: "2"
+language: "en-US"
+# shared across my repos; the path rules below are what's specific here
+tone_instructions: "Direct, warm, zero fluff. One sentence of why per finding. Comments are lowercase and terse. Flag any doc or UI claim the code doesn't back up. Here: provenance, human-in-the-loop review, honest gaps."
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!data/**"
+    - "!**/package-lock.json"
+    - "!uv.lock"
+  path_instructions:
+    - path: "src/paper_trail/**"
+      instructions: |
+        - Nothing may enter the public record without a human decision. Flag any path that auto-accepts.
+        - Re-runs must never rewrite evidence or links a reviewer already decided on.
+        - Every suggestion keeps its receipts: source URL, page, verbatim quote.
+        - Job status writes must be guarded by status='running' and claimed_by (see api/jobs.py).
+        - Mutating endpoints sit behind require_review_key. Open endpoints must be bounded.
+        - Prefer an existing dependency or framework feature over new bespoke code (AGENTS.md).
+    - path: "supabase/migrations/**"
+      instructions: |
+        - Migrations are append-only. Never edit a shipped one; add the next number.
+        - Lexical search must stay OR-style over stemmed lexemes (007), matching the file backend.
+    - path: ".github/workflows/**"
+      instructions: |
+        - Prefer maintained actions and pre-commit hooks over inline shell logic.
+        - Deploys must depend on every CI job (needs:), never run in parallel with them.
+    - path: "tests/**"
+      instructions: |
+        - The suite must stay offline: no network, no secrets.
+    - path: "web/src/**"
+      instructions: |
+        - Use theme tokens and lib/tones.ts, not raw Tailwind palette colours or hex.
+        - Show errors with QueryError or errorMessage(). Never String(error).
+        - Reads must not send custom headers (CORS preflight). Hungarian text needs latin-ext fonts.
+
+chat:
+  auto_reply: true

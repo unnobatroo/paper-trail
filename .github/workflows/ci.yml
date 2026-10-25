@@ -5,20 +5,27 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # ruff, uv-lock, uv-export: fails if any hook changes a file
+      - run: uvx pre-commit run --all-files --show-diff-on-failure
+
   backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: astral-sh/setup-uv@v6
-
-      - name: Install dependencies
-        run: uv sync --no-group ml
-
-      - name: Test
-        # the whole suite is offline by design — no secrets needed
-        run: uv run pytest -q
+      - run: uv sync --no-group ml
+      # the whole suite is offline by design, no secrets needed
+      - run: uv run pytest -q
 
   frontend:
     runs-on: ubuntu-latest
@@ -27,14 +34,65 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-
       - run: npm ci
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # deploys the api to azure app service once everything above is green on
+  # main. this used to be a separate push workflow racing ci, so a red build
+  # could ship. the frontend deploys itself (vercel watches the repo) and
+  # vercel-alias.yml re-points the domain. needs AZURE_CREDENTIALS: a
+  # service principal with contributor on the paper-trail resource group
+  changes:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - src/**
+              - requirements.txt
+              - pyproject.toml
+              - uv.lock
+              - .github/workflows/ci.yml
+
+  deploy-api:
+    needs: [hooks, backend, frontend, changes]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    concurrency: deploy-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Package and deploy
+        run: |
+          git archive --format=zip -o deploy.zip HEAD
+          az webapp deploy \
+            --resource-group paper-trail \
+            --name paper-trail-api \
+            --src-path deploy.zip --type zip --async true
+      - name: Wait for a healthy API
+        run: |
+          for i in $(seq 1 30); do
+            sleep 15
+            if curl -sf https://paper-trail-api.azurewebsites.net/healthz; then
+              exit 0
+            fi
+          done
+          echo "API did not come up healthy"; exit 1
+      - name: Sign out
+        if: always()
+        run: az logout

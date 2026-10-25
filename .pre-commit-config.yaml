@@ -1,0 +1,17 @@
+# off-the-shelf hooks instead of hand-rolled ci checks. ci runs
+# `pre-commit run --all-files`, so a skipped local install still gets caught
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        exclude: ^experiments/
+  # uv.lock matches pyproject, and requirements.txt (what azure's zip deploy
+  # installs) matches uv.lock
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.13.4
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+        args: [--format, requirements-txt, --no-hashes, --no-dev, --no-group, ml, --frozen, -o, requirements.txt]

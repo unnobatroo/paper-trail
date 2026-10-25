@@ -195,6 +195,25 @@ export interface Meta {
 
 // ---- client ------------------------------------------------------------------
 
+/** Human text for any thrown value: toasts used to show "ApiError: …"
+ * or "[object Object]". */
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** FastAPI sends 422 details as a list of {loc, msg}; flatten it. */
+export function formatDetail(detail: unknown): string {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        const where = Array.isArray(d?.loc) ? d.loc.slice(1).join(".") : "";
+        return where ? `${where}: ${d?.msg ?? "invalid"}` : String(d?.msg ?? d);
+      })
+      .join("; ");
+  }
+  return typeof detail === "string" ? detail : JSON.stringify(detail);
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -218,9 +237,13 @@ async function req<T>(
     res = await fetch(`${API_URL}${path}`, {
       ...init,
       signal: AbortSignal.timeout(90_000),
+      // only send what the request needs: a bare GET with no custom
+      // headers skips the CORS preflight, which doubles a cold start
       headers: {
-        "content-type": "application/json",
-        ...(reviewKey ? { "x-review-key": reviewKey } : {}),
+        ...(init?.body ? { "content-type": "application/json" } : {}),
+        ...(reviewKey && init?.method && init.method !== "GET"
+          ? { "x-review-key": reviewKey }
+          : {}),
         ...init?.headers,
       },
     });
@@ -241,11 +264,11 @@ async function req<T>(
     let detail = res.statusText;
     try {
       const body = await res.json();
-      detail = body?.detail ?? detail;
+      if (body?.detail !== undefined) detail = formatDetail(body.detail);
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(res.status, String(detail));
+    throw new ApiError(res.status, detail);
   }
   return (await res.json()) as T;
 }
@@ -320,6 +343,8 @@ export const api = {
 
   trail: () => req<TrailRow[]>("/api/trail"),
   job: (id: string) => req<Job>(`/api/jobs/${id}`),
+  activeJobs: (kind: string) =>
+    req<Job[]>(`/api/jobs?kind=${encodeURIComponent(kind)}`),
   translate: (texts: string[]) =>
     req<{ translations: string[]; disclaimer: string }>("/api/translate", {
       method: "POST",

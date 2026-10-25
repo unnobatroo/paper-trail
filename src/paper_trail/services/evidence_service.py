@@ -166,6 +166,10 @@ class EvidenceService:
 
         links: list[EvidenceLink] = []
         for page, snippet, sim in self._rank(commitment, pages)[:TOP_K]:
+            # a reviewer already decided on this source: the evidence row,
+            # its budgets and the link all stay as they saw them
+            if self._repo.reviewed_evidence_id(commitment.id, page.url) is not None:
+                continue
             ev = EvidenceItem(
                 commitment_id=commitment.id,
                 url=page.url,
@@ -343,7 +347,7 @@ class EvidenceService:
     def _embed_and_store(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
         chunks = self._doc_chunks(page)
         vectors = self._embed.embed(chunks)
-        pairs = list(zip(chunks, vectors))
+        pairs = list(zip(chunks, vectors, strict=True))
         self._index.put(page, self._embed.model_name, _CHUNK, pairs)
         return pairs
 
@@ -385,9 +389,16 @@ class EvidenceService:
             self._warn(
                 "Ranked by text similarity only — no reranker is loaded.")
         elif top:
-            ce = self._reranker.score(query_text, [c[1] for c in top])
-            top = [c for _, c in sorted(zip(ce, top),
-                                        key=lambda r: -r[0])]
+            # a hosted reranker can 429 or time out; losing the job over it
+            # is worse than falling back to the retrieval order
+            try:
+                ce = self._reranker.score(query_text, [c[1] for c in top])
+            except Exception as exc:
+                self._warn(f"Reranker failed ({type(exc).__name__}), "
+                           "ranked by text similarity only.")
+            else:
+                top = [c for _, c in sorted(zip(ce, top, strict=True),
+                                            key=lambda r: -r[0])]
 
         # one evidence candidate per source document: its best chunk —
         # and drop effectively redundant pages so broad reports don't

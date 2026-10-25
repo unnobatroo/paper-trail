@@ -21,9 +21,10 @@ import {
   type RowChip,
 } from "@/components/queue";
 import { Kbd } from "@/components/ui/kbd";
-import { KIND_ICON, KIND_TONE } from "@/lib/tones";
+import { KIND_ICON, KIND_TONE, TONE_TEXT } from "@/lib/tones";
 import {
   api,
+  errorMessage,
   type CandidateType,
   type PolicyCandidate,
   type ReviewStatus,
@@ -169,7 +170,7 @@ function CommitmentsPage() {
       setSelected(new Set());
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   const single = useMutation({
@@ -183,7 +184,7 @@ function CommitmentsPage() {
       );
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   // triage keyboard shortcuts — j/k move, x select, c confirm, r reject, / search
@@ -467,7 +468,7 @@ function CandidateInspector({
       );
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   return (
@@ -545,7 +546,7 @@ function CandidateInspector({
       </div>
 
       {cand.excerpt_on_page === false && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
+        <p className={`text-xs ${TONE_TEXT.amber}`}>
           We couldn&apos;t re-find this quote on the page — worth a closer
           look.
         </p>

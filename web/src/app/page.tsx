@@ -18,6 +18,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 import {
   useCandidates,
   useCommitments,
@@ -27,11 +28,14 @@ import {
 } from "@/lib/hooks";
 
 export default function Dashboard() {
-  const { data: docs, isLoading: l0 } = useDocuments();
-  const { data: cands, isLoading: l1 } = useCandidates();
-  const { data: commitments, isLoading: l2 } = useCommitments();
-  const { data: links, isLoading: l3 } = useLinks();
-  const { data: trail } = useTrail();
+  const { data: docs, isLoading: l0, error: e0, refetch: r0 } = useDocuments();
+  const { data: cands, isLoading: l1, error: e1, refetch: r1 } = useCandidates();
+  const { data: commitments, isLoading: l2, error: e2, refetch: r2 } = useCommitments();
+  const { data: links, isLoading: l3, error: e3, refetch: r3 } = useLinks();
+  const { data: trail, error: e4, refetch: r4 } = useTrail();
+  // an unreachable api used to render as "no documents ingested yet"
+  const error = e0 ?? e1 ?? e2 ?? e3 ?? e4;
+  const retry = () => Promise.all([r0(), r1(), r2(), r3(), r4()]);
 
   const loading = l0 || l1 || l2 || l3;
 
@@ -76,13 +80,32 @@ export default function Dashboard() {
             cta: "Search",
           };
 
+  const header = (
+    <>
+      <h1 className="font-heading text-4xl font-medium tracking-tight">
+        Did they do <span className="pencil-mark">what they promised</span>?
+      </h1>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        Check a municipality&apos;s climate promises against evidence from its
+        own official sources. The software only suggests. Nothing counts until
+        a person confirms it.
+      </p>
+    </>
+  );
+
+  // no next-step or progress cards over an error: they'd read as real state
+  if (error) {
+    return (
+      <div className="mx-auto max-w-4xl p-4 sm:p-8">
+        {header}
+        <QueryError error={error} retry={retry} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl p-4 sm:p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Paper Trail</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Check a municipality&apos;s climate promises against evidence from its
-        own official sources. Nothing counts until a human confirms it.
-      </p>
+      {header}
 
       {loading ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -164,7 +187,12 @@ export default function Dashboard() {
             n: 1,
             t: "Check commitments",
             d: "Confirm or reject what the strategy actually promises.",
-            badge: unreviewed ? `${unreviewed} left` : "done",
+            // nothing extracted yet isn't "done"
+            badge: unreviewed
+              ? `${unreviewed} left`
+              : cands?.length
+                ? "done"
+                : null,
           },
           {
             href: "/evidence",

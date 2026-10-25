@@ -66,7 +66,10 @@ def _layout(profile: LanguageProfile):
         rf"|^\s*{re.escape(profile.card_label)}\s+\S+\.?\s*"
         if labels else r"(?!)")
     struct = re.compile(struct_re, re.IGNORECASE)
-    alt = lambda ls: "|".join(re.escape(l) for l in ls) or r"(?!)"
+
+    def alt(ls):
+        return "|".join(re.escape(l) for l in ls) or r"(?!)"
+
     return {
         "code": code,
         "goal": re.compile(rf"{code}\s+(?:{alt(profile.goal_labels)})"

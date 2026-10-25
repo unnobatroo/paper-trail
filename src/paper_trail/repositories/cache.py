@@ -182,7 +182,7 @@ class FileVectorIndex(VectorIndex):
         if not cached.exists():
             return None
         d = json.loads(cached.read_text(encoding="utf-8"))
-        return [(c, v) for c, v in zip(d["chunks"], d["vectors"])]
+        return [(c, v) for c, v in zip(d["chunks"], d["vectors"], strict=True)]
 
     def put(self, page: FetchedPage, model: str, chunk_size: int,
             pairs: list[tuple[str, list[float]]]) -> None:

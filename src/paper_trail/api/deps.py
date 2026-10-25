@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from functools import lru_cache
 
 from fastapi import Depends, HTTPException, Request
@@ -22,7 +23,8 @@ def require_review_key(request: Request,
     A shared secret, not real auth: it stops casual visitors and bots
     from mutating the record. Reads stay open either way."""
     key = state.settings.review_key
-    if key and request.headers.get("x-review-key") != key:
+    given = request.headers.get("x-review-key", "")
+    if key and not hmac.compare_digest(given.encode(), key.encode()):
         raise HTTPException(
             403, "this deployment requires a review key for changes")
 

@@ -45,16 +45,23 @@ class LocalDocumentStore(DocumentStore):
     def __init__(self, root: Path | str):
         self._root = Path(root)
 
+    def _path(self, name: str) -> Path:
+        # names come from the api; keep them inside the store
+        path = (self._root / name).resolve()
+        if not path.is_relative_to(self._root.resolve()):
+            raise ValueError(f"document name escapes the store: {name!r}")
+        return path
+
     def read(self, name: str) -> bytes | None:
-        path = self._root / name
+        path = self._path(name)
         return path.read_bytes() if path.exists() else None
 
     def write(self, name: str, data: bytes) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
-        (self._root / name).write_bytes(data)
+        self._path(name).write_bytes(data)
 
     def delete(self, name: str) -> None:
-        (self._root / name).unlink(missing_ok=True)
+        self._path(name).unlink(missing_ok=True)
 
     def list(self, prefix: str = "") -> list[str]:
         if not self._root.exists():

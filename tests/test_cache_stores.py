@@ -73,3 +73,46 @@ def test_file_layout_compatible_with_legacy_cache(tmp_path):
     assert (cache / f"{key}.txt").read_text() == PAGE.text
     meta = json.loads((cache / f"{key}.json").read_text())
     assert meta["title"] == PAGE.title
+
+
+def _commitment(policy) -> int:
+    from paper_trail.domain.enums import CandidateType
+    from paper_trail.domain.models import Commitment
+
+    return policy.add_commitment(Commitment(kind=CandidateType.MEASURE, title="plant trees"))
+
+
+def test_rerun_leaves_reviewed_evidence_alone(policy, evidence):
+    from paper_trail.domain.enums import ReviewStatus
+    from paper_trail.domain.models import EvidenceItem, EvidenceLink
+
+    c = _commitment(policy)
+
+    ev_id = evidence.add_evidence(EvidenceItem(
+        commitment_id=c, url="https://jozsefvaros.hu/x", title="t",
+        snippet="the quote the reviewer read"))
+    link_id = evidence.add_link(EvidenceLink(
+        commitment_id=c, evidence_id=ev_id, score=0.7))
+    evidence.decide_link(link_id, ReviewStatus.ACCEPTED)
+
+    # a later search finds the same page with different wording and score
+    assert evidence.add_evidence(EvidenceItem(
+        commitment_id=c, url="https://jozsefvaros.hu/x", title="t",
+        snippet="rewritten passage")) == ev_id
+    evidence.add_link(EvidenceLink(commitment_id=c, evidence_id=ev_id, score=0.1))
+
+    assert evidence.evidence(ev_id).snippet == "the quote the reviewer read"
+    [link] = evidence.links()
+    assert link.score == 0.7 and link.review_status == ReviewStatus.ACCEPTED
+
+
+def test_rerun_refreshes_unreviewed_evidence(policy, evidence):
+    from paper_trail.domain.models import EvidenceItem
+
+    c = _commitment(policy)
+
+    ev_id = evidence.add_evidence(EvidenceItem(
+        commitment_id=c, url="https://jozsefvaros.hu/y", title="t", snippet="old"))
+    evidence.add_evidence(EvidenceItem(
+        commitment_id=c, url="https://jozsefvaros.hu/y", title="t", snippet="new"))
+    assert evidence.evidence(ev_id).snippet == "new"

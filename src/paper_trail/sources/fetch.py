@@ -13,6 +13,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 
+import charset_normalizer
 import requests
 import trafilatura
 from pypdf import PdfReader
@@ -21,6 +22,7 @@ from .web_search import allowed
 
 _HEADERS = {"User-Agent": "paper-trail/0.1 (municipal evidence research)"}
 _TIMEOUT = 30
+_MAX_BYTES = 25 * 1024 * 1024  # the biggest strategy pdfs are ~10 MB
 
 
 @dataclass
@@ -36,9 +38,12 @@ def fetch(url: str, allowed_domains: Collection[str]) -> FetchedPage | None:
     if not allowed(url, allowed_domains):
         return None
     try:
-        resp = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT)
+        resp = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT, stream=True)
         resp.raise_for_status()
+        content = _read_capped(resp)
     except requests.RequestException:
+        return None
+    if content is None:
         return None
     # redirects are followed implicitly — re-check the allowlist on the
     # final URL so an on-list page can't point the fetcher off-list
@@ -48,8 +53,33 @@ def fetch(url: str, allowed_domains: Collection[str]) -> FetchedPage | None:
     if url.lower().endswith(".pdf") or resp.headers.get("content-type", "").startswith(
         "application/pdf"
     ):
-        return _read_pdf(url, resp.content)
-    return _read_html(url, resp.text)
+        return _read_pdf(url, content)
+    return _read_html(url, _decode(content, resp.encoding))
+
+
+def _decode(content: bytes, declared: str | None) -> str:
+    """Declared charset when python knows it, else let charset_normalizer
+    (already a requests dependency) guess. A bogus header shouldn't sink
+    the whole search."""
+    if declared:
+        try:
+            return content.decode(declared, errors="replace")
+        except LookupError:
+            pass
+    best = charset_normalizer.from_bytes(content).best()
+    return str(best) if best is not None else content.decode("utf-8", errors="replace")
+
+
+def _read_capped(resp: requests.Response) -> bytes | None:
+    """Body up to _MAX_BYTES, None past it — a runaway download shouldn't
+    pin a worker or its memory."""
+    buf = bytearray()
+    for chunk in resp.iter_content(64 * 1024):
+        buf += chunk
+        if len(buf) > _MAX_BYTES:
+            resp.close()
+            return None
+    return bytes(buf)
 
 
 def _read_pdf(url: str, content: bytes) -> FetchedPage | None:

@@ -146,3 +146,9 @@ def test_unknown_ids_404(client):
     assert client.post("/api/candidates/999/reject").status_code == 404
     assert client.post(
         "/api/commitments/999/find-evidence").status_code == 404
+
+
+def test_active_jobs_endpoint_lists_in_flight_work(client):
+    res = client.get("/api/jobs", params={"kind": "find_evidence"})
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)

@@ -57,14 +57,39 @@ describe("api client", () => {
     });
   });
 
-  it("sends X-Review-Key once a key is stored", async () => {
+  it("sends X-Review-Key on writes once a key is stored", async () => {
     setReviewKey("sekret");
     expect(getReviewKey()).toBe("sekret");
+    const fetchMock = vi.fn<typeof fetch>(async () => okJson({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.rejectCandidate(1);
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      "x-review-key": "sekret",
+    });
+  });
+
+  it("keeps reads header-free so they skip the CORS preflight", async () => {
+    setReviewKey("sekret");
     const fetchMock = vi.fn<typeof fetch>(async () => okJson([]));
     vi.stubGlobal("fetch", fetchMock);
     await api.documents();
-    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
-      "x-review-key": "sekret",
+    expect(fetchMock.mock.calls[0][1]?.headers).toEqual({});
+    setReviewKey("");
+  });
+
+  it("flattens FastAPI 422 details into readable text", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        new Response(
+          JSON.stringify({ detail: [{ loc: ["body", "texts"], msg: "too long" }] }),
+          { status: 422 },
+        ),
+      ),
+    );
+    await expect(api.documents()).rejects.toMatchObject({
+      status: 422,
+      message: "texts: too long",
     });
   });
 

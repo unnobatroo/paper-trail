@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Search, Loader2, ExternalLink } from "lucide-react";
@@ -27,6 +27,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import {
   api,
+  errorMessage,
   type Commitment,
   type EvidenceItem,
   type LinkView,
@@ -45,6 +46,7 @@ import {
   titleGroups,
 } from "@/lib/labels";
 import {
+  keys,
   useCandidates,
   useCommitments,
   useInvalidateDomain,
@@ -86,7 +88,15 @@ function EvidencePage() {
   const { data: links, error: linksError, refetch: refetchLinks } = useLinks();
   const invalidate = useInvalidateDomain();
   const [phase, setPhase] = useQueryState("phase", parseAsString);
-  const [jobIds, setJobIds] = useState<string[]>([]);
+  const [startedIds, setJobIds] = useState<string[]>([]);
+  // the server is the source of truth for what's running: after a reload,
+  // a trip to another view, or from another tab, follow in-flight searches
+  // instead of orphaning them
+  const { data: inFlight } = useQuery({
+    queryKey: keys.activeJobs("find_evidence"),
+    queryFn: () => api.activeJobs("find_evidence"),
+  });
+  const jobIds = startedIds.length ? startedIds : (inFlight ?? []).map((j) => j.id);
   const { jobs, settled, error: jobError, retry: retryJobs } = useJobs(jobIds);
 
   const searchable = (commitments ?? []).filter((c) =>
@@ -241,7 +251,7 @@ function PickList({
           const job = await api.findEvidence(id);
           jobIds.push(job.id);
         } catch (error) {
-          toast.error(`Could not start search: ${String(error)}`);
+          toast.error(`Could not start search: ${errorMessage(error)}`);
           break;
         }
       }
@@ -251,7 +261,7 @@ function PickList({
       setSelected(new Set());
       onSearch(jobIds);
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   useHotkeys("j", () => !editable() && setCursor((c) => Math.min(c + 1, PAGE - 1)));
@@ -475,7 +485,7 @@ function ReviewMatches({
       setSelected(new Set());
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   const single = useMutation({
@@ -492,7 +502,7 @@ function ReviewMatches({
       toast.success(accept ? "Match confirmed." : "Match rejected.");
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   const pages = Math.max(1, Math.ceil(orderedPending.length / PAGE));

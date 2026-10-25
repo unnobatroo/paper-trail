@@ -97,6 +97,9 @@ class JobRunner:
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
 
+    def active(self, kind: str) -> list[Job]:
+        return [j for j in self._jobs.values() if j.kind == kind and j.status in _IN_FLIGHT]
+
     def shutdown(self) -> None:
         self._pool.shutdown(wait=False)
 
@@ -112,15 +115,17 @@ class SupabaseJobRunner:
     """
 
     POLL_SECONDS = 2.0
-    STALE_AFTER = timedelta(minutes=20)  # no progress write → worker died
+    STALE_AFTER = timedelta(minutes=20)  # no heartbeat → worker died
+    HEARTBEAT_SECONDS = 60.0  # lease renewal while a handler runs
 
     def __init__(self, url: str, key: str, handlers: dict[str, Handler],
                  *, max_workers: int = 4, worker_id: str | None = None):
-        from ..infrastructure.supabase_client import create
-
-        self._db = create(url, key)
+        self._db = self._client(url, key)
         self._handlers = handlers
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._max_workers = max_workers
+        self._busy = 0  # claims submitted to the pool and not yet finished
+        self._busy_lock = threading.Lock()
         self._worker = worker_id or (
             f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:4]}")
         self._stop = threading.Event()
@@ -147,10 +152,16 @@ class SupabaseJobRunner:
             if rows:
                 return self._to_job(rows[0])
             raise
-        # try to run it ourselves right away — the poller covers the
-        # case where this process dies between insert and claim
-        self._pool.submit(self._claim_and_run, job.id)
+        # try to run it ourselves right away if there's room; otherwise it
+        # waits queued and a poller (here or on another worker) claims it
+        self._spawn(job.id)
         return job
+
+    def active(self, kind: str) -> list[Job]:
+        rows = (self._db.table("jobs").select("*").eq("kind", kind)
+                .in_("status", _IN_FLIGHT).order("created_at").limit(200)
+                .execute()).data
+        return [self._to_job(r) for r in rows]
 
     def get(self, job_id: str) -> Job | None:
         res = (self._db.table("jobs").select("*")
@@ -163,48 +174,99 @@ class SupabaseJobRunner:
 
     # -- worker side --------------------------------------------------------
 
+    @staticmethod
+    def _client(url: str, key: str):
+        from ..infrastructure.supabase_client import create
+
+        return create(url, key)
+
+    def _spawn(self, job_id: str) -> bool:
+        """Reserve a pool slot and claim, or leave the job queued. Check and
+        reserve happen under one lock, so neither concurrent submits nor
+        the poller can overfill the pool."""
+        with self._busy_lock:
+            if self._busy >= self._max_workers:
+                return False
+            self._busy += 1
+        self._pool.submit(self._claim_and_run, job_id)
+        return True
+
+    def _has_capacity(self) -> bool:
+        with self._busy_lock:
+            return self._busy < self._max_workers
+
     def _claim_and_run(self, job_id: str) -> None:
         """Conditional UPDATE = atomic compare-and-swap: the row goes
         queued → running only if nobody else claimed it first."""
-        claimed = (self._db.table("jobs").update({
-            "status": "running", "claimed_by": self._worker,
-            "updated_at": _now(),
-        }).eq("id", job_id).eq("status", "queued").execute())
-        if claimed.data:
-            self._run_claimed(claimed.data[0])
+        try:
+            claimed = (self._db.table("jobs").update({
+                "status": "running", "claimed_by": self._worker,
+                "updated_at": _now(),
+            }).eq("id", job_id).eq("status", "queued").execute())
+            if claimed.data:
+                self._run_claimed(claimed.data[0])
+        finally:
+            with self._busy_lock:
+                self._busy -= 1
+
+    def _owned(self, job_id: str):
+        """Update builder scoped to a row this worker still owns. If the
+        sweeper failed the job (or anyone else touched it) the write
+        matches nothing, so a late finish can't resurrect it as done."""
+        def update(values: dict):
+            return (self._db.table("jobs").update(values).eq("id", job_id)
+                    .eq("status", "running").eq("claimed_by", self._worker))
+        return update
 
     def _run_claimed(self, row: dict) -> None:
+        owned = self._owned(row["id"])
+
         def progress(msg: str) -> None:
-            self._db.table("jobs").update(
-                {"progress": msg, "updated_at": _now()}
-            ).eq("id", row["id"]).execute()
+            owned({"progress": msg, "updated_at": _now()}).execute()
+
+        # heartbeat: a healthy handler that never reports progress (ingest)
+        # must not look dead to the stale sweep
+        done = threading.Event()
+
+        def heartbeat() -> None:
+            while not done.wait(self.HEARTBEAT_SECONDS):
+                try:
+                    owned({"updated_at": _now()}).execute()
+                except Exception:
+                    pass  # a missed beat is fine; STALE_AFTER spans many
+        threading.Thread(target=heartbeat, daemon=True).start()
 
         try:
             result = self._handlers[row["kind"]](row["payload"], progress)
-            self._db.table("jobs").update(
-                {"status": "done", "result": result,
-                 "updated_at": _now()}
-            ).eq("id", row["id"]).execute()
+            owned({"status": "done", "result": result,
+                   "updated_at": _now()}).execute()
         except Exception as exc:
-            self._db.table("jobs").update(
-                {"status": "failed",
-                 "error": f"{type(exc).__name__}: {exc}",
-                 "updated_at": _now()}
-            ).eq("id", row["id"]).execute()
+            owned({"status": "failed",
+                   "error": f"{type(exc).__name__}: {exc}",
+                   "updated_at": _now()}).execute()
+        finally:
+            done.set()
 
     def _poll_loop(self) -> None:
         """Pick up queued rows nobody claimed (e.g. the submitting worker
         died between insert and claim) and fail stale claims."""
         while not self._stop.wait(self.POLL_SECONDS):
             try:
-                self._sweep_stale()
-                rows = (self._db.table("jobs").select("id")
-                        .eq("status", "queued").order("created_at")
-                        .limit(1).execute()).data
-                if rows:
-                    self._pool.submit(self._claim_and_run, rows[0]["id"])
+                self._poll_once()
             except Exception:
                 pass  # transient DB errors mustn't kill the poller
+
+    def _poll_once(self) -> None:
+        self._sweep_stale()
+        # a full pool would just queue claim attempts behind the running
+        # jobs, so only look for work when there's room
+        if not self._has_capacity():
+            return
+        rows = (self._db.table("jobs").select("id")
+                .eq("status", "queued").order("created_at")
+                .limit(1).execute()).data
+        if rows:
+            self._spawn(rows[0]["id"])
 
     def _sweep_stale(self) -> None:
         cutoff = (datetime.now(UTC) - self.STALE_AFTER).isoformat()

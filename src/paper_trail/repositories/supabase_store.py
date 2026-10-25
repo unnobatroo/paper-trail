@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import logging
 
+from postgrest.exceptions import APIError
+
 from supabase import Client
 
 from ..domain.enums import CandidateType, RelationshipType, ReviewStatus
@@ -35,6 +37,7 @@ class _SupabaseRepo:
 
     def __init__(self, url: str, key: str, client: Client | None = None):
         self._db = client or create_supabase(url, key)
+        self._legacy_upserts = False  # set once migration 008 turns out missing
 
 
 _PAGE = 1000
@@ -183,8 +186,43 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
              "sort_order": src.sort_order},
             on_conflict="url").execute()
 
+    def reviewed_evidence_id(self, commitment_id: int, url: str) -> int | None:
+        """Id of an evidence row a reviewer already decided on, if any."""
+        ev = (self._db.table("evidence").select("id")
+              .eq("commitment_id", commitment_id).eq("url", url)
+              .execute()).data
+        if not ev:
+            return None
+        reviewed = (self._db.table("links").select("id")
+                    .eq("evidence_id", ev[0]["id"])
+                    .neq("review_status", ReviewStatus.UNREVIEWED.value)
+                    .limit(1).execute()).data
+        return ev[0]["id"] if reviewed else None
+
+    def _guarded_upsert(self, fn: str, row: dict, table: str, conflict: str,
+                        reviewed_id) -> int:
+        """Write through migration 008's check-and-write function. Until that
+        migration is applied (PostgREST answers PGRST202, no such function)
+        fall back to check-then-upsert, so a deploy that lands before the
+        migration keeps working instead of failing every evidence write."""
+        if not self._legacy_upserts:
+            try:
+                return int(self._db.rpc(fn, {"r": row}).execute().data)
+            except APIError as exc:
+                if exc.code != "PGRST202":
+                    raise
+                log.warning("%s missing; run supabase/migrations/008 — "
+                            "using the non-atomic fallback", fn)
+                self._legacy_upserts = True
+        if (kept := reviewed_id()) is not None:
+            return kept
+        res = self._db.table(table).upsert(row, on_conflict=conflict).execute()
+        return res.data[0]["id"]
+
     def add_evidence(self, ev: EvidenceItem) -> int:
-        res = self._db.table("evidence").upsert({
+        # check-and-write in one statement (migration 008), so a review that
+        # lands mid-run can't have its quote rewritten
+        row = {
             "commitment_id": ev.commitment_id,
             "url": ev.url,
             "title": ev.title,
@@ -197,8 +235,10 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
             "dates_mentioned": json.dumps(ev.dates_mentioned, ensure_ascii=False),
             "status_hint": ev.status_hint.value,
             "status_excerpt": ev.status_excerpt,
-        }, on_conflict="commitment_id,url").execute()
-        return res.data[0]["id"]
+        }
+        return self._guarded_upsert(
+            "upsert_evidence_unless_reviewed", row, "evidence", "commitment_id,url",
+            lambda: self.reviewed_evidence_id(ev.commitment_id, ev.url))
 
     def evidence(self, evidence_id: int) -> EvidenceItem | None:
         res = (self._db.table("evidence").select("*")
@@ -216,7 +256,7 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         return out
 
     def add_link(self, link: EvidenceLink) -> int:
-        res = self._db.table("links").upsert({
+        row = {
             "commitment_id": link.commitment_id,
             "evidence_id": link.evidence_id,
             "score": link.score,
@@ -229,8 +269,19 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
                 link.features.shared_dates, ensure_ascii=False),
             "suggested_relationship": link.suggested_relationship.value,
             "reasons": json.dumps(link.reasons, ensure_ascii=False),
-        }, on_conflict="commitment_id,evidence_id").execute()
-        return res.data[0]["id"]
+        }
+
+        def reviewed_link_id() -> int | None:
+            existing = (self._db.table("links").select("id,review_status")
+                        .eq("commitment_id", link.commitment_id)
+                        .eq("evidence_id", link.evidence_id).execute()).data
+            if existing and existing[0]["review_status"] != ReviewStatus.UNREVIEWED.value:
+                return existing[0]["id"]
+            return None
+
+        return self._guarded_upsert(
+            "upsert_link_unless_reviewed", row, "links", "commitment_id,evidence_id",
+            reviewed_link_id)
 
     def links(self, status: ReviewStatus | None = None) -> list[EvidenceLink]:
         q = self._db.table("links").select("*")
