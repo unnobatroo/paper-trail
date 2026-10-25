@@ -101,7 +101,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="px-4 pt-4">
         <Link href="/" onClick={() => setOpenMobile(false)} className="flex items-baseline gap-2">
-          <span className="text-lg font-semibold tracking-tight">
+          <span className="font-heading text-xl font-medium tracking-tight pencil-mark">
             Paper Trail
           </span>
           {meta?.deployment && (
@@ -110,8 +110,8 @@ export function AppSidebar() {
             </Badge>
           )}
         </Link>
-        <p className="text-xs text-muted-foreground">
-          Promise → evidence → status
+        <p className="font-heading text-sm italic text-muted-foreground">
+          Did they do what they promised?
         </p>
       </SidebarHeader>
 
@@ -172,18 +172,18 @@ export function AppSidebar() {
         </Button>
         {meta?.review_required && <ReviewKeyDialog />}
         <ThemeToggle />
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Press <kbd className="rounded border px-1">⌘K</kbd> for the command
           menu · <kbd className="rounded border px-1">j</kbd>/<kbd className="rounded border px-1">k</kbd> navigate queues
         </p>
         {meta && !meta.translation && (
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             English translation is unavailable.
           </p>
         )}
 
         <SidebarSeparator />
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="receipt flex items-center gap-2 text-[11px] text-muted-foreground">
           <FileText className="size-3" />
           {meta
             ? `${documents?.length ?? 0} document(s) · ${meta.storage} · ${meta.search_provider}`
@@ -191,6 +191,15 @@ export function AppSidebar() {
               ? "API unreachable"
               : "connecting…"}
         </div>
+        <p className="receipt text-[11px] text-muted-foreground">
+          salam · made by{" "}
+          <a
+            href="https://jismailov.com"
+            className="underline decoration-pencil/50 underline-offset-2 hover:text-foreground"
+          >
+            jalol
+          </a>
+        </p>
       </SidebarFooter>
     </Sidebar>
   );

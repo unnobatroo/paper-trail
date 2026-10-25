@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
-import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
+import { useQueryState, parseAsInteger, parseAsString, parseAsArrayOf } from "nuqs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Search, Loader2, ExternalLink } from "lucide-react";
 import { QueryError } from "@/components/query-error";
@@ -27,6 +27,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import {
   api,
+  errorMessage,
   type Commitment,
   type EvidenceItem,
   type LinkView,
@@ -86,7 +87,12 @@ function EvidencePage() {
   const { data: links, error: linksError, refetch: refetchLinks } = useLinks();
   const invalidate = useInvalidateDomain();
   const [phase, setPhase] = useQueryState("phase", parseAsString);
-  const [jobIds, setJobIds] = useState<string[]>([]);
+  // in the url, so a reload or a trip to another view doesn't orphan
+  // searches that are still running server-side
+  const [jobIds, setJobIds] = useQueryState(
+    "jobs",
+    parseAsArrayOf(parseAsString).withDefault([]),
+  );
   const { jobs, settled, error: jobError, retry: retryJobs } = useJobs(jobIds);
 
   const searchable = (commitments ?? []).filter((c) =>
@@ -241,7 +247,7 @@ function PickList({
           const job = await api.findEvidence(id);
           jobIds.push(job.id);
         } catch (error) {
-          toast.error(`Could not start search: ${String(error)}`);
+          toast.error(`Could not start search: ${errorMessage(error)}`);
           break;
         }
       }
@@ -251,7 +257,7 @@ function PickList({
       setSelected(new Set());
       onSearch(jobIds);
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   useHotkeys("j", () => !editable() && setCursor((c) => Math.min(c + 1, PAGE - 1)));
@@ -475,7 +481,7 @@ function ReviewMatches({
       setSelected(new Set());
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   const single = useMutation({
@@ -492,7 +498,7 @@ function ReviewMatches({
       toast.success(accept ? "Match confirmed." : "Match rejected.");
       invalidate();
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e) => toast.error(errorMessage(e)),
   });
 
   const pages = Math.max(1, Math.ceil(orderedPending.length / PAGE));

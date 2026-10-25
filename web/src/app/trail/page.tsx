@@ -221,7 +221,7 @@ function TrailPage() {
                 <div key={rootId ?? "other"}>
                   <p className="flex items-center gap-1.5 text-sm font-semibold">
                     {root ? (
-                      <KIND_ICON.objective className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                      <KIND_ICON.objective className={`size-4 shrink-0 ${TONE_TEXT.blue}`} />
                     ) : null}
                     {root
                       ? `${root.code ? root.code + " · " : ""}${displayTitle(root.title)}`
