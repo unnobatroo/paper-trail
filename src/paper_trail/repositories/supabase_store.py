@@ -183,7 +183,24 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
              "sort_order": src.sort_order},
             on_conflict="url").execute()
 
+    def _reviewed_evidence_id(self, commitment_id: str, url: str) -> int | None:
+        """Id of an evidence row a reviewer already decided on, if any.
+        PostgREST upserts can't carry a WHERE, so re-runs check first and
+        leave reviewed rows exactly as the reviewer saw them."""
+        ev = (self._db.table("evidence").select("id")
+              .eq("commitment_id", commitment_id).eq("url", url)
+              .execute()).data
+        if not ev:
+            return None
+        reviewed = (self._db.table("links").select("id")
+                    .eq("evidence_id", ev[0]["id"])
+                    .neq("review_status", ReviewStatus.UNREVIEWED.value)
+                    .limit(1).execute()).data
+        return ev[0]["id"] if reviewed else None
+
     def add_evidence(self, ev: EvidenceItem) -> int:
+        if (kept := self._reviewed_evidence_id(ev.commitment_id, ev.url)) is not None:
+            return kept
         res = self._db.table("evidence").upsert({
             "commitment_id": ev.commitment_id,
             "url": ev.url,
@@ -216,6 +233,11 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         return out
 
     def add_link(self, link: EvidenceLink) -> int:
+        existing = (self._db.table("links").select("id,review_status")
+                    .eq("commitment_id", link.commitment_id)
+                    .eq("evidence_id", link.evidence_id).execute()).data
+        if existing and existing[0]["review_status"] != ReviewStatus.UNREVIEWED.value:
+            return existing[0]["id"]
         res = self._db.table("links").upsert({
             "commitment_id": link.commitment_id,
             "evidence_id": link.evidence_id,

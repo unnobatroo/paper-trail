@@ -68,7 +68,8 @@ def _candidate(row: Mapping) -> PolicyCandidate:
         source_page=row["source_page"],
         source_excerpt=row["source_excerpt"],
         code=row["code"],
-        excerpt_on_page=bool(row["excerpt_on_page"]) if row["excerpt_on_page"] is not None else None,
+        excerpt_on_page=(bool(row["excerpt_on_page"])
+                         if row["excerpt_on_page"] is not None else None),
         responsible_org=row["responsible_org"],
         timeframe=row["timeframe"],
         deadline_year=row["deadline_year"],
@@ -293,7 +294,12 @@ class EvidenceRepository(_Repo):
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(commitment_id, url) DO UPDATE SET
                      snippet=excluded.snippet, status_hint=excluded.status_hint,
-                     status_excerpt=excluded.status_excerpt""",
+                     status_excerpt=excluded.status_excerpt
+                   -- a reviewer signed off on what this row said; a re-run
+                   -- must not rewrite the quote under their decision
+                   WHERE NOT EXISTS (
+                     SELECT 1 FROM links l WHERE l.evidence_id = evidence.id
+                       AND l.review_status != 'unreviewed')""",
                 (ev.commitment_id, ev.url, ev.title, ev.publisher,
                  ev.published_on.isoformat() if ev.published_on else None,
                  ev.snippet,
@@ -319,8 +325,8 @@ class EvidenceRepository(_Repo):
             return {}
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM evidence WHERE id IN (%s)"
-                % ",".join("?" * len(ids)), ids).fetchall()
+                f"SELECT * FROM evidence WHERE id IN ({','.join('?' * len(ids))})",
+                ids).fetchall()
         return {r["id"]: _evidence(r) for r in rows}
 
     def add_link(self, link: EvidenceLink) -> int:
@@ -332,7 +338,8 @@ class EvidenceRepository(_Repo):
                    VALUES (?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(commitment_id, evidence_id) DO UPDATE SET
                      score=excluded.score, suggested_relationship=excluded.suggested_relationship,
-                     reasons=excluded.reasons""",
+                     reasons=excluded.reasons
+                   WHERE links.review_status = 'unreviewed'""",
                 (link.commitment_id, link.evidence_id, link.score,
                  link.features.semantic_similarity,
                  json.dumps(link.features.shared_organisations, ensure_ascii=False),
@@ -412,8 +419,9 @@ class EvidenceRepository(_Repo):
             return {}
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM budgets WHERE evidence_id IN (%s) ORDER BY id"
-                % ",".join("?" * len(evidence_ids)), evidence_ids).fetchall()
+                "SELECT * FROM budgets WHERE evidence_id IN"
+                f" ({','.join('?' * len(evidence_ids))}) ORDER BY id",
+                evidence_ids).fetchall()
         out: dict[int, list[BudgetRecord]] = {}
         for r in rows:
             out.setdefault(r["evidence_id"], []).append(_budget(r))

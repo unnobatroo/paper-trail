@@ -92,12 +92,15 @@ class SupabaseVectorIndex(VectorIndex):
         return res.data[0]["id"]
 
     def has(self, page: FetchedPage, model: str, chunk_size: int) -> bool:
+        # put() writes chunk 0 last, so its presence means every batch
+        # landed. any chunk existing used to count, and a put that died
+        # halfway left the page half-indexed for good
         pid = self._page_id(page.url)
         if pid is None:
             return False
         res = (self._db.table("chunks").select("id")
                .eq("page_id", pid).eq("embed_model", model)
-               .limit(1).execute())
+               .eq("chunk_index", 0).limit(1).execute())
         return bool(res.data)
 
     def get(self, page: FetchedPage, model: str,
@@ -128,6 +131,8 @@ class SupabaseVectorIndex(VectorIndex):
             "text": text,
             "embedding": _vec_literal(pad_vector(vec)),
         } for i, (text, vec) in enumerate(pairs)]
+        # highest indices first: chunk 0 is the commit marker has() reads
+        rows.reverse()
         for i in range(0, len(rows), _BATCH):
             (self._db.table("chunks")
              .upsert(rows[i: i + _BATCH],
