@@ -13,6 +13,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 
+import charset_normalizer
 import requests
 import trafilatura
 from pypdf import PdfReader
@@ -53,7 +54,20 @@ def fetch(url: str, allowed_domains: Collection[str]) -> FetchedPage | None:
         "application/pdf"
     ):
         return _read_pdf(url, content)
-    return _read_html(url, content.decode(resp.encoding or "utf-8", errors="replace"))
+    return _read_html(url, _decode(content, resp.encoding))
+
+
+def _decode(content: bytes, declared: str | None) -> str:
+    """Declared charset when python knows it, else let charset_normalizer
+    (already a requests dependency) guess. A bogus header shouldn't sink
+    the whole search."""
+    if declared:
+        try:
+            return content.decode(declared, errors="replace")
+        except LookupError:
+            pass
+    best = charset_normalizer.from_bytes(content).best()
+    return str(best) if best is not None else content.decode("utf-8", errors="replace")
 
 
 def _read_capped(resp: requests.Response) -> bytes | None:

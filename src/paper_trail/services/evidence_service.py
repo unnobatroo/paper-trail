@@ -166,6 +166,10 @@ class EvidenceService:
 
         links: list[EvidenceLink] = []
         for page, snippet, sim in self._rank(commitment, pages)[:TOP_K]:
+            # a reviewer already decided on this source: the evidence row,
+            # its budgets and the link all stay as they saw them
+            if self._repo.reviewed_evidence_id(commitment.id, page.url) is not None:
+                continue
             ev = EvidenceItem(
                 commitment_id=commitment.id,
                 url=page.url,

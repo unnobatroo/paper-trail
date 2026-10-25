@@ -32,10 +32,10 @@ export default function Dashboard() {
   const { data: cands, isLoading: l1, error: e1, refetch: r1 } = useCandidates();
   const { data: commitments, isLoading: l2, error: e2, refetch: r2 } = useCommitments();
   const { data: links, isLoading: l3, error: e3, refetch: r3 } = useLinks();
-  const { data: trail } = useTrail();
+  const { data: trail, error: e4, refetch: r4 } = useTrail();
   // an unreachable api used to render as "no documents ingested yet"
-  const error = e0 ?? e1 ?? e2 ?? e3;
-  const retry = () => Promise.all([r0(), r1(), r2(), r3()]);
+  const error = e0 ?? e1 ?? e2 ?? e3 ?? e4;
+  const retry = () => Promise.all([r0(), r1(), r2(), r3(), r4()]);
 
   const loading = l0 || l1 || l2 || l3;
 

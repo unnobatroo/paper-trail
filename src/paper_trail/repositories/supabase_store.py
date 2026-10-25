@@ -183,10 +183,8 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
              "sort_order": src.sort_order},
             on_conflict="url").execute()
 
-    def _reviewed_evidence_id(self, commitment_id: str, url: str) -> int | None:
-        """Id of an evidence row a reviewer already decided on, if any.
-        PostgREST upserts can't carry a WHERE, so re-runs check first and
-        leave reviewed rows exactly as the reviewer saw them."""
+    def reviewed_evidence_id(self, commitment_id: int, url: str) -> int | None:
+        """Id of an evidence row a reviewer already decided on, if any."""
         ev = (self._db.table("evidence").select("id")
               .eq("commitment_id", commitment_id).eq("url", url)
               .execute()).data
@@ -199,9 +197,9 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         return ev[0]["id"] if reviewed else None
 
     def add_evidence(self, ev: EvidenceItem) -> int:
-        if (kept := self._reviewed_evidence_id(ev.commitment_id, ev.url)) is not None:
-            return kept
-        res = self._db.table("evidence").upsert({
+        # check-and-write in one statement (migration 008), so a review that
+        # lands mid-run can't have its quote rewritten
+        res = self._db.rpc("upsert_evidence_unless_reviewed", {"r": {
             "commitment_id": ev.commitment_id,
             "url": ev.url,
             "title": ev.title,
@@ -214,8 +212,8 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
             "dates_mentioned": json.dumps(ev.dates_mentioned, ensure_ascii=False),
             "status_hint": ev.status_hint.value,
             "status_excerpt": ev.status_excerpt,
-        }, on_conflict="commitment_id,url").execute()
-        return res.data[0]["id"]
+        }}).execute()
+        return int(res.data)
 
     def evidence(self, evidence_id: int) -> EvidenceItem | None:
         res = (self._db.table("evidence").select("*")
@@ -233,12 +231,7 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         return out
 
     def add_link(self, link: EvidenceLink) -> int:
-        existing = (self._db.table("links").select("id,review_status")
-                    .eq("commitment_id", link.commitment_id)
-                    .eq("evidence_id", link.evidence_id).execute()).data
-        if existing and existing[0]["review_status"] != ReviewStatus.UNREVIEWED.value:
-            return existing[0]["id"]
-        res = self._db.table("links").upsert({
+        res = self._db.rpc("upsert_link_unless_reviewed", {"r": {
             "commitment_id": link.commitment_id,
             "evidence_id": link.evidence_id,
             "score": link.score,
@@ -251,8 +244,8 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
                 link.features.shared_dates, ensure_ascii=False),
             "suggested_relationship": link.suggested_relationship.value,
             "reasons": json.dumps(link.reasons, ensure_ascii=False),
-        }, on_conflict="commitment_id,evidence_id").execute()
-        return res.data[0]["id"]
+        }}).execute()
+        return int(res.data)
 
     def links(self, status: ReviewStatus | None = None) -> list[EvidenceLink]:
         q = self._db.table("links").select("*")

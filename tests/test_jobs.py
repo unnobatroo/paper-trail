@@ -127,3 +127,47 @@ def test_poller_does_not_claim_when_pool_is_full():
     r._poll_once()
     assert _wait(lambda: r._db.rows[0]["status"] == "done")
     r.shutdown()
+
+
+def test_submit_leaves_job_queued_when_pool_is_full():
+    import threading
+
+    gate = threading.Event()
+    r = _Runner("u", "k", {"block": lambda p, progress: gate.wait(2)}, max_workers=1)
+    first = r.submit("block", {"n": 1})
+    second = r.submit("block", {"n": 2})  # no slot: must not pile onto the executor
+    assert _wait(lambda: r.get(first.id).status == "running")
+    assert r.get(second.id).status == "queued"
+    assert r._busy == 1
+    gate.set()
+    assert _wait(lambda: r.get(first.id).status == "done")
+    r._poll_once()  # the poller picks up what submit couldn't
+    assert _wait(lambda: r.get(second.id).status == "done")
+    r.shutdown()
+
+
+def test_heartbeat_renews_the_lease_of_a_quiet_handler():
+    import threading
+
+    gate = threading.Event()
+
+    class _Fast(_Runner):
+        HEARTBEAT_SECONDS = 0.02
+
+    r = _Fast("u", "k", {"quiet": lambda p, progress: gate.wait(2)})
+    job = r.submit("quiet", {})
+    assert _wait(lambda: r.get(job.id).status == "running")
+    stamp = r._db.rows[0]["updated_at"]
+    assert _wait(lambda: r._db.rows[0]["updated_at"] != stamp)  # no progress calls, still alive
+    gate.set()
+    assert _wait(lambda: r.get(job.id).status == "done")
+    r.shutdown()
+
+
+def test_active_lists_in_flight_jobs_of_a_kind():
+    r = _Runner("u", "k", {"x": lambda p, progress: None}, max_workers=1)
+    r._busy = 1  # keep everything queued
+    a = r.submit("x", {"n": 1})
+    r.submit("y", {"n": 2})
+    assert [j.id for j in r.active("x")] == [a.id]
+    r.shutdown()

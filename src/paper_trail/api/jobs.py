@@ -97,6 +97,9 @@ class JobRunner:
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
 
+    def active(self, kind: str) -> list[Job]:
+        return [j for j in self._jobs.values() if j.kind == kind and j.status in _IN_FLIGHT]
+
     def shutdown(self) -> None:
         self._pool.shutdown(wait=False)
 
@@ -112,7 +115,8 @@ class SupabaseJobRunner:
     """
 
     POLL_SECONDS = 2.0
-    STALE_AFTER = timedelta(minutes=20)  # no progress write → worker died
+    STALE_AFTER = timedelta(minutes=20)  # no heartbeat → worker died
+    HEARTBEAT_SECONDS = 60.0  # lease renewal while a handler runs
 
     def __init__(self, url: str, key: str, handlers: dict[str, Handler],
                  *, max_workers: int = 4, worker_id: str | None = None):
@@ -148,10 +152,16 @@ class SupabaseJobRunner:
             if rows:
                 return self._to_job(rows[0])
             raise
-        # try to run it ourselves right away — the poller covers the
-        # case where this process dies between insert and claim
+        # try to run it ourselves right away if there's room; otherwise it
+        # waits queued and a poller (here or on another worker) claims it
         self._spawn(job.id)
         return job
+
+    def active(self, kind: str) -> list[Job]:
+        rows = (self._db.table("jobs").select("*").eq("kind", kind)
+                .in_("status", _IN_FLIGHT).order("created_at").limit(200)
+                .execute()).data
+        return [self._to_job(r) for r in rows]
 
     def get(self, job_id: str) -> Job | None:
         res = (self._db.table("jobs").select("*")
@@ -170,10 +180,16 @@ class SupabaseJobRunner:
 
         return create(url, key)
 
-    def _spawn(self, job_id: str) -> None:
+    def _spawn(self, job_id: str) -> bool:
+        """Reserve a pool slot and claim, or leave the job queued. Check and
+        reserve happen under one lock, so neither concurrent submits nor
+        the poller can overfill the pool."""
         with self._busy_lock:
+            if self._busy >= self._max_workers:
+                return False
             self._busy += 1
         self._pool.submit(self._claim_and_run, job_id)
+        return True
 
     def _has_capacity(self) -> bool:
         with self._busy_lock:
@@ -208,6 +224,18 @@ class SupabaseJobRunner:
         def progress(msg: str) -> None:
             owned({"progress": msg, "updated_at": _now()}).execute()
 
+        # heartbeat: a healthy handler that never reports progress (ingest)
+        # must not look dead to the stale sweep
+        done = threading.Event()
+
+        def heartbeat() -> None:
+            while not done.wait(self.HEARTBEAT_SECONDS):
+                try:
+                    owned({"updated_at": _now()}).execute()
+                except Exception:
+                    pass  # a missed beat is fine; STALE_AFTER spans many
+        threading.Thread(target=heartbeat, daemon=True).start()
+
         try:
             result = self._handlers[row["kind"]](row["payload"], progress)
             owned({"status": "done", "result": result,
@@ -216,6 +244,8 @@ class SupabaseJobRunner:
             owned({"status": "failed",
                    "error": f"{type(exc).__name__}: {exc}",
                    "updated_at": _now()}).execute()
+        finally:
+            done.set()
 
     def _poll_loop(self) -> None:
         """Pick up queued rows nobody claimed (e.g. the submitting worker

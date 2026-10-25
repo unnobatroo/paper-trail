@@ -285,6 +285,15 @@ class EvidenceRepository(_Repo):
                 (src.url, src.title, src.publisher, src.sort_order),
             )
 
+    def reviewed_evidence_id(self, commitment_id: int, url: str) -> int | None:
+        """Id of an evidence row a reviewer already decided on, if any."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT e.id FROM evidence e JOIN links l ON l.evidence_id = e.id
+                   WHERE e.commitment_id=? AND e.url=? AND l.review_status != 'unreviewed'
+                   LIMIT 1""", (commitment_id, url)).fetchone()
+        return row["id"] if row else None
+
     def add_evidence(self, ev: EvidenceItem) -> int:
         with self._connect() as conn:
             conn.execute(

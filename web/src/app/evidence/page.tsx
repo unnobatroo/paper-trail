@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useMutation } from "@tanstack/react-query";
-import { useQueryState, parseAsInteger, parseAsString, parseAsArrayOf } from "nuqs";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Search, Loader2, ExternalLink } from "lucide-react";
 import { QueryError } from "@/components/query-error";
@@ -46,6 +46,7 @@ import {
   titleGroups,
 } from "@/lib/labels";
 import {
+  keys,
   useCandidates,
   useCommitments,
   useInvalidateDomain,
@@ -87,12 +88,15 @@ function EvidencePage() {
   const { data: links, error: linksError, refetch: refetchLinks } = useLinks();
   const invalidate = useInvalidateDomain();
   const [phase, setPhase] = useQueryState("phase", parseAsString);
-  // in the url, so a reload or a trip to another view doesn't orphan
-  // searches that are still running server-side
-  const [jobIds, setJobIds] = useQueryState(
-    "jobs",
-    parseAsArrayOf(parseAsString).withDefault([]),
-  );
+  const [startedIds, setJobIds] = useState<string[]>([]);
+  // the server is the source of truth for what's running: after a reload,
+  // a trip to another view, or from another tab, follow in-flight searches
+  // instead of orphaning them
+  const { data: inFlight } = useQuery({
+    queryKey: keys.activeJobs("find_evidence"),
+    queryFn: () => api.activeJobs("find_evidence"),
+  });
+  const jobIds = startedIds.length ? startedIds : (inFlight ?? []).map((j) => j.id);
   const { jobs, settled, error: jobError, retry: retryJobs } = useJobs(jobIds);
 
   const searchable = (commitments ?? []).filter((c) =>

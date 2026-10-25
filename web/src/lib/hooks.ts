@@ -20,6 +20,7 @@ export const keys = {
   link: (id: number) => ["link", id] as const,
   trail: ["trail"] as const,
   job: (id: string) => ["job", id] as const,
+  activeJobs: (kind: string) => ["jobs", "active", kind] as const,
   translate: (text: string) => ["translate", text] as const,
 };
 
@@ -63,7 +64,8 @@ export function useInvalidateDomain() {
   return useCallback(() =>
     qc.invalidateQueries({
       predicate: (q) =>
-        ["candidates", "commitments", "links", "link", "trail", "documents"].includes(
+        // "jobs" so a finished batch drops out of the in-flight list
+        ["candidates", "commitments", "links", "link", "trail", "documents", "jobs"].includes(
           q.queryKey[0] as string,
         ),
     }), [qc]);

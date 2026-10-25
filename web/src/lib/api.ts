@@ -343,6 +343,8 @@ export const api = {
 
   trail: () => req<TrailRow[]>("/api/trail"),
   job: (id: string) => req<Job>(`/api/jobs/${id}`),
+  activeJobs: (kind: string) =>
+    req<Job[]>(`/api/jobs?kind=${encodeURIComponent(kind)}`),
   translate: (texts: string[]) =>
     req<{ translations: string[]; disclaimer: string }>("/api/translate", {
       method: "POST",
