@@ -1,4 +1,3 @@
-SHELL := /bin/bash
 # same verbs in every repo of mine: setup, dev, test, check, fmt, clean
 .PHONY: setup dev dev-api dev-web test check fmt clean
 
@@ -22,12 +21,11 @@ test:
 
 # what ci gates on
 check: test
-	uv run ruff check src tests scripts
-	diff <(uv export --format requirements-txt --no-hashes --no-dev --no-group ml --frozen -q | grep -v '^#') <(grep -v '^#' requirements.txt)
+	uvx pre-commit run --all-files
 	cd web && npm run lint && npm run build
 
 fmt:
-	uv run ruff check --fix src tests scripts
+	uvx pre-commit run --all-files || true
 
 clean:
 	rm -rf .pytest_cache .ruff_cache web/.next
