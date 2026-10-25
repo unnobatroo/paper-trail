@@ -6,28 +6,39 @@ name: CD
 # Needs an AZURE_CREDENTIALS secret: a service principal with
 # contributor on the paper-trail resource group.
 
+# Runs only after CI passes on main. It used to fire on push in parallel
+# with CI, so a red build could ship.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths:
-      - src/**
-      - requirements.txt
-      - Dockerfile
-      - pyproject.toml
-      - uv.lock
-      - .github/workflows/cd.yml
 
 jobs:
   deploy-api:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+
+      # workflow_run has no paths filter, so skip frontend/docs-only pushes here
+      - name: Backend changed?
+        id: changed
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -qE '^(src/|requirements\.txt|pyproject\.toml|uv\.lock|\.github/workflows/cd\.yml)'; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: azure/login@v2
+        if: steps.changed.outputs.backend == 'true'
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Package and deploy
+        if: steps.changed.outputs.backend == 'true'
         run: |
           git archive --format=zip -o deploy.zip HEAD
           az webapp deploy \
@@ -36,6 +47,7 @@ jobs:
             --src-path deploy.zip --type zip --async true
 
       - name: Wait for a healthy API
+        if: steps.changed.outputs.backend == 'true'
         run: |
           for i in $(seq 1 30); do
             sleep 15
@@ -46,5 +58,6 @@ jobs:
           echo "API did not come up healthy"; exit 1
 
       - name: Sign out
+        if: steps.changed.outputs.backend == 'true'
         if: always()
         run: az logout

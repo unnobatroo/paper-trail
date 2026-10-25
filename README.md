@@ -39,6 +39,8 @@ cd web
 npm install && npm run dev                             # interface on :3000
 ```
 
+Or `make setup && make dev` for both at once. `make check` runs what CI does.
+
 Open http://localhost:3000 and walk the three steps in the sidebar:
 check the extracted commitments, find evidence for them, then read the
 resulting trail. Everything works offline with stub providers — the
@@ -82,3 +84,7 @@ review, and every claim needs a quotable source). Security issues go to
 
 [GPL-3.0](LICENSE) — free to use, study, share and improve; derivatives
 stay open. Copyright © 2026 Paper Trail contributors.
+
+---
+
+<sub>salam from [jalol](https://jismailov.com)</sub>

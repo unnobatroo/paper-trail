@@ -16,6 +16,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --no-group ml
 
+      - name: Lint
+        run: uv run ruff check src tests scripts
+
+      # azure's zip deploy installs from requirements.txt, so it has to match uv.lock
+      - name: requirements.txt matches uv.lock
+        run: diff <(uv export --format requirements-txt --no-hashes --no-dev --no-group ml --frozen -q | grep -v '^#') <(grep -v '^#' requirements.txt)
+
       - name: Test
         # the whole suite is offline by design — no secrets needed
         run: uv run pytest -q

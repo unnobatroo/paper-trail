@@ -13,3 +13,6 @@
 - Keep diffs focused; match the conventions of the file you're in.
 - `web/AGENTS.md` applies under `web/` — read the version-matched Next.js
   docs in `node_modules/next/dist/docs/` before Next.js-specific changes.
+- Checks: `make check` runs what CI gates on (pytest, ruff, the
+  requirements.txt/uv.lock sync, web lint/test/build). Database changes go
+  in a new numbered file under `supabase/migrations/`, never an edit.
