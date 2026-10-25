@@ -84,7 +84,3 @@ review, and every claim needs a quotable source). Security issues go to
 
 [GPL-3.0](LICENSE) — free to use, study, share and improve; derivatives
 stay open. Copyright © 2026 Paper Trail contributors.
-
----
-
-<sub>salam from [jalol](https://jismailov.com)</sub>
