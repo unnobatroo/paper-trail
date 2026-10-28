@@ -26,6 +26,7 @@ export function TrailDetail({
   onMention,
   promise,
   docUrl,
+  hideHeader,
 }: {
   row: TrailRow;
   mentions: number;
@@ -34,6 +35,7 @@ export function TrailDetail({
   onMention: (id: number) => void;
   promise?: string | null;
   docUrl?: string | null;
+  hideHeader?: boolean;
 }) {
   const com = row.commitment;
 
@@ -52,15 +54,14 @@ export function TrailDetail({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Selected paper trail
-      </p>
-      <div>
-        <h2 className="text-lg font-semibold leading-snug">
-          {displayTitle(com.title)}
-        </h2>
-        <En text={displayTitle(com.title)} />
-      </div>
+      {!hideHeader && (
+        <div>
+          <h2 className="text-lg font-semibold leading-snug">
+            {displayTitle(com.title)}
+          </h2>
+          <En text={displayTitle(com.title)} />
+        </div>
+      )}
 
       {mentions > 1 && (
         <Select

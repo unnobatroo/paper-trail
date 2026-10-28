@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Languages, Loader2, Search } from "lucide-react";
@@ -15,28 +14,16 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useTranslate } from "@/components/en";
 import {
   keys,
-  useCandidates,
   useDocuments,
   useJobs,
-  useLinks,
   useMeta,
 } from "@/lib/hooks";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
-
-const TABS = [
-  { href: "/commitments", label: "Commitments" },
-  { href: "/evidence", label: "Evidence" },
-  { href: "/trail", label: "Trail" },
-];
 
 export function TopNav() {
-  const pathname = usePathname();
   const qc = useQueryClient();
   const { data: meta, isError: metaError } = useMeta();
   const { data: documents } = useDocuments();
-  const { data: cands } = useCandidates();
-  const { data: links } = useLinks();
   const { on: translateOn, setOn: setTranslateOn } = useTranslate();
   const [startedIds, setJobIds] = useState<string[]>([]);
   // the server knows what is running, so a reload keeps following an ingest
@@ -47,13 +34,6 @@ export function TopNav() {
   const jobIds = startedIds.length ? startedIds : (inFlight ?? []).map((j) => j.id);
   const { jobs, settled } = useJobs(jobIds);
 
-  // open work per queue, shown on the tab
-  const counts: Record<string, number> = {
-    "/commitments":
-      cands?.filter((c) => c.review_status === "unreviewed").length ?? 0,
-    "/evidence":
-      links?.filter((l) => l.link.review_status === "unreviewed").length ?? 0,
-  };
 
   const notified = useRef("");
   useEffect(() => {
@@ -81,7 +61,7 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
       <div className="mx-auto flex min-h-12 max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-1 px-4 py-1">
-        <Link href="/commitments" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-tight">Paper Trail</span>
           {meta?.deployment && (
             <Badge variant="outline" className="text-[10px]">
@@ -90,31 +70,6 @@ export function TopNav() {
           )}
         </Link>
 
-        <nav className="flex items-stretch gap-1 self-stretch" aria-label="Stages">
-          {TABS.map(({ href, label }) => {
-            const active = pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-1.5 border-b-2 px-2 text-sm transition-colors",
-                  active
-                    ? "border-primary font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {label}
-                {counts[href] ? (
-                  <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
-                    {counts[href]}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </nav>
 
         <div className="ml-auto flex items-center gap-1">
           {running.length > 0 && (

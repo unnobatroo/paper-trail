@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Check, X, SquarePen, Clock, CircleHelp } from "lucide-react";
+import { Check, X, FileText, SquarePen, Clock, CircleHelp } from "lucide-react";
 import { En } from "@/components/en";
 import { Chip, type RowChip } from "@/components/chip";
 import { Kbd } from "@/components/ui/kbd";
@@ -105,9 +105,6 @@ export function CandidateDetail({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Commitment inspector
-      </p>
       <div>
         <h2 className="text-lg font-semibold leading-snug">
           {displayTitle(cand.normalized_title)}
@@ -168,7 +165,8 @@ export function CandidateDetail({
       )}
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <FileText className="size-3.5" />
           Official source text
         </p>
         <blockquote className="mt-1 border-l-2 pl-3 text-sm text-muted-foreground">
@@ -208,7 +206,7 @@ export function CandidateDetail({
       {cand.review_status === "unreviewed" && (
         <div className="space-y-2 border-t pt-3">
           {!editing ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 onClick={() => decide.mutate("accept")}

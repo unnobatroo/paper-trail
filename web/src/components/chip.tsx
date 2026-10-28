@@ -13,7 +13,7 @@ export function Chip({ label, tone, icon: Icon }: RowChip) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-px text-[11px] font-medium leading-4",
+        "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-px text-[11px] font-medium leading-4 whitespace-nowrap",
         TONE_CHIP[tone],
       )}
     >
