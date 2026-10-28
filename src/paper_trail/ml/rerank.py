@@ -1,17 +1,10 @@
-"""Cross-encoder rerankers — stage 2 of evidence retrieval.
+"""cross-encoder rerankers, stage 2 of retrieval
 
-Same pattern as embeddings: a small interface, a local ONNX default
-(fastembed, multilingual, no extra dependencies), an optional
-sentence-transformers provider for the benchmarked bge-reranker-v2-m3,
-and "none" to disable reranking entirely (embedding order is kept).
-
-Selection: PAPER_TRAIL_RERANKER
-    unset/"auto" -> hosted Jina reranker when JINA_API_KEY is set,
-                    else no reranker (embedding order is kept)
-    "none"       -> no reranker
-    "jina"       -> hosted Jina reranker (errors to none without a key)
-    a model name -> local cross-encoder via fastembed if supported there,
-                    else sentence-transformers
+PAPER_TRAIL_RERANKER:
+    unset/"auto"  jina if JINA_API_KEY is set, else none
+    "none"        keep embedding order
+    "jina"        hosted jina (falls back to none without a key)
+    <model name>  fastembed if it supports it, else sentence-transformers
 """
 
 from __future__ import annotations
@@ -34,17 +27,15 @@ class Reranker(ABC):
 
     @abstractmethod
     def score(self, query: str, passages: list[str]) -> list[float]:
-        """One relevance score per passage — rank, don't threshold."""
+        """one score per passage, rank it, don't threshold it"""
 
 
 class FastembedReranker(Reranker):
-    """Local ONNX cross-encoder — multilingual, CPU-friendly, no torch."""
+    """local onnx cross-encoder, multilingual, cpu, no torch"""
 
     def __init__(self, model: str = DEFAULT_RERANKER,
                  cache_dir: str | None = None):
-        # keep HF's xet shared-blob store off: it scatters a model's
-        # external ONNX data outside the model dir and onnxruntime
-        # refuses to load it
+        # hf xet store scatters onnx data outside the model dir and onnxruntime refuses to load it
         os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
         from fastembed.rerank.cross_encoder import TextCrossEncoder
 
@@ -58,9 +49,7 @@ class FastembedReranker(Reranker):
 
 
 class SentenceTransformerReranker(Reranker):
-    """sentence-transformers cross-encoder — for the benchmarked
-    BAAI/bge-reranker-v2-m3. Only usable when the `ml` extra is
-    installed; the app never hard-requires it."""
+    """sentence-transformers cross-encoder (bge-reranker-v2-m3), needs the `ml` extra"""
 
     def __init__(self, model: str):
         from sentence_transformers import CrossEncoder
@@ -74,8 +63,7 @@ class SentenceTransformerReranker(Reranker):
 
 
 class JinaReranker(Reranker):
-    """Hosted cross-encoder via the Jina AI rerank API — same task as the
-    local ONNX reranker, no model download. Needs JINA_API_KEY."""
+    """jina rerank api, no model download, needs JINA_API_KEY"""
 
     def __init__(self, model: str = JINA_RERANKER,
                  api_key: str | None = None):
@@ -112,12 +100,7 @@ _FASTEMBED_MODELS = {
 
 def get_reranker(name: str | None = None,
                  cache_dir: str | None = None) -> Reranker | None:
-    """Build the configured reranker; None means 'keep embedding order'.
-
-    "auto"/unset resolves to the hosted Jina reranker when JINA_API_KEY
-    is set — it's small, fast, and needs no local model — and to no
-    reranker otherwise. Naming a local model opts into downloading it;
-    "none" disables reranking outright."""
+    """build the configured reranker, None = keep embedding order"""
     name = name if name is not None else os.environ.get(
         "PAPER_TRAIL_RERANKER", "")
     lowered = name.lower()
@@ -142,11 +125,11 @@ def get_reranker(name: str | None = None,
     for build in builds:
         try:
             return (build(name, cache_dir=cache_dir)
-                        if build is FastembedReranker else build(name))
+                    if build is FastembedReranker else build(name))
         except Exception:
             continue
 
-    # configured model unavailable — degrade to the bundled ONNX reranker
+    # model unavailable, fall back to the bundled onnx reranker
     if name != FALLBACK_RERANKER:
         log.warning("reranker %s unavailable; falling back to %s",
                     name, FALLBACK_RERANKER)

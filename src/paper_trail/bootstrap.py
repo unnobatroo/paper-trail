@@ -1,19 +1,11 @@
-"""Shared application wiring — one `build_state` for every front door.
+"""app wiring, `build_state` is the one entrypoint for the api, scripts and tests
 
-The FastAPI service (api/), scripts and tests all construct the same
-AppState from Settings:
+* repositories: supabase when configured, sqlite otherwise
+* page/vector cache: pgvector tables, else files under `data/processed/fetched/`
+* document store: supabase storage, else `data/source_documents/`
+* ml: embedder / reranker / extractor from env
 
-* repositories      — Supabase/Postgres when configured, SQLite otherwise
-* page/vector cache — Postgres `pages`/`chunks` + pgvector when
-                      configured, the `data/processed/fetched/` file
-                      layout otherwise
-* document store    — Supabase Storage bucket, else `data/source_documents/`
-* ml providers      — embedder / reranker / extractor per env config
-
-Nothing here may hold a live sqlite3 connection: the SQLite repos hold a
-path and open per-operation connections, the Supabase pieces hold a
-stateless HTTP client — safe to share across the FastAPI process and its
-job-runner threads.
+never hold a live sqlite3 connection here, jobs run on other threads
 """
 
 from __future__ import annotations
@@ -28,6 +20,7 @@ from .ml.extraction import get_extractor
 from .ml.lang import get_profile
 from .ml.rerank import get_reranker
 from .repositories.cache import FilePageStore, FileVectorIndex
+from .repositories.ports import EvidenceStore, PolicyStore
 from .repositories.store import EvidenceRepository, PolicyRepository
 from .repositories.supabase_store import (
     SupabaseEvidenceRepository,
@@ -44,8 +37,8 @@ from .sources.web_search import get_search_provider
 @dataclass
 class AppState:
     settings: Settings
-    policy: PolicyRepository | SupabasePolicyRepository
-    evidence: EvidenceRepository | SupabaseEvidenceRepository
+    policy: PolicyStore
+    evidence: EvidenceStore
     review: ReviewService
     ingestion: IngestionService
     evidence_svc: EvidenceService
@@ -54,9 +47,7 @@ class AppState:
 
 
 def _baseline_year(settings: Settings, policy) -> int | None:
-    """The year the tracked strategy was adopted: PAPER_TRAIL_BASELINE_YEAR
-    wins, else the earliest /YYYY/MM/ segment in a document URL (uploads sit
-    under dated folders on the official site)."""
+    """strategy year: PAPER_TRAIL_BASELINE_YEAR, else earliest /YYYY/MM/ in a doc url"""
     if settings.baseline_year:
         return settings.baseline_year
     years = [
@@ -95,10 +86,12 @@ def build_state(settings: Settings | None = None) -> AppState:
         docs = LocalDocumentStore(settings.seed_dir)
 
     embedder = get_provider(settings.embed_model,
-                            cache_dir=str(settings.model_cache))
+                            cache_dir=str(settings.model_cache),
+                            base_url=settings.embed_base_url,
+                            api_key=settings.embed_api_key)
     extractor = get_extractor(
         settings.llm_base_url, settings.llm_api_key, settings.llm_model,
-        profile)
+        profile, settings.llm_window_pages)
     search = get_search_provider(settings.search_provider,
                                  settings.fixture_dir)
     return AppState(

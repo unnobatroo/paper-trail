@@ -1,12 +1,7 @@
-"""Paper Trail REST API — the production surface.
+"""rest api, run with `make dev-api`
 
-Run locally:
-
-    uv run uvicorn paper_trail.api.app:app --app-dir src --reload
-
-Services are assembled in `bootstrap.build_state`; evidence discovery
-and ingestion run as background jobs — poll GET /api/jobs/{id}.
-OpenAPI docs at /docs.
+services come from `bootstrap.build_state`, slow work runs as jobs (poll /api/jobs/{id}),
+docs at /docs
 """
 
 from __future__ import annotations
@@ -32,9 +27,7 @@ from .routers import (
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     from .deps import get_jobs
-    # Build the durable runner at boot so queued jobs orphaned by a
-    # restart get claimed — otherwise they wait for the first request.
-    # Cheap now that the embedder lazy-loads.
+    # build the runner at boot so jobs orphaned by a restart get claimed (cheap, embedder is lazy)
     jobs = get_jobs() if load().supabase_configured else None
     yield
     if jobs is not None:
@@ -49,8 +42,7 @@ def create_app() -> FastAPI:
                     "Józsefváros climate commitments under human review.",
         lifespan=_lifespan,
     )
-    # load() alone for origins — building AppState here would load the
-    # embedder (~GB model) at import time instead of on first request
+    # load() only, building AppState here would pull the embedder at import time
     app.add_middleware(
         CORSMiddleware,
         allow_origins=load().api_origins,

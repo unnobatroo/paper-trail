@@ -3,28 +3,19 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
-import { useHotkeys } from "react-hotkeys-hook";
-import { Search, Loader2, ExternalLink } from "lucide-react";
-import { QueryError } from "@/components/query-error";
-import { PageHeader } from "@/components/page-header";
+import { useQueryState, parseAsString } from "nuqs";
+import { Check, Loader2, Search, X } from "lucide-react";
+import { Chip, EmptyState } from "@/components/chip";
+import { DataTable, useRowKeys, type Columns } from "@/components/data-table";
+import { DetailSheet } from "@/components/detail-sheet";
+import { LinkDetail } from "@/components/detail/link-detail";
 import { En } from "@/components/en";
-import {
-  QueueList,
-  Pager,
-  BatchBar,
-  EmptyState,
-  Chip,
-} from "@/components/queue";
-import {
-  KIND_ICON,
-  KIND_TONE,
-  REL_ICON,
-  REL_TONE,
-  STATUS_ICON,
-  STATUS_TONE,
-} from "@/lib/tones";
+import { QueryError } from "@/components/query-error";
+import { PageTitle, Toolbar } from "@/components/toolbar";
+import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   api,
   errorMessage,
@@ -33,65 +24,24 @@ import {
   type LinkView,
   type RelationshipType,
 } from "@/lib/api";
-import {
-  BUDGET_LABEL,
-  KIND_LABEL,
-  REL_HELP,
-  REL_LABEL,
-  STATUS_LABEL,
-  STATUS_SENTENCE,
-  displayTitle,
-  evidenceKind,
-  huf,
-  titleGroups,
-} from "@/lib/labels";
-import {
-  keys,
-  useCandidates,
-  useCommitments,
-  useInvalidateDomain,
-  useJobs,
-  useLink,
-  useLinks,
-} from "@/lib/hooks";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { keys, useCommitments, useInvalidateDomain, useJobs, useLink, useLinks } from "@/lib/hooks";
+import { KIND_LABEL, REL_LABEL, STATUS_LABEL, displayTitle, evidenceKind, titleGroups } from "@/lib/labels";
+import { KIND_ICON, KIND_TONE, REL_ICON, REL_TONE, STATUS_ICON, STATUS_TONE } from "@/lib/tones";
 
-const EVIDENCE_KINDS = new Set(["objective", "measure", "target"]);
-const PAGE = 10;
+const SEARCHABLE = new Set(["objective", "measure", "target"]);
 const KIND_ORDER = ["objective", "target", "measure"];
-const KIND_SECTION: Record<string, string> = {
-  objective: "Objectives",
-  target: "Targets",
-  measure: "Measures",
-};
 
-const editable = () =>
-  ["INPUT", "TEXTAREA", "SELECT"].includes(
-    document.activeElement?.tagName ?? "",
-  );
+type Pending = LinkView & { evidence: EvidenceItem };
 
 function EvidencePage() {
   const { data: commitments, isLoading, error, refetch } = useCommitments();
   const { data: links, error: linksError, refetch: refetchLinks } = useLinks();
   const invalidate = useInvalidateDomain();
-  const [phase, setPhase] = useQueryState("phase", parseAsString);
-  const [startedIds, setJobIds] = useState<string[]>([]);
-  // the server is the source of truth for what's running: after a reload,
-  // a trip to another view, or from another tab, follow in-flight searches
-  // instead of orphaning them
+  const [view, setView] = useQueryState("view", parseAsString);
+  const [startedIds, setStartedIds] = useState<string[]>([]);
+
+  // the server is the source of truth for what's running, so a reload or
+  // another tab keeps following in-flight searches instead of orphaning them
   const { data: inFlight } = useQuery({
     queryKey: keys.activeJobs("find_evidence"),
     queryFn: () => api.activeJobs("find_evidence"),
@@ -99,389 +49,321 @@ function EvidencePage() {
   const jobIds = startedIds.length ? startedIds : (inFlight ?? []).map((j) => j.id);
   const { jobs, settled, error: jobError, retry: retryJobs } = useJobs(jobIds);
 
-  const searchable = (commitments ?? []).filter((c) =>
-    EVIDENCE_KINDS.has(c.kind),
+  const searchable = useMemo(
+    () => (commitments ?? []).filter((c) => SEARCHABLE.has(c.kind)),
+    [commitments],
   );
-  const pendingLinks = (links ?? []).filter(
-    (l) => l.link.review_status === "unreviewed" && l.evidence,
+  const pending = useMemo(
+    () =>
+      (links ?? []).filter(
+        (l): l is Pending => l.link.review_status === "unreviewed" && !!l.evidence,
+      ),
+    [links],
   );
 
-  const notifiedBatch = useRef<string>("");
+  const notified = useRef("");
   useEffect(() => {
     const batch = jobIds.join(",");
-    if (!settled || notifiedBatch.current === batch) return;
-    notifiedBatch.current = batch;
-    const total = jobs.reduce((acc, j) => acc + (j.result?.links ?? 0), 0);
+    if (!settled || notified.current === batch) return;
+    notified.current = batch;
+    const total = jobs.reduce((n, j) => n + (j.result?.links ?? 0), 0);
     const failed = jobs.filter((j) => j.status === "failed");
-    if (failed.length)
-      toast.error(
-        `${failed.length} search(es) failed: ${failed[0].error ?? "unknown"}`,
-      );
-    else
-      toast.success(
-        total
-          ? `Search done — ${total} possible matches.`
-          : "Search done — nothing useful on the official sites.",
-      );
-    jobs
-      .flatMap((j) => j.result?.warnings ?? [])
-      .forEach((w) => toast.warning(w));
+    if (failed.length) toast.error(`${failed.length} search(es) failed: ${failed[0].error ?? "unknown"}`);
+    else toast.success(total ? `Search done: ${total} possible matches.` : "Search done: nothing useful on the official sites.");
+    jobs.flatMap((j) => j.result?.warnings ?? []).forEach((w) => toast.warning(w));
     invalidate();
   }, [settled, jobs, jobIds, invalidate]);
 
-  const activePhase = settled ? "review" : phase ?? (pendingLinks.length ? "review" : "choose");
+  if (linksError) return <QueryError error={linksError} retry={refetchLinks} />;
+  if (error) return <QueryError error={error} retry={refetch} />;
+  if (isLoading) return <Skeleton className="h-96 w-full" />;
 
-  if (linksError) return <div className="p-4 sm:p-8"><QueryError error={linksError} retry={refetchLinks} /></div>;
-
-  if (error) return <div className="p-4 sm:p-8"><QueryError error={error} retry={refetch} /></div>;
-
-  if (isLoading)
-    return (
-      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="mt-6 h-96 w-full" />
-      </div>
-    );
-
+  const hint = "Find official sources for each commitment, then confirm or reject the matches.";
   if (!searchable.length)
     return (
-      <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
-        <PageHeader title="Find evidence" guide="evidence" />
-        <EmptyState className="mt-8">
-          Nothing to check yet — confirm some commitments first.
-        </EmptyState>
-      </div>
+      <>
+        <PageTitle title="Evidence" hint={hint} guide="evidence" />
+        <EmptyState className="mt-6">Nothing to check yet. Confirm some commitments first.</EmptyState>
+      </>
     );
 
-  return (
-    <div className="mx-auto w-full max-w-[1320px] p-4 sm:p-8">
-      <PageHeader title="Find evidence" guide="evidence" />
+  const running = jobIds.length > 0 && !settled;
+  const active = settled ? "review" : view ?? (pending.length ? "review" : "find");
 
-      {jobIds.length > 0 && !settled && (
-        <div className="mt-4 rounded-md border p-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
+  return (
+    <>
+      <PageTitle title="Evidence" hint={hint} guide="evidence" />
+
+      {running && (
+        <div role="status" aria-live="polite" className="mt-4 rounded-lg border bg-card p-3 text-sm">
+          <div className="flex items-center gap-2 font-medium">
             <Loader2 className="size-4 animate-spin" />
-            Finding evidence ({jobIds.length} job
-            {jobIds.length > 1 ? "s" : ""})
+            Finding evidence ({jobIds.length} job{jobIds.length > 1 ? "s" : ""})
           </div>
+          {jobs.filter((j) => j.progress).map((j) => (
+            <p key={j.id} className="mt-1 text-xs text-muted-foreground">{j.progress}</p>
+          ))}
           {jobError && (
-            <p role="alert" className="mt-2 text-sm text-destructive">
-              Cannot check search progress. Your search may still be running.
+            <p role="alert" className="mt-2 text-destructive">
+              Cannot check progress, the search may still be running.
               <Button variant="outline" size="sm" className="ml-2" onClick={() => retryJobs()}>Retry</Button>
             </p>
           )}
-          <div className="mt-2 space-y-1" role="status" aria-live="polite">
-            {jobs
-              .filter((j) => j.progress)
-              .map((j) => (
-                <p key={j.id} className="text-xs text-muted-foreground">
-                  {j.progress}
-                </p>
-              ))}
-          </div>
         </div>
       )}
 
-      {(jobIds.length === 0 || settled) && <>
-      <ToggleGroup
-        className="mt-4"
-        value={[activePhase]}
-        onValueChange={(v) => { if (v[0]) { setJobIds([]); setPhase(v[0]); } }}
-        variant="outline"
-        size="sm"
-      >
-        <ToggleGroupItem value="choose">Choose commitments</ToggleGroupItem>
-        <ToggleGroupItem value="review">
-          Review matches
-          {pendingLinks.length > 0 && (
-            <Badge variant="secondary" className="ml-1.5">
-              {pendingLinks.length}
-            </Badge>
+      {!running && (
+        <>
+          <Toolbar>
+            <ToggleGroup
+              value={[active]}
+              onValueChange={(v) => { if (v[0]) { setStartedIds([]); setView(v[0]); } }}
+              variant="outline"
+              size="sm"
+            >
+              <ToggleGroupItem value="find">Find</ToggleGroupItem>
+              <ToggleGroupItem value="review">
+                Review matches{pending.length > 0 ? ` (${pending.length})` : ""}
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <span className="ml-auto text-xs text-muted-foreground">
+              <Kbd>j</Kbd> <Kbd>k</Kbd> move <Kbd>x</Kbd> select{active === "review" && <> <Kbd>c</Kbd> confirm <Kbd>r</Kbd> reject</>}
+            </span>
+          </Toolbar>
+          {active === "find" ? (
+            <FindTable commitments={searchable} links={links ?? []} onStarted={setStartedIds} />
+          ) : (
+            <ReviewTable pending={pending} commitments={searchable} />
           )}
-        </ToggleGroupItem>
-      </ToggleGroup>
-
-      {activePhase === "choose" ? (
-        <PickList
-          commitments={searchable}
-          links={links ?? []}
-          onSearch={setJobIds}
-        />
-      ) : (
-        <ReviewMatches pending={pendingLinks} commitments={searchable} />
+        </>
       )}
-      </>}
-    </div>
+    </>
   );
 }
 
-/* ---------- phase 1: choose commitments ---------------------------------- */
+/* find: pick commitments, start searches */
 
-function PickList({
+const findColumns = (matches: Map<number, number>): Columns<Commitment[]> => [
+  {
+    id: "title",
+    header: "Commitment",
+    cell: ({ row }) => (
+      <div className="max-w-xl">
+        <p className="font-medium leading-snug">{displayTitle(row.original[0].title)}</p>
+        <En text={displayTitle(row.original[0].title)} />
+      </div>
+    ),
+  },
+  {
+    id: "kind",
+    header: "Type",
+    cell: ({ row }) => {
+      const k = row.original[0].kind;
+      return <Chip label={KIND_LABEL[k]} tone={KIND_TONE[k]} icon={KIND_ICON[k]} />;
+    },
+  },
+  {
+    id: "page",
+    header: "Page",
+    cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original[0].source_page ?? ""}</span>,
+  },
+  {
+    id: "matches",
+    header: "Matches",
+    cell: ({ row }) => {
+      const n = row.original.reduce((s, c) => s + (matches.get(c.id) ?? 0), 0);
+      return <span className="tabular-nums text-muted-foreground">{n || "not searched"}</span>;
+    },
+  },
+];
+
+function FindTable({
   commitments,
   links,
-  onSearch,
+  onStarted,
 }: {
   commitments: Commitment[];
   links: LinkView[];
-  onSearch: (jobIds: string[]) => void;
+  onStarted: (ids: string[]) => void;
 }) {
-  const { data: candidates } = useCandidates();
-  const linkedIds = useMemo(
-    () => new Set(links.map((l) => l.link.commitment_id)),
-    [links],
-  );
-  const unsearched = commitments.filter((c) => !linkedIds.has(c.id));
+  const matches = useMemo(() => {
+    const m = new Map<number, number>();
+    links.forEach((l) => m.set(l.link.commitment_id, (m.get(l.link.commitment_id) ?? 0) + 1));
+    return m;
+  }, [links]);
   const groups = useMemo(
     () =>
-      titleGroups(unsearched, (c) => c.title, (c) => c.kind).sort(
+      titleGroups(commitments, (c) => c.title, (c) => c.kind).sort(
         (a, b) => KIND_ORDER.indexOf(a[0].kind) - KIND_ORDER.indexOf(b[0].kind),
       ),
-    [unsearched],
+    [commitments],
   );
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const columns = useMemo(() => findColumns(matches), [matches]);
   const [cursor, setCursor] = useState(0);
-  const [requestedPage, setPage] = useQueryState("spage", parseAsInteger.withDefault(1));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const gid = (g: Commitment[]) => String(g[0].id);
+  const at = Math.min(cursor, Math.max(0, groups.length - 1));
 
   const search = useMutation({
     mutationFn: async (ids: number[]) => {
       const jobIds: string[] = [];
       for (const id of ids) {
         try {
-          const job = await api.findEvidence(id);
-          jobIds.push(job.id);
-        } catch (error) {
-          toast.error(`Could not start search: ${errorMessage(error)}`);
+          jobIds.push((await api.findEvidence(id)).id);
+        } catch (e) {
+          toast.error(`Could not start search: ${errorMessage(e)}`);
           break;
         }
       }
       return jobIds;
     },
-    onSuccess: (jobIds) => {
-      setSelected(new Set());
-      onSearch(jobIds);
-    },
+    onSuccess: (ids) => { setSelected(new Set()); onStarted(ids); },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  useHotkeys("j", () => !editable() && setCursor((c) => Math.min(c + 1, PAGE - 1)));
-  useHotkeys("k", () => !editable() && setCursor((c) => Math.max(c - 1, 0)));
-
-  if (!unsearched.length)
-    return (
-      <p className="mt-8 rounded-md border border-green-500/30 bg-green-500/5 p-6 font-medium text-green-700 dark:text-green-400">
-        All commitments searched. Review the matches to continue.
-      </p>
-    );
-
-  const pages = Math.max(1, Math.ceil(groups.length / PAGE));
-  const page = Math.max(1, Math.min(requestedPage, pages));
-  const pageGroups = groups.slice((page - 1) * PAGE, page * PAGE);
-  const detail = pageGroups[Math.min(cursor, pageGroups.length - 1)] ?? null;
-  const detailCandidates = detail
-    ? [
-        ...new Map(
-          detail
-            .map((c) => candidates?.find((x) => x.id === c.candidate_id))
-            .filter((x): x is NonNullable<typeof x> => !!x)
-            .map((c) => [c.id, c] as const),
-        ).values(),
-      ]
-    : [];
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  useRowKeys(groups.length, at, setCursor, { onToggle: () => groups[at] && toggle(gid(groups[at])) });
 
   return (
-    <div className="mt-4">
-      <p className="text-xs text-muted-foreground">
-        {groups.length} commitments available to search · Click a title to
-        inspect; check a box to select.
-      </p>
-      <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setSelected(new Set(groups.map((g) => g[0].id)))}
-            >
-              Select all not searched
-            </Button>
-            {selected.size > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setSelected(new Set())}
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-          <Button
-            className="mt-2"
-            size="sm"
-            disabled={!selected.size || search.isPending}
-            onClick={() =>
-              search.mutate(
-                groups
-                  .filter((g) => selected.has(g[0].id))
-                  .flatMap((g) => g.map((c) => c.id)),
-              )
-            }
-          >
-            {search.isPending ? (
-              <Loader2 className="mr-1 size-3.5 animate-spin" />
-            ) : (
-              <Search className="mr-1 size-3.5" />
-            )}
-            Find evidence for {selected.size} selected
-          </Button>
-
-          <div className="mt-3">
-            <QueueList
-              maxH="max-h-[55vh]"
-              rows={pageGroups.map((g) => ({
-                key: String(g[0].id),
-                title: displayTitle(g[0].title),
-                section: KIND_SECTION[g[0].kind] ?? g[0].kind,
-                sectionIcon: KIND_ICON[g[0].kind],
-                chips: [
-                  {
-                    label: KIND_LABEL[g[0].kind],
-                    tone: KIND_TONE[g[0].kind],
-                    icon: KIND_ICON[g[0].kind],
-                  },
-                  { label: "Not searched", tone: "gray" },
-                ],
-                meta: [
-                  `p.${g[0].source_page}`,
-                  ...(g.length > 1 ? [`${g.length} source mentions`] : []),
-                ],
-              }))}
-              activeKey={detail ? String(detail[0].id) : null}
-              selected={new Set([...selected].map(String))}
-              onInspect={(key) =>
-                setCursor(
-                  pageGroups.findIndex((g) => String(g[0].id) === key),
-                )
-              }
-              onToggle={(key, on) =>
-                setSelected((prev) => {
-                  const next = new Set(prev);
-                  if (on) next.add(Number(key));
-                  else next.delete(Number(key));
-                  return next;
-                })
-              }
-              onToggleAll={(keys, on) =>
-                setSelected((prev) => {
-                  const next = new Set(prev);
-                  for (const k of keys) {
-                    if (on) next.add(Number(k));
-                    else next.delete(Number(k));
-                  }
-                  return next;
-                })
-              }
-            />
-          </div>
-          <Pager page={page} pages={pages} onPage={(p) => { setPage(p); setCursor(0); }} />
-        </div>
-
-        <div className="rounded-md border p-4">
-          {detail && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold leading-snug">
-                {displayTitle(detail[0].title)}
-              </h2>
-              <En text={displayTitle(detail[0].title)} />
-              {detailCandidates.length > 0 ? (
-                detailCandidates.map((c) => (
-                  <blockquote
-                    key={c.id}
-                    className="border-l-2 pl-3 text-sm text-muted-foreground"
-                  >
-                    {c.source_excerpt}
-                    <En text={c.source_excerpt} />
-                  </blockquote>
-                ))
-              ) : (
-                <blockquote className="border-l-2 pl-3 text-sm text-muted-foreground">
-                  {detail[0].summary}
-                </blockquote>
-              )}
-              {detail[0].deadline_year && (
-                <p className="text-sm">
-                  <span className="font-medium">Deadline</span> ·{" "}
-                  {detail[0].deadline_year}
-                </p>
-              )}
-              {detail[0].target_value != null && (
-                <p className="text-sm">
-                  <span className="font-medium">Target</span> ·{" "}
-                  {detail[0].target_value} {detail[0].unit ?? ""}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+    <>
+      <div className="mb-3 flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={!selected.size || search.isPending}
+          onClick={() =>
+            search.mutate(groups.filter((g) => selected.has(gid(g))).flatMap((g) => g.map((c) => c.id)))
+          }
+        >
+          {search.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+          Search {selected.size || ""} selected
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            setSelected(new Set(groups.filter((g) => !g.some((c) => matches.has(c.id))).map(gid)))
+          }
+        >
+          Select all not searched
+        </Button>
+        {selected.size > 0 && (
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+        )}
       </div>
-    </div>
+      <DataTable
+        columns={columns}
+        data={groups}
+        getId={gid}
+        cursor={at}
+        onCursor={setCursor}
+        onOpen={(g) => toggle(gid(g))}
+        selected={selected}
+        onToggle={toggle}
+        onToggleAll={(on) => setSelected(on ? new Set(groups.map(gid)) : new Set())}
+      />
+    </>
   );
 }
 
-/* ---------- phase 2: review pending matches ------------------------------- */
+/* review: confirm or reject suggested matches */
 
-function ReviewMatches({
-  pending,
-  commitments,
-}: {
-  pending: LinkView[];
-  commitments: Commitment[];
-}) {
+function ReviewTable({ pending, commitments }: { pending: Pending[]; commitments: Commitment[] }) {
   const invalidate = useInvalidateDomain();
-  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [cursor, setCursor] = useState(0);
-  const [relChoice, setRelChoice] = useState<Map<number, RelationshipType>>(
-    new Map(),
-  );
-  const [requestedPage, setPage] = useQueryState("epage", parseAsInteger.withDefault(1));
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [relChoice, setRelChoice] = useState<Map<number, RelationshipType>>(new Map());
 
-  const comById = useMemo(
-    () => new Map(commitments.map((c) => [c.id, c])),
-    [commitments],
-  );
-
-  const orderedPending = useMemo(
+  const comById = useMemo(() => new Map(commitments.map((c) => [c.id, c])), [commitments]);
+  const rows = useMemo(
     () =>
       [...pending].sort((a, b) => {
-        const ta = displayTitle(
-          comById.get(a.link.commitment_id)?.title ?? "",
-        );
-        const tb = displayTitle(
-          comById.get(b.link.commitment_id)?.title ?? "",
-        );
+        const ta = displayTitle(comById.get(a.link.commitment_id)?.title ?? "");
+        const tb = displayTitle(comById.get(b.link.commitment_id)?.title ?? "");
         return ta.localeCompare(tb) || b.link.score - a.link.score;
       }),
     [pending, comById],
   );
+  const lid = (r: Pending) => String(r.link.id);
+  const at = Math.min(cursor, Math.max(0, rows.length - 1));
+  const current = rows[at] ?? null;
+  const rel = (r: Pending) => relChoice.get(r.link.id) ?? r.link.suggested_relationship;
 
-  const apply = useMutation({
+  // rows are fetched lite, the panel hydrates the selected link
+  const full = useLink(open && current ? current.link.id : null);
+  const detail = (full.data ?? current) as Pending | null;
+
+  const columns: Columns<Pending> = useMemo(
+    () => [
+      {
+        id: "commitment",
+        header: "Commitment",
+        cell: ({ row }) => (
+          <p className="max-w-sm font-medium leading-snug">
+            {displayTitle(comById.get(row.original.link.commitment_id)?.title ?? "")}
+          </p>
+        ),
+      },
+      {
+        id: "source",
+        header: "Source",
+        cell: ({ row }) => {
+          const ev = row.original.evidence;
+          return (
+            <div className="max-w-md">
+              <p className="line-clamp-1">{displayTitle(ev.title)}</p>
+              <p className="text-xs text-muted-foreground">
+                {[ev.publisher ?? "Official source", ev.published_on, evidenceKind(ev.url, ev.title)].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+          );
+        },
+      },
+      {
+        id: "says",
+        header: "Source says",
+        cell: ({ row }) => {
+          const s = row.original.evidence.status_hint;
+          return <Chip label={STATUS_LABEL[s]} tone={STATUS_TONE[s]} icon={STATUS_ICON[s]} />;
+        },
+      },
+      {
+        id: "rel",
+        header: "Relationship",
+        cell: ({ row }) => {
+          const r = rel(row.original);
+          return <Chip label={REL_LABEL[r]} tone={REL_TONE[r]} icon={REL_ICON[r]} />;
+        },
+      },
+      {
+        id: "score",
+        header: "Score",
+        cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.link.score.toFixed(2)}</span>,
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [comById, relChoice],
+  );
+
+  const bulk = useMutation({
     mutationFn: (accept: boolean) => {
-      const ids = [...selected];
+      // selection can hold links already decided one by one, the backend would overwrite them
+      const pendingIds = new Set(pending.map((r) => r.link.id));
+      const ids = [...selected].map(Number).filter((id) => pendingIds.has(id));
       const relationships = accept
-        ? Object.fromEntries(
-            ids
-              .filter((id) => relChoice.has(id))
-              .map((id) => [id, relChoice.get(id)!]),
-          )
+        ? Object.fromEntries(ids.filter((id) => relChoice.has(id)).map((id) => [id, relChoice.get(id)!]))
         : undefined;
-      return api.bulkLinks(
-        accept ? { accept: ids, relationships } : { reject: ids },
-      );
+      return api.bulkLinks(accept ? { accept: ids, relationships } : { reject: ids });
     },
     onSuccess: (res, accept) => {
-      toast.success(
-        `${accept ? res.accepted : res.rejected} match(es) ${accept ? "confirmed" : "rejected"}.`,
-      );
+      toast.success(`${accept ? res.accepted : res.rejected} match(es) ${accept ? "confirmed" : "rejected"}.`);
       setSelected(new Set());
       invalidate();
     },
@@ -490,291 +372,81 @@ function ReviewMatches({
 
   const single = useMutation({
     mutationFn: async (accept: boolean) => {
-      const link = detail?.link;
-      if (!link) return;
-      await api.decideLink(
-        link.id,
-        accept,
-        accept ? relChoice.get(link.id) : undefined,
-      );
+      if (!current) return;
+      await api.decideLink(current.link.id, accept, accept ? relChoice.get(current.link.id) : undefined);
     },
     onSuccess: (_r, accept) => {
       toast.success(accept ? "Match confirmed." : "Match rejected.");
+      setOpen(false);
       invalidate();
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  const pages = Math.max(1, Math.ceil(orderedPending.length / PAGE));
-  const page = Math.max(1, Math.min(requestedPage, pages));
-  const pageItems = orderedPending.slice((page - 1) * PAGE, page * PAGE);
-  const detail =
-    pageItems[Math.min(cursor, Math.max(0, pageItems.length - 1))] ?? null;
-  // rows are fetched lite; the inspector hydrates the selected link
-  const detailQuery = useLink(detail?.link.id ?? null);
-  const detailView = detailQuery.data ?? detail;
-
-  useHotkeys("j", () => !editable() && setCursor((c) => Math.min(c + 1, pageItems.length - 1)), [pageItems.length]);
-  useHotkeys("k", () => !editable() && setCursor((c) => Math.max(c - 1, 0)), []);
-  useHotkeys("x", () => {
-    if (editable() || !detail) return;
+  function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(detail.link.id)) next.delete(detail.link.id);
-      else next.add(detail.link.id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
-  }, [detail]);
-  useHotkeys("c", () => !editable() && detail && single.mutate(true), [detail]);
-  useHotkeys("r", () => !editable() && detail && single.mutate(false), [detail]);
+  }
+  useRowKeys(rows.length, at, setCursor, {
+    onOpen: () => current && setOpen(true),
+    onToggle: () => current && toggle(lid(current)),
+    onAccept: () => current && single.mutate(true),
+    onReject: () => current && single.mutate(false),
+  });
 
-  if (!pending.length)
-    return (
-      <div className="mt-8">
-        <p className="font-medium text-green-700 dark:text-green-400">
-          No matches waiting for review.
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Choose commitments to search for more evidence, or read the confirmed
-          paper trail.
-        </p>
-      </div>
-    );
+  if (!rows.length)
+    return <EmptyState>No matches waiting. Search a commitment on the Find tab.</EmptyState>;
 
   return (
-    <div className="mt-4">
-      <p className="text-xs text-muted-foreground">
-        {pending.length} matches waiting for review · Inspect the source before
-        confirming a relationship.
-      </p>
-      <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div>
-          <BatchBar
-            count={selected.size}
-            busy={apply.isPending}
-            onConfirm={() => apply.mutate(true)}
-            onReject={() => apply.mutate(false)}
-            onClear={() => setSelected(new Set())}
-          />
-
-          <div className="mt-3">
-            <QueueList
-              maxH="max-h-[55vh]"
-              rows={pageItems.map((lv) => {
-                const com = comById.get(lv.link.commitment_id);
-                const rel = lv.link.suggested_relationship;
-                return {
-                  key: String(lv.link.id),
-                  title: displayTitle(lv.evidence?.title),
-                  section: `For · ${displayTitle(com?.title ?? "")}`,
-                  chips: lv.evidence
-                    ? [
-                        {
-                          label: STATUS_LABEL[lv.evidence.status_hint],
-                          tone: STATUS_TONE[lv.evidence.status_hint],
-                          icon: STATUS_ICON[lv.evidence.status_hint],
-                        },
-                        {
-                          label: `suggested: ${REL_LABEL[rel]}`,
-                          tone: REL_TONE[rel],
-                          icon: REL_ICON[rel],
-                        },
-                      ]
-                    : [],
-                  meta: [
-                    lv.evidence?.publisher ?? "Official source",
-                    lv.evidence?.published_on ?? "Date unknown",
-                  ],
-                };
-              })}
-              activeKey={detail ? String(detail.link.id) : null}
-              selected={new Set([...selected].map(String))}
-              onInspect={(key) =>
-                setCursor(
-                  pageItems.findIndex((l) => String(l.link.id) === key),
-                )
-              }
-              onToggle={(key, on) =>
-                setSelected((prev) => {
-                  const next = new Set(prev);
-                  if (on) next.add(Number(key));
-                  else next.delete(Number(key));
-                  return next;
-                })
-              }
-              onToggleAll={(keys, on) =>
-                setSelected((prev) => {
-                  const next = new Set(prev);
-                  for (const k of keys) {
-                    if (on) next.add(Number(k));
-                    else next.delete(Number(k));
-                  }
-                  return next;
-                })
-              }
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            <Kbd>J</Kbd>/<Kbd>K</Kbd> move · <Kbd>X</Kbd> select ·{" "}
-            <Kbd>C</Kbd> confirm · <Kbd>R</Kbd> reject
-          </p>
-          <Pager page={page} pages={pages} onPage={(p) => { setPage(p); setCursor(0); }} />
+    <>
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+          <span className="text-sm">{selected.size} selected</span>
+          <Button size="sm" disabled={bulk.isPending} onClick={() => bulk.mutate(true)}>
+            <Check className="size-3.5" /> Confirm
+          </Button>
+          <Button size="sm" variant="outline" disabled={bulk.isPending} onClick={() => bulk.mutate(false)}>
+            <X className="size-3.5" /> Reject
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
         </div>
-
-        <div className="rounded-md border p-4">
-          {detailView?.evidence && (
-            <LinkInspector
-              view={detailView as LinkView & { evidence: EvidenceItem }}
-              commitment={comById.get(detail.link.commitment_id)}
-              rel={
-                relChoice.get(detail.link.id) ??
-                detail.link.suggested_relationship
-              }
-              onRel={(r) =>
-                setRelChoice((prev) => new Map(prev).set(detail.link.id, r))
-              }
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LinkInspector({
-  view,
-  commitment,
-  rel,
-  onRel,
-}: {
-  view: LinkView & { evidence: EvidenceItem };
-  commitment?: Commitment;
-  rel: RelationshipType;
-  onRel: (r: RelationshipType) => void;
-}) {
-  const ev = view.evidence;
-  return (
-    <div className="space-y-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Evidence inspector
-      </p>
-      <div>
-        <h2 className="text-lg font-semibold leading-snug">
-          {displayTitle(ev.title)}
-        </h2>
-        <En text={displayTitle(ev.title)} />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {[
-          ev.publisher ?? "Official source",
-          ev.published_on ?? "Date unknown",
-          evidenceKind(ev.url, ev.title),
-        ].join(" · ")}
-      </p>
-
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Linked commitment
-        </p>
-        <p className="text-sm">{displayTitle(commitment?.title ?? "")}</p>
-      </div>
-
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Matched excerpt
-        </p>
-        <blockquote className="mt-1 max-h-56 overflow-y-auto border-l-2 pl-3 text-sm text-muted-foreground">
-          {ev.snippet}
-        </blockquote>
-        <En text={ev.snippet} />
-      </div>
-
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          What this source reports
-        </p>
-        <div className="mt-1">
-          <Chip
-            label={STATUS_LABEL[ev.status_hint]}
-            tone={STATUS_TONE[ev.status_hint]}
-            icon={STATUS_ICON[ev.status_hint]}
-          />
-        </div>
-        <p className="mt-1 text-sm">{STATUS_SENTENCE[ev.status_hint]}</p>
-        {ev.status_excerpt && (
-          <blockquote className="mt-1 border-l-2 pl-3 text-sm text-muted-foreground">
-            {ev.status_excerpt}
-          </blockquote>
-        )}
-      </div>
-
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Why Paper Trail matched it
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {view.link.reasons.length
-            ? view.link.reasons.join("; ")
-            : "No matching explanation stored."}
-        </p>
-      </div>
-
-      {view.budgets.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Money mentioned:{" "}
-          {view.budgets
-            .slice(0, 4)
-            .map((b) => `${huf(b.amount_huf)} (${BUDGET_LABEL[b.kind]})`)
-            .join(" · ")}
-        </p>
       )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        nativeButton={false}
-        render={
-          <a href={ev.url} target="_blank" rel="noopener noreferrer" />
-        }
-      >
-        <ExternalLink className="mr-1 size-3.5" /> Read official source
-      </Button>
-
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Relationship
-        </p>
-        <Select
-          value={rel}
-          onValueChange={(v) => onRel(v as RelationshipType)}
-          items={REL_LABEL}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(REL_LABEL).map(([k, l]) => {
-              const Icon = REL_ICON[k as RelationshipType];
-              return (
-                <SelectItem key={k} value={k}>
-                  <span className="flex items-center gap-1.5">
-                    <Icon className="size-3.5" />
-                    {l}
-                  </span>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-        <div className="mt-1">
-          <Chip label={REL_LABEL[rel]} tone={REL_TONE[rel]} icon={REL_ICON[rel]} />
-        </div>
-        <p className="text-xs text-muted-foreground">{REL_HELP[rel]}</p>
-        <p className="text-xs text-muted-foreground">
-          Applied when you confirm this selected match.
-        </p>
-      </div>
-    </div>
+      <DataTable
+        columns={columns}
+        data={rows}
+        getId={lid}
+        cursor={at}
+        onCursor={setCursor}
+        onOpen={() => setOpen(true)}
+        selected={selected}
+        onToggle={toggle}
+        onToggleAll={(on) => setSelected(on ? new Set(rows.map(lid)) : new Set())}
+      />
+      <DetailSheet open={open && !!current} onClose={() => setOpen(false)} label="Match detail">
+        {current && detail && (
+          <div className="space-y-4">
+            <LinkDetail
+              view={detail}
+              commitment={comById.get(current.link.commitment_id)}
+              rel={rel(current)}
+              onRel={(r) => setRelChoice((m) => new Map(m).set(current.link.id, r))}
+            />
+            <div className="flex gap-2 border-t pt-3">
+              <Button size="sm" disabled={single.isPending} onClick={() => single.mutate(true)}>
+                <Check className="size-3.5" /> Confirm <Kbd>C</Kbd>
+              </Button>
+              <Button size="sm" variant="outline" disabled={single.isPending} onClick={() => single.mutate(false)}>
+                <X className="size-3.5" /> Reject <Kbd>R</Kbd>
+              </Button>
+            </div>
+          </div>
+        )}
+      </DetailSheet>
+    </>
   );
 }
 

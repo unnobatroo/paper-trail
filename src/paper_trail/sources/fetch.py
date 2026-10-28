@@ -22,7 +22,7 @@ from .web_search import allowed
 
 _HEADERS = {"User-Agent": "paper-trail/0.1 (municipal evidence research)"}
 _TIMEOUT = 30
-_MAX_BYTES = 25 * 1024 * 1024  # the biggest strategy pdfs are ~10 MB
+_MAX_BYTES = 25 * 1024 * 1024  # biggest strategy pdfs are ~10 MB
 
 
 @dataclass
@@ -45,13 +45,12 @@ def fetch(url: str, allowed_domains: Collection[str]) -> FetchedPage | None:
         return None
     if content is None:
         return None
-    # redirects are followed implicitly — re-check the allowlist on the
-    # final URL so an on-list page can't point the fetcher off-list
+    # redirects are followed, recheck the allowlist on the final url
     if not allowed(resp.url, allowed_domains):
         return None
 
     if url.lower().endswith(".pdf") or resp.headers.get("content-type", "").startswith(
-        "application/pdf"
+            "application/pdf"
     ):
         return _read_pdf(url, content)
     return _read_html(url, _decode(content, resp.encoding))
@@ -95,8 +94,7 @@ def _read_pdf(url: str, content: bytes) -> FetchedPage | None:
 
 
 def _read_html(url: str, html: str) -> FetchedPage | None:
-    # htmldate can crash on malformed dates (e.g. a +25:00 UTC offset in a
-    # meta tag) — a bad date must not cost us the page
+    # htmldate chokes on junk dates (+25:00 offsets), a bad date shouldn't cost us the page
     try:
         meta = trafilatura.extract_metadata(html)
     except Exception:

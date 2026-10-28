@@ -1,4 +1,4 @@
-"""Tracker rollups: what each accepted commitment has, and what's missing."""
+"""tracker rollups: what each accepted commitment has, what's missing"""
 
 from __future__ import annotations
 
@@ -7,12 +7,11 @@ from dataclasses import dataclass, field
 
 from ..domain.enums import RelationshipType, ReviewStatus, Status
 from ..domain.models import BudgetRecord, Commitment, EvidenceItem
-from ..repositories.store import EvidenceRepository, PolicyRepository
+from ..repositories.ports import EvidenceStore, PolicyStore
 
 
 def _dedupe(budgets) -> list[BudgetRecord]:
-    """The same figure can be quoted several times across a long report —
-    keep each (wording, kind, source) once."""
+    """same figure gets quoted all over a report, keep one per (wording, kind, source)"""
     seen, out = set(), []
     for b in budgets:
         key = (b.amount_raw, b.kind, b.source_url)
@@ -21,8 +20,8 @@ def _dedupe(budgets) -> list[BudgetRecord]:
             out.append(b)
     return out
 
-# lifecycle stages only — BUDGET / BACKGROUND evidence never promotes a
-# commitment's status
+
+# lifecycle stages only, budget/background evidence never bumps status
 _STATUS_ORDER = [
     Status.UNKNOWN,
     Status.ANNOUNCED,
@@ -35,7 +34,7 @@ _STATUS_ORDER = [
 
 @dataclass
 class TrailRow:
-    """One commitment plus everything verified about it."""
+    """a commitment plus everything verified about it"""
 
     commitment: Commitment
     evidence: list[EvidenceItem] = field(default_factory=list)
@@ -47,13 +46,12 @@ class TrailRow:
 
 
 class MetricsService:
-    def __init__(self, policy: PolicyRepository, evidence: EvidenceRepository):
+    def __init__(self, policy: PolicyStore, evidence: EvidenceStore):
         self._policy = policy
         self._evidence = evidence
 
     def trail(self) -> list[TrailRow]:
-        # batch the reads — a per-link evidence()/budgets_for_evidence()
-        # loop costs two queries per link (hundreds per trail view)
+        # batch reads, per-link lookups = 2 queries each (hundreds per trail view)
         links = self._evidence.links()
         ev_ids = sorted({l.evidence_id for l in links})
         ev_map = self._evidence.evidence_many(ev_ids)
@@ -69,20 +67,17 @@ class MetricsService:
                 l for l in by_commit.get(com.id, [])
                 if l.review_status == ReviewStatus.ACCEPTED
             ]
-            # pair link↔evidence so a missing evidence row can't shift the
-            # pairing (zip(items, accepted) would silently misalign)
+            # pair by id, zip() would silently misalign on a missing row
             pairs = [(l, e) for l in accepted
                      if (e := ev_map.get(l.evidence_id)) is not None]
             items = [e for _, e in pairs]
             budgets = _dedupe(
                 b for e in items for b in budget_map.get(e.id, []))
-            # only evidence the reviewer called "direct implementation" can
-            # mark a commitment as progressing or done — supporting/budget
-            # pages never promote status on their own
+            # only reviewer-confirmed direct implementation moves status
             direct = [
                 e for l, e in pairs
                 if (l.relationship or l.suggested_relationship)
-                == RelationshipType.DIRECT_IMPLEMENTATION
+                   == RelationshipType.DIRECT_IMPLEMENTATION
             ]
             status, excerpt = self._best_status(direct)
             rows.append(TrailRow(
@@ -97,8 +92,8 @@ class MetricsService:
         return rows
 
     def _gaps(self, com: Commitment, items: list[EvidenceItem],
-            budgets: list[BudgetRecord],
-            direct: list[EvidenceItem]) -> list[str]:
+              budgets: list[BudgetRecord],
+              direct: list[EvidenceItem]) -> list[str]:
         gaps = []
         if not direct:
             gaps.append("No implementation evidence found yet.")

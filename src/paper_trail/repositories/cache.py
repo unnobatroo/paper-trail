@@ -1,15 +1,9 @@
-"""System caches behind small interfaces — fetched pages and chunk vectors.
+"""page + vector caches, two backends behind one interface
 
-Two backends, same interface:
+* files (`FilePageStore`, `FileVectorIndex`): sqlite/offline/tests
+* postgres (`supabase_index.py`): pages/chunks + pgvector when SUPABASE_* is set
 
-* file-backed (`FilePageStore`, `FileVectorIndex`) — the original
-  `data/processed/fetched/` layout, used for SQLite/offline runs and tests;
-* Postgres-backed (`SupabasePageStore`, `SupabaseVectorIndex` in
-  `supabase_index.py`) — `pages`/`chunks` tables + pgvector, used when
-  `SUPABASE_URL`/`SUPABASE_KEY` are configured.
-
-Either way the invariant holds: a page is fetched once and embedded once
-per model, then reused by every later evidence search.
+either way a page is fetched once and embedded once per model
 """
 
 from __future__ import annotations
@@ -26,26 +20,22 @@ from py_rust_stemmers import SnowballStemmer
 
 from ..sources.fetch import FetchedPage
 
-# pgvector column width — every provider's vectors are right-padded to
-# this length before storing. Zero-padding is cosine-neutral.
+# pgvector column width, vectors get zero-padded to it (cosine-neutral)
 VECTOR_DIM = 1024
 
-# Dense/lexical fusion weight — benchmark-measured optimum (see
-# migrations/006_hybrid_search.sql). Kept identical on both backends.
+# dense/lexical fusion weight, benchmarked (migration 006), same on both backends
 LEX_WEIGHT = 0.5
 
 
 def stemmer_for(language: str):
-    """A word→stem callable for `language` (Snowball name)."""
+    """word -> stem callable for a snowball language"""
     st = SnowballStemmer(language)
     return getattr(st, "stem_word", None) or st.stemWord
 
 
 def lexical_scores(query_text: str, texts: list[str],
                    stem) -> np.ndarray:
-    """Stemmed tf-idf cosine per text — the file backend's counterpart to
-    the ts_rank side of `match_chunks_hybrid`. `stem` is a word→stem
-    callable (see `stemmer_for`)."""
+    """stemmed tf-idf cosine, the file backend's stand-in for ts_rank in `match_chunks_hybrid`"""
     docs = [[stem(w) for w in re.findall(r"\w+", t.lower())]
             for t in texts]
     q_terms = [stem(w) for w in re.findall(r"\w+", query_text.lower())]
@@ -70,15 +60,24 @@ def _norm(s: np.ndarray) -> np.ndarray:
     return (s - lo) / (hi - lo) if hi > lo else np.zeros_like(s)
 
 
+def fit_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
+    """pad to the pgvector column width, wider vectors can't be stored so fail loudly"""
+    if len(vec) > dim:
+        raise ValueError(
+            f"embedding has {len(vec)} dims, the pgvector column holds {dim}: "
+            "use a model with <= 1024 dims or widen the column")
+    return pad_vector(vec, dim)
+
+
 def pad_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
-    """Right-pad with zeros to `dim`; longer vectors are left as-is."""
+    """zero-pad to `dim`, longer vectors untouched"""
     if len(vec) >= dim:
         return vec
     return vec + [0.0] * (dim - len(vec))
 
 
 def url_key(url: str) -> str:
-    """Stable short key for a source URL — the file cache layout."""
+    """short stable key for a url (file cache layout)"""
     return hashlib.sha256(url.encode()).hexdigest()[:16]
 
 

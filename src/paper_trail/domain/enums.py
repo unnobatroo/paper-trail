@@ -1,5 +1,4 @@
-"""Shared enumerations. Deliberately conservative: nothing is inferred
-without evidence, and nothing reaches the tracker without human review."""
+"""shared enums, nothing inferred without evidence, nothing tracked without review"""
 
 from enum import StrEnum
 
@@ -20,7 +19,7 @@ class ReviewStatus(StrEnum):
 
 
 class RelationshipType(StrEnum):
-    """How an official source relates to a policy commitment."""
+    """how a source relates to a commitment"""
 
     DIRECT_IMPLEMENTATION = "direct_implementation"
     SUPPORTING = "supporting"
@@ -30,8 +29,7 @@ class RelationshipType(StrEnum):
 
 
 class Status(StrEnum):
-    """What the evidence source itself supports — never the commitment's
-    own state, and never inferred beyond the text."""
+    """what the source says, not the commitment's state, nothing beyond the text"""
 
     ANNOUNCED = "announced"
     PLANNED = "planned"
@@ -44,7 +42,7 @@ class Status(StrEnum):
 
 
 class BudgetKind(StrEnum):
-    """Three distinct money concepts. Never merged, never estimated."""
+    """three money concepts, never merged or estimated"""
 
     ESTIMATED_COST = "estimated_cost"
     APPROVED_ALLOCATION = "approved_allocation"

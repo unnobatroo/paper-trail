@@ -1,25 +1,11 @@
-"""Shared Supabase client factory.
+"""supabase client factory, use this instead of `create_client` for the shared http settings
 
-Every Supabase-backed component calls this instead of `create_client`
-directly so they share the same hardened HTTP settings:
-
-* `keepalive_expiry=30s` — cloud NATs (Azure SNAT in particular) drop
-  idle outbound connections after a few minutes. A pooled keep-alive
-  socket that has been silently killed stalls until TCP timeout on
-  reuse. Expiring pooled connections early means requests nearly always
-  open a fresh, healthy socket.
-* explicit timeouts — the default PostgREST timeout is 120s; a dead
-  connection should fail fast so callers (e.g. the job poller, which
-  retries every 2s) recover instead of pinning a worker thread for
-  two minutes.
-* transport retries via httpx-retries for transport-level flakes seen
-  on Azure F1: SNAT kills sockets mid-request (ReadError EAGAIN,
-  RemoteProtocolError), DNS hiccups (ConnectError), TLS handshakes that
-  never finish (ConnectTimeout). All our writes are idempotent —
-  upserts, get-or-create, CAS job claims — so replaying a request the
-  server may have half-received cannot double-write.
-  ReadTimeout is deliberately absent: a slow-but-alive query shouldn't
-  be duplicated under load.
+* keepalive_expiry=30s: azure snat silently kills idle sockets, a dead pooled one stalls
+  until tcp timeout
+* explicit timeouts: postgrest defaults to 120s, fail fast so the job poller recovers
+* httpx-retries on transport flakes (ReadError, RemoteProtocolError, ConnectError,
+  ConnectTimeout), safe because every write is idempotent (upserts, get-or-create, cas claims).
+  ReadTimeout is left out on purpose so slow queries aren't duplicated
 """
 
 from __future__ import annotations

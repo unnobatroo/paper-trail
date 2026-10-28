@@ -3,10 +3,13 @@ The Supabase backends implement the same interface against Postgres."""
 
 import json
 
+import pytest
+
 from paper_trail.repositories.cache import (
     FilePageStore,
     FileVectorIndex,
     content_key,
+    fit_vector,
     pad_vector,
     url_key,
 )
@@ -116,3 +119,9 @@ def test_rerun_refreshes_unreviewed_evidence(policy, evidence):
     evidence.add_evidence(EvidenceItem(
         commitment_id=c, url="https://jozsefvaros.hu/y", title="t", snippet="new"))
     assert evidence.evidence(ev_id).snippet == "new"
+
+
+def test_fit_vector_rejects_vectors_wider_than_the_column():
+    assert len(fit_vector([1.0])) == 1024
+    with pytest.raises(ValueError):
+        fit_vector([0.1] * 1025)

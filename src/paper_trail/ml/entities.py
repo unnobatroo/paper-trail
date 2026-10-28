@@ -15,8 +15,7 @@ from functools import lru_cache
 from ..domain.enums import BudgetKind, Status
 from .lang import LanguageProfile
 
-# ---------------------------------------------------------------------------
-# Money
+# money
 
 _AMOUNT = r"(\d[\d\s.,]*)"
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
@@ -97,7 +96,7 @@ def _sentence_around(text: str, start: int, end: int) -> str:
 class BudgetMention:
     amount_huf: int | None
     amount_raw: str
-    kind: BudgetKind | None  # None = explicitly stated money, kind unclear
+    kind: BudgetKind | None  # None = money stated, kind unclear
     sentence: str
     year: int | None
 
@@ -126,8 +125,7 @@ def extract_money(text: str,
     return mentions
 
 
-# ---------------------------------------------------------------------------
-# Dates
+# dates
 
 def extract_dates(text: str, profile: LanguageProfile) -> list[str]:
     """Verbatim date mentions: full dates like '2024. március 15.' and
@@ -145,8 +143,7 @@ def extract_dates(text: str, profile: LanguageProfile) -> list[str]:
     return out
 
 
-# ---------------------------------------------------------------------------
-# Organisations and locations
+# orgs and locations
 
 def _norm_place(raw: str, profile: LanguageProfile) -> str:
     """Rough base form for matching: 'Losonci téren' → 'losonci tér'."""
@@ -190,10 +187,7 @@ def extract_locations(text: str,
     return out
 
 
-# ---------------------------------------------------------------------------
-# What the source itself supports — keyword rules over the matched excerpt,
-# never inferred. Evaluated on the retrieved chunk, not the whole document:
-# a 100-page report always contains every cue somewhere.
+# what the source supports: keyword rules on the matched chunk, never the whole doc
 
 def is_report_doc(url: str, title: str,
                   profile: LanguageProfile) -> bool:

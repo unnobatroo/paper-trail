@@ -9,9 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-serif);
-  --font-serif: var(--font-newsreader);
-  --color-pencil: var(--pencil);
+  --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,77 +49,73 @@
 }
 
 :root {
-  /* paper trail: an archive reading room. warm paper, iron-gall ink, and
-     the reviewer's red pencil as the only loud colour */
-  --background: oklch(0.975 0.008 85);
-  --foreground: oklch(0.22 0.015 60);
-  --card: oklch(0.99 0.006 85);
-  --card-foreground: oklch(0.22 0.015 60);
-  --popover: oklch(0.99 0.006 85);
-  --popover-foreground: oklch(0.22 0.015 60);
-  --primary: oklch(0.25 0.02 60);
-  --primary-foreground: oklch(0.975 0.008 85);
-  --secondary: oklch(0.94 0.012 85);
-  --secondary-foreground: oklch(0.25 0.02 60);
-  --muted: oklch(0.94 0.012 85);
-  --muted-foreground: oklch(0.48 0.02 65);
-  --accent: oklch(0.93 0.02 75);
-  --accent-foreground: oklch(0.25 0.02 60);
-  --destructive: oklch(0.53 0.19 28);
-  --pencil: oklch(0.55 0.19 30);
-  --border: oklch(0.88 0.015 80);
-  --input: oklch(0.86 0.015 80);
-  --ring: oklch(0.55 0.19 30 / 60%);
-  --chart-1: oklch(0.55 0.19 30);
-  --chart-2: oklch(0.5 0.08 160);
-  --chart-3: oklch(0.55 0.1 250);
-  --chart-4: oklch(0.7 0.12 80);
-  --chart-5: oklch(0.45 0.02 60);
+  /* neutral grays, one indigo accent. color only where it carries meaning */
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.21 0.01 270);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.01 270);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.01 270);
+  --primary: oklch(0.52 0.2 276);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.003 270);
+  --secondary-foreground: oklch(0.25 0.01 270);
+  --muted: oklch(0.96 0.003 270);
+  --muted-foreground: oklch(0.5 0.01 270);
+  --accent: oklch(0.95 0.005 270);
+  --accent-foreground: oklch(0.25 0.01 270);
+  --destructive: oklch(0.55 0.21 25);
+  --border: oklch(0.92 0.004 270);
+  --input: oklch(0.9 0.004 270);
+  --ring: oklch(0.52 0.2 276 / 55%);
+  --chart-1: oklch(0.52 0.2 276);
+  --chart-2: oklch(0.6 0.12 160);
+  --chart-3: oklch(0.6 0.12 240);
+  --chart-4: oklch(0.75 0.14 80);
+  --chart-5: oklch(0.5 0.01 270);
   --radius: 0.375rem;
-  --sidebar: oklch(0.955 0.012 82);
-  --sidebar-foreground: oklch(0.22 0.015 60);
-  --sidebar-primary: oklch(0.55 0.19 30);
-  --sidebar-primary-foreground: oklch(0.985 0.005 85);
-  --sidebar-accent: oklch(0.92 0.018 80);
-  --sidebar-accent-foreground: oklch(0.22 0.015 60);
-  --sidebar-border: oklch(0.87 0.015 80);
-  --sidebar-ring: oklch(0.55 0.19 30 / 60%);
+  --sidebar: oklch(0.97 0.003 270);
+  --sidebar-foreground: oklch(0.3 0.01 270);
+  --sidebar-primary: oklch(0.52 0.2 276);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.935 0.006 270);
+  --sidebar-accent-foreground: oklch(0.21 0.01 270);
+  --sidebar-border: oklch(0.92 0.004 270);
+  --sidebar-ring: oklch(0.52 0.2 276 / 55%);
 }
 
 .dark {
-  /* the same room after hours: lamp-lit desk, pencil turns ember */
-  --background: oklch(0.18 0.01 60);
-  --foreground: oklch(0.92 0.015 85);
-  --card: oklch(0.215 0.012 60);
-  --card-foreground: oklch(0.92 0.015 85);
-  --popover: oklch(0.215 0.012 60);
-  --popover-foreground: oklch(0.92 0.015 85);
-  --primary: oklch(0.92 0.015 85);
-  --primary-foreground: oklch(0.2 0.01 60);
-  --secondary: oklch(0.26 0.012 60);
-  --secondary-foreground: oklch(0.92 0.015 85);
-  --muted: oklch(0.26 0.012 60);
-  --muted-foreground: oklch(0.7 0.02 75);
-  --accent: oklch(0.28 0.02 55);
-  --accent-foreground: oklch(0.92 0.015 85);
-  --destructive: oklch(0.68 0.17 28);
-  --pencil: oklch(0.72 0.15 40);
-  --border: oklch(1 0.02 85 / 11%);
-  --input: oklch(1 0.02 85 / 15%);
-  --ring: oklch(0.72 0.15 40 / 60%);
-  --chart-1: oklch(0.72 0.15 40);
-  --chart-2: oklch(0.7 0.09 160);
-  --chart-3: oklch(0.72 0.09 250);
-  --chart-4: oklch(0.8 0.11 85);
-  --chart-5: oklch(0.6 0.02 70);
-  --sidebar: oklch(0.155 0.01 60);
-  --sidebar-foreground: oklch(0.92 0.015 85);
-  --sidebar-primary: oklch(0.72 0.15 40);
-  --sidebar-primary-foreground: oklch(0.18 0.01 60);
-  --sidebar-accent: oklch(0.25 0.015 60);
-  --sidebar-accent-foreground: oklch(0.92 0.015 85);
-  --sidebar-border: oklch(1 0.02 85 / 9%);
-  --sidebar-ring: oklch(0.72 0.15 40 / 60%);
+  --background: oklch(0.16 0.005 270);
+  --foreground: oklch(0.94 0.005 270);
+  --card: oklch(0.2 0.006 270);
+  --card-foreground: oklch(0.94 0.005 270);
+  --popover: oklch(0.2 0.006 270);
+  --popover-foreground: oklch(0.94 0.005 270);
+  --primary: oklch(0.68 0.17 276);
+  --primary-foreground: oklch(0.16 0.005 270);
+  --secondary: oklch(0.25 0.006 270);
+  --secondary-foreground: oklch(0.94 0.005 270);
+  --muted: oklch(0.25 0.006 270);
+  --muted-foreground: oklch(0.68 0.01 270);
+  --accent: oklch(0.27 0.008 270);
+  --accent-foreground: oklch(0.94 0.005 270);
+  --destructive: oklch(0.68 0.18 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.68 0.17 276 / 55%);
+  --chart-1: oklch(0.68 0.17 276);
+  --chart-2: oklch(0.72 0.12 160);
+  --chart-3: oklch(0.72 0.1 240);
+  --chart-4: oklch(0.8 0.12 85);
+  --chart-5: oklch(0.65 0.01 270);
+  --sidebar: oklch(0.14 0.005 270);
+  --sidebar-foreground: oklch(0.88 0.005 270);
+  --sidebar-primary: oklch(0.68 0.17 276);
+  --sidebar-primary-foreground: oklch(0.16 0.005 270);
+  --sidebar-accent: oklch(0.23 0.007 270);
+  --sidebar-accent-foreground: oklch(0.94 0.005 270);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.68 0.17 276 / 55%);
 }
 
 @layer base {
@@ -137,18 +131,9 @@
 }
 
 @layer components {
-  /* a red-pencil underline, the reviewer's mark. used on the wordmark and
-     page titles so every view reads as part of the same dossier */
-  .pencil-mark {
-    text-decoration: underline;
-    text-decoration-color: var(--pencil);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.22em;
-  }
-  /* receipts (page numbers, urls, quotes) are set like a typed index card */
+  /* page numbers, urls, quotes: mono so provenance reads as data */
   .receipt {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    letter-spacing: 0.01em;
   }
 }

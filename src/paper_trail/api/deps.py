@@ -1,4 +1,4 @@
-"""Shared dependencies: one AppState and one job runner per process."""
+"""one AppState + one job runner per process"""
 
 from __future__ import annotations
 
@@ -17,11 +17,8 @@ def get_state() -> AppState:
 
 
 def require_review_key(request: Request,
-                     state: AppState = Depends(get_state)) -> None:
-    """Write gate — only active when PAPER_TRAIL_REVIEW_KEY is set.
-
-    A shared secret, not real auth: it stops casual visitors and bots
-    from mutating the record. Reads stay open either way."""
+                       state: AppState = Depends(get_state)) -> None:
+    """write gate when PAPER_TRAIL_REVIEW_KEY is set, shared secret not real auth"""
     key = state.settings.review_key
     given = request.headers.get("x-review-key", "")
     if key and not hmac.compare_digest(given.encode(), key.encode()):
@@ -30,9 +27,7 @@ def require_review_key(request: Request,
 
 
 def _handlers():
-    """kind → worker functions. `state` is resolved inside each handler —
-    a fresh worker process or a cleared test cache must not keep handlers
-    bound to a stale AppState."""
+    """kind -> worker fn, cleared cache can't go stale - state resolves per handler"""
 
     def ingest(payload: dict, progress) -> dict:
         state = get_state()
@@ -45,8 +40,7 @@ def _handlers():
             payload.get("url", ""))
         result: dict = {"document_id": doc_id, "candidates": n}
         if n == 0:
-            # an empty review queue with no explanation reads as a bug —
-            # say why the document yielded nothing
+            # empty queue reads as a bug, say why
             result["warnings"] = [
                 "no commitments were extracted — the layout may not "
                 "match the rule parser; try an LLM extractor "
@@ -70,14 +64,12 @@ def _handlers():
 
 @lru_cache
 def get_jobs() -> JobRunner | SupabaseJobRunner:
-    """Durable Postgres-backed queue when Supabase is configured —
-    otherwise the in-process runner (dev/test only)."""
+    """postgres queue when supabase is set, else in process (dev/test)"""
     settings = get_state().settings
     if settings.supabase_configured:
         return SupabaseJobRunner(
             settings.supabase_url, settings.supabase_key, _handlers(),
-            # 2 workers × ~6 fetch threads keeps outbound connections
-            # inside free-tier SNAT limits; more parallelism starves DNS
-            # and sockets on shared Azure instances.
+            # 2 workers x ~6 fetch threads stays inside free-tier snat limits, more starves
+            # dns/sockets
             max_workers=2)
     return JobRunner(_handlers())

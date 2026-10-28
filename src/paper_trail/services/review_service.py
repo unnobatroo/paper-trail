@@ -4,22 +4,21 @@ from __future__ import annotations
 
 from ..domain.enums import CandidateType, RelationshipType, ReviewStatus
 from ..domain.models import Commitment, PolicyCandidate
-from ..repositories.store import EvidenceRepository, PolicyRepository
+from ..repositories.ports import EvidenceStore, PolicyStore
 
 
 class ReviewService:
-    def __init__(self, policy: PolicyRepository, evidence: EvidenceRepository):
+    def __init__(self, policy: PolicyStore, evidence: EvidenceStore):
         self._policy = policy
         self._evidence = evidence
 
-    # commitments -----------------------------------------------------------
 
     def accept_candidate(
-        self,
-        candidate_id: int,
-        kind: CandidateType | None = None,
-        title: str | None = None,
-        parent_id: int | None = None,
+            self,
+            candidate_id: int,
+            kind: CandidateType | None = None,
+            title: str | None = None,
+            parent_id: int | None = None,
     ) -> int:
         cand = self._policy.candidate(candidate_id)
         if cand is None:
@@ -67,7 +66,6 @@ class ReviewService:
     def queue(self) -> list[PolicyCandidate]:
         return self._policy.candidates(ReviewStatus.UNREVIEWED)
 
-    # evidence links ----------------------------------------------------------
 
     def accept_link(self, link_id: int,
                     relationship: RelationshipType | None = None) -> None:
@@ -83,9 +81,9 @@ class ReviewService:
         self._evidence.decide_link(link_id, ReviewStatus.REJECTED)
 
     def accept_links(
-        self,
-        link_ids: list[int],
-        relationships: dict[int, RelationshipType] | None = None,
+            self,
+            link_ids: list[int],
+            relationships: dict[int, RelationshipType] | None = None,
     ) -> int:
         """Batch-accept links; each keeps its suggested relationship
         unless the reviewer picked another in `relationships`."""

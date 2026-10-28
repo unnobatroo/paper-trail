@@ -37,11 +37,11 @@ class _SupabaseRepo:
 
     def __init__(self, url: str, key: str, client: Client | None = None):
         self._db = client or create_supabase(url, key)
-        self._legacy_upserts = False  # set once migration 008 turns out missing
+        self._legacy_upserts = False  # flips when migration 008 turns out missing
 
 
 _PAGE = 1000
-_IN_CHUNK = 200  # keep `in.()` filter URLs well under PostgREST's limit
+_IN_CHUNK = 200  # keeps `in.()` urls under postgrest's limit
 
 
 def select_all(query) -> list[dict]:
@@ -60,11 +60,8 @@ def select_all(query) -> list[dict]:
 class SupabasePolicyRepository(_SupabaseRepo):
     """Documents, extraction candidates and accepted commitments."""
 
-    # documents -----------------------------------------------------------
     def add_document(self, doc: SourceDocument) -> int:
-        # natural-key dedupe — upsert on the unique index keeps this atomic;
-        # a retried ingest returns the existing row instead of duplicating
-        # the document (and its candidate set)
+        # natural-key dedupe via upsert on the unique index (atomic), retry returns the existing row
         res = self._db.table("documents").upsert(
             {"title": doc.title, "publisher": doc.publisher, "url": doc.url},
             on_conflict="title,publisher,url").execute()
@@ -78,10 +75,8 @@ class SupabasePolicyRepository(_SupabaseRepo):
             for r in rows
         ]
 
-    # candidates ----------------------------------------------------------
     def add_candidate(self, cand: PolicyCandidate) -> int:
-        # dedupe on (document, page, text) — re-ingesting keeps existing
-        # candidate rows and their review_status
+        # dedupe on (document, page, text), re-ingest keeps rows and their review_status
         existing = (self._db.table("candidates").select("id")
                     .eq("document_id", cand.document_id)
                     .eq("source_page", cand.source_page)
@@ -122,10 +117,8 @@ class SupabasePolicyRepository(_SupabaseRepo):
          .update({"review_status": status.value})
          .eq("id", candidate_id).execute())
 
-    # commitments ---------------------------------------------------------
     def add_commitment(self, com: Commitment) -> int:
-        # one commitment per accepted candidate — a double accept returns
-        # the existing row
+        # one commitment per candidate, double accept returns the existing row
         if com.candidate_id is not None:
             existing = (self._db.table("commitments").select("id")
                         .eq("candidate_id", com.candidate_id)
@@ -163,16 +156,14 @@ class SupabasePolicyRepository(_SupabaseRepo):
 class SupabaseEvidenceRepository(_SupabaseRepo):
     """Retrieved evidence, proposed links and extracted budget figures."""
 
-    # official_sources — the source catalogue the evidence search always
-    # checks. Rows are managed in the database (see migration 005).
+    # official_sources: catalogue the evidence search always checks (migration 005)
     def official_sources(self) -> list[OfficialSource]:
         try:
             rows = select_all(
                 self._db.table("official_sources").select("*")
                 .order("sort_order").order("id"))
         except Exception as exc:
-            # PGRST205: table missing — migration 005 not applied yet.
-            # Degrade to search-only rather than breaking evidence runs.
+            # PGRST205 = migration 005 missing, search-only instead of failing
             if getattr(exc, "code", "") == "PGRST205":
                 log.warning("official_sources missing — run "
                             "supabase/migrations/005_official_sources.sql")
@@ -220,8 +211,8 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
         return res.data[0]["id"]
 
     def add_evidence(self, ev: EvidenceItem) -> int:
-        # check-and-write in one statement (migration 008), so a review that
-        # lands mid-run can't have its quote rewritten
+        # check+write in one statement (migration 008), a mid-run review can't get its quote
+        # rewritten
         row = {
             "commitment_id": ev.commitment_id,
             "url": ev.url,
@@ -307,10 +298,8 @@ class SupabaseEvidenceRepository(_SupabaseRepo):
                   "relationship": relationship.value if relationship else None})
          .eq("id", link_id).execute())
 
-    # budgets --------------------------------------------------------------
     def add_budget(self, b: BudgetRecord) -> int:
-        # evidence rows upsert, so a re-run reaches here with the same
-        # evidence_id — don't insert the same figure twice
+        # evidence upserts so a re-run lands here with the same id, don't insert the figure twice
         q = (self._db.table("budgets").select("id")
              .eq("evidence_id", b.evidence_id).eq("kind", b.kind.value)
              .eq("amount_raw", b.amount_raw)

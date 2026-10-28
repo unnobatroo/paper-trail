@@ -6,12 +6,12 @@ from pathlib import Path
 
 from ..domain.models import SourceDocument
 from ..ml.extraction import Extractor, excerpt_found
-from ..repositories.store import PolicyRepository
+from ..repositories.ports import PolicyStore
 from ..sources.pdf import read_pages
 
 
 class IngestionService:
-    def __init__(self, repo: PolicyRepository, extractor: Extractor):
+    def __init__(self, repo: PolicyStore, extractor: Extractor):
         self._repo = repo
         self._extractor = extractor
 

@@ -1,12 +1,6 @@
-"""Web search providers — one interface, two implementations:
+"""search providers: ddgs (no key) and a jsonl fixture for offline/tests
 
-* `DdgSearch` — DuckDuckGo via the `ddgs` package, no API key needed.
-* `FixtureSearch` — reads cached JSONL results (offline runs and tests).
-
-Providers are dumb: they return whatever the engine found. The SSRF
-allowlist (`allowed()`) is enforced by the caller — the evidence service —
-which derives the domains from the official-source registry plus any
-configured extras, so the list follows data, not code.
+providers are dumb, the evidence service enforces the ssrf allowlist
 """
 
 from __future__ import annotations
@@ -28,8 +22,8 @@ class SearchHit:
 
 
 def allowed(url: str, domains: Collection[str]) -> bool:
-    """Is `url` on one of the allowed domains (or a subdomain)?"""
-    # hostname, not netloc: "user@evil.test" or ":443" must not pass
+    """url on an allowed domain (or subdomain)?"""
+    # hostname not netloc, "user@evil.test" / ":443" must not pass
     host = (urlparse(url).hostname or "").lower()
     return any(host == d or host.endswith("." + d) for d in domains)
 
@@ -41,9 +35,7 @@ class SearchProvider(ABC):
 
 
 class DdgSearch(SearchProvider):
-    """DuckDuckGo via `ddgs` — no API key. Transient blips (rate limits,
-    TLS resets) get two retries with backoff; a total failure still
-    propagates so the caller can degrade to no hits for that domain."""
+    """ddgs, two retries w/ backoff, total failure propagates so the caller can skip the domain"""
 
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
         from ddgs import DDGS
@@ -63,14 +55,14 @@ class DdgSearch(SearchProvider):
                 if attempt == 2:
                     raise
                 time.sleep(1.5 * (attempt + 1))
-        return []  # unreachable — the last attempt re-raises
+        return []  # unreachable, last attempt re-raises
 
 
 class FixtureSearch(SearchProvider):
-    """Reads cached search results — one JSON object per line:
+    """cached results, one json object per line:
 
     {"query_substring": "utcafásítás", "url": "...", "title": "...", "snippet": "..."}
-    A hit is returned when `query_substring` appears in the query.
+    hit when `query_substring` is in the query
     """
 
     def __init__(self, fixture_path: Path):
