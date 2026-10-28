@@ -121,9 +121,10 @@ class OpenAICompatEmbeddingProvider(EmbeddingProvider):
                 json={"model": self._model, "input": batch}, timeout=120)
             resp.raise_for_status()
             data = sorted(resp.json()["data"], key=lambda d: d["index"])
-            if len(data) != len(batch):
+            if [d["index"] for d in data] != list(range(len(batch))):
                 raise ValueError(
-                    f"embeddings: sent {len(batch)} texts, got {len(data)} vectors")
+                    f"embeddings: sent {len(batch)} texts, got indices "
+                    f"{[d['index'] for d in data]}")
             out.extend(list(map(float, d["embedding"])) for d in data)
         return out
 
@@ -155,7 +156,8 @@ def cosine(a: list[float], b: list[float]) -> float:
 def get_provider(model: str | None = None,
                  cache_dir: str | None = None,
                  providers: list[str] | None = None,
-                 base_url: str | None = None) -> EmbeddingProvider:
+                 base_url: str | None = None,
+                 api_key: str | None = None) -> EmbeddingProvider:
     """fastembed locally by default, "jina" for the hosted api, "openai:<model>" or
     "bge-m3" for an openai-compatible endpoint (PAPER_TRAIL_EMBED_BASE_URL),
     hashing only when asked"""
@@ -166,7 +168,7 @@ def get_provider(model: str | None = None,
         return OpenAICompatEmbeddingProvider(
             base_url or os.environ.get("PAPER_TRAIL_EMBED_BASE_URL", ""),
             model.removeprefix("openai:"),
-            api_key=os.environ.get("PAPER_TRAIL_EMBED_API_KEY"))
+            api_key=api_key or os.environ.get("PAPER_TRAIL_EMBED_API_KEY"))
     if model == "jina" or (model or "").startswith("jina-embeddings"):
         return JinaEmbeddingProvider(
             model if model != "jina" else JINA_EMBED_MODEL)

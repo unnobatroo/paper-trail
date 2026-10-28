@@ -111,11 +111,15 @@ const columns: Columns<Group> = [
     id: "says",
     header: "Sources say",
     cell: ({ row }) => {
-      const s = row.original.find((r) => r.status !== "unknown")?.status ?? "unknown";
-      return s === "unknown" ? (
-        <span className="text-xs text-muted-foreground">–</span>
+      const all = [...new Set(row.original.map((r) => r.status))].filter((s) => s !== "unknown");
+      return all.length ? (
+        <div className="flex flex-wrap gap-1">
+          {all.map((s) => (
+            <Chip key={s} label={STATUS_LABEL[s]} tone={STATUS_TONE[s]} icon={STATUS_ICON[s]} />
+          ))}
+        </div>
       ) : (
-        <Chip label={STATUS_LABEL[s]} tone={STATUS_TONE[s]} icon={STATUS_ICON[s]} />
+        <span className="text-xs text-muted-foreground">–</span>
       );
     },
   },

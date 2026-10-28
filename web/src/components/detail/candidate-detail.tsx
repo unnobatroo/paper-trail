@@ -45,15 +45,20 @@ type EditValues = z.infer<typeof editSchema>;
 export function CandidateDetail({
   group,
   commitments,
-  docUrl,
+  documents,
+  mentionId,
+  onMention,
 }: {
   group: PolicyCandidate[];
   commitments: { id: number; code: string | null; title: string }[];
-  docUrl?: string | null;
+  documents: { id: number; url: string | null }[];
+  mentionId: number;
+  onMention: (id: number) => void;
 }) {
   const invalidate = useInvalidateDomain();
-  const [mentionId, setMentionId] = useState<number>(group[0].id);
   const cand = group.find((c) => c.id === mentionId) ?? group[0];
+  // each mention links to its own document, groups can span several
+  const docUrl = documents.find((d) => d.id === cand.document_id)?.url;
   const [editing, setEditing] = useState(false);
 
   const form = useForm<EditValues>({
@@ -113,7 +118,7 @@ export function CandidateDetail({
       {group.length > 1 && (
         <Select
           value={String(cand.id)}
-          onValueChange={(v) => setMentionId(Number(v))}
+          onValueChange={(v) => onMention(Number(v))}
           items={Object.fromEntries(
             group.map((c) => [
               String(c.id),

@@ -109,12 +109,20 @@ export function DataTable<T extends RowData>({
               <tr
                 key={row.id}
                 ref={active ? activeRef : undefined}
+                tabIndex={active ? 0 : -1}
+                onKeyDown={(e) => {
+                  // not for keys that bubble up from the row's checkbox
+                  if (e.key === "Enter" && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    onOpen(row.original);
+                  }
+                }}
                 onClick={() => {
                   onCursor(i);
                   onOpen(row.original);
                 }}
                 className={cn(
-                  "cursor-pointer border-b last:border-0 transition-colors hover:bg-muted/40",
+                  "cursor-pointer border-b last:border-0 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                   active && "bg-accent hover:bg-accent",
                 )}
               >

@@ -316,7 +316,14 @@ class LLMExtractor(Extractor):
         for i in range(0, len(pages), self._window):
             window = pages[i: i + self._window]
             # malformed window reply gets retried per page so one bad answer can't lose four
-            responses = [(window, self._ask(window))]
+            try:
+                responses = [(window, self._ask(window))]
+            except requests.RequestException as exc:
+                # a timeout/5xx on a big window falls back to one call per page
+                if len(window) == 1:
+                    raise
+                log.warning("LLM window failed (%s), retrying per page", exc)
+                responses = [(window, None)]
             if responses[0][1] is None and len(window) > 1:
                 responses = [([p], self._ask([p])) for p in window]
             for scope, parsed in responses:

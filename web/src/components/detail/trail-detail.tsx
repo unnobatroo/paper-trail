@@ -48,6 +48,7 @@ export function TrailDetail({
     ...(byRel.get("related_but_indirect") ?? []),
   ];
   const budgetItems = byRel.get("budget") ?? [];
+  const unrelated = byRel.get("probably_unrelated") ?? [];
 
   return (
     <div className="space-y-4">
@@ -196,6 +197,15 @@ export function TrailDetail({
               sources
             </p>
           )}
+        </div>
+      )}
+
+      {unrelated.length > 0 && (
+        <div>
+          <SectionLabel tone="gray">Probably unrelated</SectionLabel>
+          {unrelated.map((ev) => (
+            <EvidenceLine key={ev.id} ev={ev} />
+          ))}
         </div>
       )}
 

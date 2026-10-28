@@ -27,7 +27,7 @@ def require_review_key(request: Request,
 
 
 def _handlers():
-    """kind -> worker fn, state resolves per handler so a cleared cache can't go stale"""
+    """kind -> worker fn, cleared cache can't go stale - state resolves per handler"""
 
     def ingest(payload: dict, progress) -> dict:
         state = get_state()
@@ -64,7 +64,7 @@ def _handlers():
 
 @lru_cache
 def get_jobs() -> JobRunner | SupabaseJobRunner:
-    """postgres queue when supabase is set, else in-process (dev/test)"""
+    """postgres queue when supabase is set, else in process (dev/test)"""
     settings = get_state().settings
     if settings.supabase_configured:
         return SupabaseJobRunner(

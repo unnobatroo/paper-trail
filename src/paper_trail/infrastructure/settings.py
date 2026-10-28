@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     # endpoint for PAPER_TRAIL_EMBED_MODEL=openai:<model> / bge-m3
     embed_base_url: str | None = Field(
         default=None, validation_alias="PAPER_TRAIL_EMBED_BASE_URL")
+    embed_api_key: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_EMBED_API_KEY")
     # "auto" = jina if JINA_API_KEY is set, else embedding-only
     reranker_model: str = Field(
         default="auto", validation_alias="PAPER_TRAIL_RERANKER")

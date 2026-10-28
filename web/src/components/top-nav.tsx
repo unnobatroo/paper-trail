@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Languages, Loader2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   useLinks,
   useMeta,
 } from "@/lib/hooks";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -37,7 +38,13 @@ export function TopNav() {
   const { data: cands } = useCandidates();
   const { data: links } = useLinks();
   const { on: translateOn, setOn: setTranslateOn } = useTranslate();
-  const [jobIds, setJobIds] = useState<string[]>([]);
+  const [startedIds, setJobIds] = useState<string[]>([]);
+  // the server knows what is running, so a reload keeps following an ingest
+  const { data: inFlight } = useQuery({
+    queryKey: keys.activeJobs("ingest"),
+    queryFn: () => api.activeJobs("ingest"),
+  });
+  const jobIds = startedIds.length ? startedIds : (inFlight ?? []).map((j) => j.id);
   const { jobs, settled } = useJobs(jobIds);
 
   // open work per queue, shown on the tab
@@ -73,7 +80,7 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-12 max-w-[1400px] items-center gap-6 px-4">
+      <div className="mx-auto flex min-h-12 max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-1 px-4 py-1">
         <Link href="/commitments" className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-tight">Paper Trail</span>
           {meta?.deployment && (
@@ -83,7 +90,7 @@ export function TopNav() {
           )}
         </Link>
 
-        <nav className="flex h-full items-stretch gap-1" aria-label="Stages">
+        <nav className="flex items-stretch gap-1 self-stretch" aria-label="Stages">
           {TABS.map(({ href, label }) => {
             const active = pathname.startsWith(href);
             return (

@@ -43,6 +43,28 @@ def test_model_name_is_prefixed():
     assert OpenAICompatEmbeddingProvider("http://x/v1").model_name == "openai:bge-m3"
 
 
+def test_duplicate_or_missing_indices_raise(monkeypatch):
+    # full-length reply, but index 0 twice and 1 missing: would silently misalign vectors
+    monkeypatch.setattr(
+        embeddings.requests, "post",
+        lambda *a, **k: _Resp({"data": [
+            {"index": 0, "embedding": [1.0]}, {"index": 0, "embedding": [2.0]}]}))
+    with pytest.raises(ValueError):
+        OpenAICompatEmbeddingProvider("http://x/v1").embed(["a", "b"])
+
+
+def test_api_key_is_sent_as_bearer(monkeypatch):
+    seen = {}
+
+    def post(url, headers, json, timeout):
+        seen.update(headers)
+        return _Resp({"data": [{"index": 0, "embedding": [1.0]}]})
+
+    monkeypatch.setattr(embeddings.requests, "post", post)
+    get_provider("bge-m3", base_url="http://x/v1", api_key="s3cret").embed(["a"])
+    assert seen["Authorization"] == "Bearer s3cret"
+
+
 def test_count_mismatch_raises(monkeypatch):
     monkeypatch.setattr(
         embeddings.requests, "post",

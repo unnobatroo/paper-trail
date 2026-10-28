@@ -60,6 +60,15 @@ def _norm(s: np.ndarray) -> np.ndarray:
     return (s - lo) / (hi - lo) if hi > lo else np.zeros_like(s)
 
 
+def fit_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
+    """pad to the pgvector column width, wider vectors can't be stored so fail loudly"""
+    if len(vec) > dim:
+        raise ValueError(
+            f"embedding has {len(vec)} dims, the pgvector column holds {dim}: "
+            "use a model with <= 1024 dims or widen the column")
+    return pad_vector(vec, dim)
+
+
 def pad_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
     """zero-pad to `dim`, longer vectors untouched"""
     if len(vec) >= dim:

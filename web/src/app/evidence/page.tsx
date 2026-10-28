@@ -354,7 +354,9 @@ function ReviewTable({ pending, commitments }: { pending: Pending[]; commitments
 
   const bulk = useMutation({
     mutationFn: (accept: boolean) => {
-      const ids = [...selected].map(Number);
+      // selection can hold links already decided one by one, the backend would overwrite them
+      const pendingIds = new Set(pending.map((r) => r.link.id));
+      const ids = [...selected].map(Number).filter((id) => pendingIds.has(id));
       const relationships = accept
         ? Object.fromEntries(ids.filter((id) => relChoice.has(id)).map((id) => [id, relChoice.get(id)!]))
         : undefined;

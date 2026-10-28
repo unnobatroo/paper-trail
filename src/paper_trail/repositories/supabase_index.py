@@ -15,7 +15,7 @@ from supabase import Client
 
 from ..infrastructure.supabase_client import create as create_supabase
 from ..sources.fetch import FetchedPage
-from .cache import LEX_WEIGHT, PageStore, VectorIndex, pad_vector
+from .cache import LEX_WEIGHT, PageStore, VectorIndex, fit_vector
 from .supabase_store import select_all
 
 log = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ class SupabaseVectorIndex(VectorIndex):
             "embed_model": model,
             "chunk_index": i,
             "text": text,
-            "embedding": _vec_literal(pad_vector(vec)),
+            "embedding": _vec_literal(fit_vector(vec)),
         } for i, (text, vec) in enumerate(pairs)]
         # highest first, chunk 0 is the commit marker
         rows.reverse()
@@ -137,7 +137,7 @@ class SupabaseVectorIndex(VectorIndex):
         by_url = {p.url: p for p in pages}
         try:
             res = self._db.rpc("match_chunks_hybrid", {
-                "query_embedding": _vec_literal(pad_vector(query)),
+                "query_embedding": _vec_literal(fit_vector(query)),
                 "query_text": query_text,
                 "model": model,
                 "match_count": k,
@@ -153,7 +153,7 @@ class SupabaseVectorIndex(VectorIndex):
                         "supabase/migrations/006_hybrid_search.sql; "
                         "falling back to dense-only match_chunks")
             res = self._db.rpc("match_chunks", {
-                "query_embedding": _vec_literal(pad_vector(query)),
+                "query_embedding": _vec_literal(fit_vector(query)),
                 "model": model,
                 "match_count": k,
                 "page_urls": [p.url for p in pages],

@@ -87,7 +87,8 @@ def build_state(settings: Settings | None = None) -> AppState:
 
     embedder = get_provider(settings.embed_model,
                             cache_dir=str(settings.model_cache),
-                            base_url=settings.embed_base_url)
+                            base_url=settings.embed_base_url,
+                            api_key=settings.embed_api_key)
     extractor = get_extractor(
         settings.llm_base_url, settings.llm_api_key, settings.llm_model,
         profile, settings.llm_window_pages)

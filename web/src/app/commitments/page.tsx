@@ -100,6 +100,8 @@ function CommitmentsPage() {
   const [cursor, setCursor] = useState(0);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // mention shown in the panel, per group, so c/r act on what the reviewer sees
+  const [mentionSel, setMentionSel] = useState<Record<number, number>>({});
 
   const groups = useMemo(() => {
     const want = STATUS_OPTS[status] ?? null;
@@ -120,6 +122,9 @@ function CommitmentsPage() {
 
   const at = Math.min(cursor, Math.max(0, groups.length - 1));
   const current = groups[at] ?? null;
+  const shown = current
+    ? (current.find((c) => c.id === mentionSel[current[0].id]) ?? current[0])
+    : null;
   const gid = (g: Group) => String(g[0].id);
 
   const bulk = useMutation({
@@ -137,7 +142,7 @@ function CommitmentsPage() {
 
   const single = useMutation({
     mutationFn: async (action: "accept" | "reject") => {
-      const id = current![0].id;
+      const id = shown!.id;
       if (action === "accept") await api.acceptCandidate(id);
       else await api.rejectCandidate(id);
     },
@@ -148,7 +153,7 @@ function CommitmentsPage() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
-  const pending = current?.[0].review_status === "unreviewed";
+  const pending = shown?.review_status === "unreviewed";
   useRowKeys(groups.length, at, setCursor, {
     onOpen: () => current && setOpen(true),
     onToggle: () => current && toggle(gid(current)),
@@ -177,8 +182,6 @@ function CommitmentsPage() {
         </EmptyState>
       </>
     );
-
-  const docUrl = documents?.[0]?.url;
 
   return (
     <>
@@ -255,7 +258,9 @@ function CommitmentsPage() {
             key={current[0].id}
             group={current}
             commitments={commitments ?? []}
-            docUrl={docUrl}
+            documents={documents ?? []}
+            mentionId={shown!.id}
+            onMention={(id) => setMentionSel((p) => ({ ...p, [current[0].id]: id }))}
           />
         )}
       </DetailSheet>

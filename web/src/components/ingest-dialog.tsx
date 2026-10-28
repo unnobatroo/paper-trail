@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -59,6 +59,11 @@ export function IngestDialog({ onJob }: { onJob: (ids: string[]) => void }) {
 
   const name = useWatch({ control: form.control, name: "name" });
 
+  // a name typed before the list loaded may not exist in the store
+  useEffect(() => {
+    if (names?.length && name && !names.includes(name)) form.setValue("name", "");
+  }, [names, name, form]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="outline" className="gap-1.5" />}>
@@ -106,6 +111,9 @@ export function IngestDialog({ onJob }: { onJob: (ids: string[]) => void }) {
           <div className="space-y-1.5">
             <Label>Title</Label>
             <Input {...form.register("title")} />
+            {form.formState.errors.title && (
+              <p className="text-xs text-destructive">{form.formState.errors.title.message}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Publisher</Label>
