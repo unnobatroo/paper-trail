@@ -34,8 +34,7 @@ def available(state: AppState = Depends(get_state)) -> list[str]:
 def ingest(req: IngestRequest,
            state: AppState = Depends(get_state),
            jobs: JobRunner = Depends(get_jobs)) -> JobOut:
-    # fail fast if the PDF isn't in the store — the job itself re-reads
-    # it by name so the payload stays portable data
+    # fail fast if the pdf is missing, the job re-reads it by name so the payload stays plain data
     if state.docs.read(req.name) is None:
         raise HTTPException(
             404, f"{req.name} is not in the document store")

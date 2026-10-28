@@ -1,21 +1,12 @@
-"""Background jobs — evidence discovery and ingest take minutes, so they
-run off the request thread and the client polls GET /api/jobs/{id}.
+"""background jobs: evidence + ingest take minutes so clients poll /api/jobs/{id}
 
-A job is data (kind + JSON payload), not a closure — that's what makes
-it portable across workers. `handlers[kind](payload, progress)` does the
-work; the handler registry lives in deps.py.
+a job is data (kind + json payload), not a closure, so any worker can run it.
+`handlers[kind](payload, progress)` does the work, registry is in deps.py
 
-Two backends, same interface:
-
-* JobRunner          in-process thread pool — dev/test only. Job state
-                     dies with the process and is invisible to other
-                     workers.
-* SupabaseJobRunner  jobs as rows in the `jobs` table — every API worker
-                     sees the same queue. Claiming is a conditional
-                     UPDATE (queued → running), which PostgREST executes
-                     as one atomic statement, so a job can't run twice.
-                     A run whose worker dies is marked failed by the
-                     stale-claim sweeper — never silently re-run.
+* JobRunner         thread pool, dev/test only, state dies with the process
+* SupabaseJobRunner rows in `jobs`, shared by every worker. claim = conditional
+                    UPDATE queued -> running (atomic), dead workers get swept to
+                    failed, never silently re-run
 """
 
 from __future__ import annotations
@@ -51,16 +42,15 @@ class Job:
 
 
 def _dedupe_key(kind: str, payload: dict) -> str:
-    """Stable identity for 'the same work' — a double-submit attaches to
-    the in-flight job instead of duplicating it."""
+    """identity of "the same work", double-submits attach to the in-flight job"""
     raw = json.dumps(payload or {}, sort_keys=True)
     return f"{kind}:{hashlib.sha256(raw.encode()).hexdigest()[:24]}"
 
 
 class JobRunner:
-    """In-process runner — SQLite/dev mode only, not for deployment."""
+    """in-process runner, sqlite/dev only"""
 
-    _KEEP = 500  # bound the dict — finished jobs are evicted past this
+    _KEEP = 500  # finished jobs get evicted past this
 
     def __init__(self, handlers: dict[str, Handler], max_workers: int = 4):
         self._jobs: dict[str, Job] = {}
@@ -105,17 +95,14 @@ class JobRunner:
 
 
 class SupabaseJobRunner:
-    """Durable queue on the `jobs` table (migration 003_jobs.sql).
+    """durable queue on the `jobs` table (migration 003)
 
-    submit() inserts a queued row — a unique index on the dedupe key of
-    in-flight jobs makes double-submit return the existing job. The
-    claiming worker (this instance immediately, or any instance's poller
-    for orphaned rows) runs it on the local pool and writes progress,
-    result and status back to the row.
+    submit() inserts a queued row, a unique index on in-flight dedupe keys makes
+    double-submit return the existing job. whoever claims it runs it and writes back
     """
 
     POLL_SECONDS = 2.0
-    STALE_AFTER = timedelta(minutes=20)  # no heartbeat → worker died
+    STALE_AFTER = timedelta(minutes=20)  # no heartbeat = worker died
     HEARTBEAT_SECONDS = 60.0  # lease renewal while a handler runs
 
     def __init__(self, url: str, key: str, handlers: dict[str, Handler],
@@ -124,7 +111,7 @@ class SupabaseJobRunner:
         self._handlers = handlers
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._max_workers = max_workers
-        self._busy = 0  # claims submitted to the pool and not yet finished
+        self._busy = 0  # claims in the pool, not finished
         self._busy_lock = threading.Lock()
         self._worker = worker_id or (
             f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:4]}")
@@ -132,8 +119,6 @@ class SupabaseJobRunner:
         self._poller = threading.Thread(
             target=self._poll_loop, name="paper-trail-jobs", daemon=True)
         self._poller.start()
-
-    # -- API-facing ---------------------------------------------------------
 
     def submit(self, kind: str, payload: dict | None = None) -> Job:
         payload = payload or {}
@@ -144,16 +129,14 @@ class SupabaseJobRunner:
                 "dedupe_key": _dedupe_key(kind, payload),
             }).execute()
         except Exception:
-            # jobs_inflight_uq — identical work is already queued/running;
-            # return that job instead of duplicating it
+            # jobs_inflight_uq: same work already in flight, return it
             rows = (self._db.table("jobs").select("*")
                     .eq("dedupe_key", _dedupe_key(kind, payload))
                     .in_("status", _IN_FLIGHT).limit(1).execute()).data
             if rows:
                 return self._to_job(rows[0])
             raise
-        # try to run it ourselves right away if there's room; otherwise it
-        # waits queued and a poller (here or on another worker) claims it
+        # run it now if there's room, else a poller picks it up
         self._spawn(job.id)
         return job
 
@@ -172,8 +155,6 @@ class SupabaseJobRunner:
         self._stop.set()
         self._pool.shutdown(wait=False)
 
-    # -- worker side --------------------------------------------------------
-
     @staticmethod
     def _client(url: str, key: str):
         from ..infrastructure.supabase_client import create
@@ -181,9 +162,7 @@ class SupabaseJobRunner:
         return create(url, key)
 
     def _spawn(self, job_id: str) -> bool:
-        """Reserve a pool slot and claim, or leave the job queued. Check and
-        reserve happen under one lock, so neither concurrent submits nor
-        the poller can overfill the pool."""
+        """reserve a pool slot and claim, or stay queued (one lock, pool can't overfill)"""
         with self._busy_lock:
             if self._busy >= self._max_workers:
                 return False
@@ -196,8 +175,7 @@ class SupabaseJobRunner:
             return self._busy < self._max_workers
 
     def _claim_and_run(self, job_id: str) -> None:
-        """Conditional UPDATE = atomic compare-and-swap: the row goes
-        queued → running only if nobody else claimed it first."""
+        """atomic cas: queued -> running only if nobody beat us to it"""
         try:
             claimed = (self._db.table("jobs").update({
                 "status": "running", "claimed_by": self._worker,
@@ -210,12 +188,13 @@ class SupabaseJobRunner:
                 self._busy -= 1
 
     def _owned(self, job_id: str):
-        """Update builder scoped to a row this worker still owns. If the
-        sweeper failed the job (or anyone else touched it) the write
-        matches nothing, so a late finish can't resurrect it as done."""
+        """update scoped to a row we still own, a swept job matches nothing so it can't come back as
+        done"""
+
         def update(values: dict):
             return (self._db.table("jobs").update(values).eq("id", job_id)
                     .eq("status", "running").eq("claimed_by", self._worker))
+
         return update
 
     def _run_claimed(self, row: dict) -> None:
@@ -224,8 +203,7 @@ class SupabaseJobRunner:
         def progress(msg: str) -> None:
             owned({"progress": msg, "updated_at": _now()}).execute()
 
-        # heartbeat: a healthy handler that never reports progress (ingest)
-        # must not look dead to the stale sweep
+        # heartbeat, a quiet handler (ingest) must not look dead to the sweeper
         done = threading.Event()
 
         def heartbeat() -> None:
@@ -233,7 +211,8 @@ class SupabaseJobRunner:
                 try:
                     owned({"updated_at": _now()}).execute()
                 except Exception:
-                    pass  # a missed beat is fine; STALE_AFTER spans many
+                    pass  # a missed beat is fine, STALE_AFTER spans many
+
         threading.Thread(target=heartbeat, daemon=True).start()
 
         try:
@@ -248,18 +227,16 @@ class SupabaseJobRunner:
             done.set()
 
     def _poll_loop(self) -> None:
-        """Pick up queued rows nobody claimed (e.g. the submitting worker
-        died between insert and claim) and fail stale claims."""
+        """claim orphaned queued rows, fail stale claims"""
         while not self._stop.wait(self.POLL_SECONDS):
             try:
                 self._poll_once()
             except Exception:
-                pass  # transient DB errors mustn't kill the poller
+                pass  # transient db errors can't kill the poller
 
     def _poll_once(self) -> None:
         self._sweep_stale()
-        # a full pool would just queue claim attempts behind the running
-        # jobs, so only look for work when there's room
+        # full pool just queues claims behind running jobs, only poll when there's room
         if not self._has_capacity():
             return
         rows = (self._db.table("jobs").select("id")

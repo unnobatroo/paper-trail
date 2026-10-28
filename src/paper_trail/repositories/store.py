@@ -1,9 +1,7 @@
-"""Data access. Two small repositories; the only layer that speaks SQL.
+"""sqlite repositories, the only layer that speaks sql
 
-Repositories hold the database *path*, never a connection — a sqlite3
-connection is bound to the thread that created it and background jobs run
-on worker threads. Every operation opens, uses and closes its own
-connection via `_connect()`.
+hold the db path, never a connection (sqlite3 conns are thread-bound, jobs run on workers),
+every op opens and closes its own via `_connect()`
 """
 
 from __future__ import annotations
@@ -34,7 +32,7 @@ from ..infrastructure.database import connect, init_db
 
 
 class _Repo:
-    """Shared base: database path + one short-lived connection per call."""
+    """db path + one short-lived connection per call"""
 
     def __init__(self, db_path: Path | str):
         self.db_path = Path(db_path)
@@ -42,8 +40,7 @@ class _Repo:
 
     @contextmanager
     def _connect(self):
-        """Yield a connection; commit on success, roll back on error,
-        always close. Keeps no state between calls."""
+        """commit on success, roll back on error, always close"""
         conn = connect(self.db_path)
         try:
             with conn:
@@ -147,12 +144,10 @@ def _budget(row: Mapping) -> BudgetRecord:
 
 
 class PolicyRepository(_Repo):
-    """Documents, extraction candidates and accepted commitments."""
+    """documents, candidates, commitments"""
 
-    # documents -----------------------------------------------------------
     def add_document(self, doc: SourceDocument) -> int:
-        # natural-key dedupe — a retried ingest returns the existing row
-        # instead of duplicating the document (and its candidate set)
+        # natural-key dedupe, retried ingest returns the existing row
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO documents(title, publisher, url) VALUES (?,?,?)"
@@ -174,10 +169,8 @@ class PolicyRepository(_Repo):
             for r in rows
         ]
 
-    # candidates ----------------------------------------------------------
     def add_candidate(self, cand: PolicyCandidate) -> int:
-        # dedupe on (document, page, text) — re-ingesting a document keeps
-        # existing candidate rows, and with them their review_status
+        # dedupe on (document, page, text), re-ingest keeps rows and their review_status
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT id FROM candidates WHERE document_id=?"
@@ -188,8 +181,8 @@ class PolicyRepository(_Repo):
             cur = conn.execute(
                 """INSERT INTO candidates(document_id, suggested_type, text, normalized_title,
                    source_page, source_excerpt, code, excerpt_on_page, responsible_org,
-                   timeframe, deadline_year, unit, target_value)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                          timeframe, deadline_year, unit, target_value)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (cand.document_id, cand.suggested_type.value, cand.text, cand.normalized_title,
                  cand.source_page, cand.source_excerpt, cand.code,
                  None if cand.excerpt_on_page is None else int(cand.excerpt_on_page),
@@ -219,11 +212,9 @@ class PolicyRepository(_Repo):
             conn.execute("UPDATE candidates SET review_status=? WHERE id=?",
                          (status.value, candidate_id))
 
-    # commitments ---------------------------------------------------------
     def add_commitment(self, com: Commitment) -> int:
         with self._connect() as conn:
-            # one commitment per accepted candidate — a retried/double
-            # accept returns the existing row
+            # one commitment per candidate, double accept returns the existing row
             if com.candidate_id is not None:
                 row = conn.execute(
                     "SELECT id FROM commitments WHERE candidate_id=?",
@@ -233,7 +224,7 @@ class PolicyRepository(_Repo):
             cur = conn.execute(
                 """INSERT INTO commitments(candidate_id, parent_id, kind, title, summary, code,
                    responsible_org, timeframe, deadline_year, unit, target_value, source_page)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (com.candidate_id, com.parent_id, com.kind.value, com.title, com.summary,
                  com.code, com.responsible_org, com.timeframe, com.deadline_year,
                  com.unit, com.target_value, com.source_page),
@@ -259,10 +250,9 @@ class PolicyRepository(_Repo):
 
 
 class EvidenceRepository(_Repo):
-    """Retrieved evidence, proposed links and extracted budget figures."""
+    """evidence, links, budgets"""
 
-    # official_sources — the source catalogue the evidence search always
-    # checks. Rows are managed in the database (see migration 005).
+    # official_sources: catalogue the evidence search always checks (migration 005)
     def official_sources(self) -> list[OfficialSource]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -286,11 +276,15 @@ class EvidenceRepository(_Repo):
             )
 
     def reviewed_evidence_id(self, commitment_id: int, url: str) -> int | None:
-        """Id of an evidence row a reviewer already decided on, if any."""
+        """evidence id a reviewer already decided on, if any"""
         with self._connect() as conn:
             row = conn.execute(
-                """SELECT e.id FROM evidence e JOIN links l ON l.evidence_id = e.id
-                   WHERE e.commitment_id=? AND e.url=? AND l.review_status != 'unreviewed'
+                """SELECT e.id
+                   FROM evidence e
+                            JOIN links l ON l.evidence_id = e.id
+                   WHERE e.commitment_id = ?
+                     AND e.url = ?
+                     AND l.review_status != 'unreviewed'
                    LIMIT 1""", (commitment_id, url)).fetchone()
         return row["id"] if row else None
 
@@ -298,17 +292,16 @@ class EvidenceRepository(_Repo):
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO evidence(commitment_id, url, title, publisher, published_on,
-                   snippet, organisations, locations, dates_mentioned,
-                   status_hint, status_excerpt)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(commitment_id, url) DO UPDATE SET
-                     snippet=excluded.snippet, status_hint=excluded.status_hint,
-                     status_excerpt=excluded.status_excerpt
-                   -- a reviewer signed off on what this row said; a re-run
-                   -- must not rewrite the quote under their decision
-                   WHERE NOT EXISTS (
-                     SELECT 1 FROM links l WHERE l.evidence_id = evidence.id
-                       AND l.review_status != 'unreviewed')""",
+                                        snippet, organisations, locations, dates_mentioned,
+                                        status_hint, status_excerpt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(commitment_id, url) DO
+                UPDATE SET
+                    snippet=excluded.snippet, status_hint=excluded.status_hint,
+                    status_excerpt=excluded.status_excerpt
+                -- reviewer signed off on this row, a re-run can't rewrite the quote
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM links l WHERE l.evidence_id = evidence.id
+                  AND l.review_status != 'unreviewed')""",
                 (ev.commitment_id, ev.url, ev.title, ev.publisher,
                  ev.published_on.isoformat() if ev.published_on else None,
                  ev.snippet,
@@ -329,7 +322,7 @@ class EvidenceRepository(_Repo):
         return _evidence(row) if row else None
 
     def evidence_many(self, ids: list[int]) -> dict[int, EvidenceItem]:
-        """Batch fetch — one query instead of one per link."""
+        """batch fetch, one query not one per link"""
         if not ids:
             return {}
         with self._connect() as conn:
@@ -342,13 +335,13 @@ class EvidenceRepository(_Repo):
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO links(commitment_id, evidence_id, score, similarity,
-                   shared_organisations, shared_locations, shared_dates,
-                   suggested_relationship, reasons)
-                   VALUES (?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(commitment_id, evidence_id) DO UPDATE SET
-                     score=excluded.score, suggested_relationship=excluded.suggested_relationship,
-                     reasons=excluded.reasons
-                   WHERE links.review_status = 'unreviewed'""",
+                                     shared_organisations, shared_locations, shared_dates,
+                                     suggested_relationship, reasons)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(commitment_id, evidence_id) DO
+                UPDATE SET
+                    score=excluded.score, suggested_relationship=excluded.suggested_relationship,
+                    reasons=excluded.reasons
+                WHERE links.review_status = 'unreviewed'""",
                 (link.commitment_id, link.evidence_id, link.score,
                  link.features.semantic_similarity,
                  json.dumps(link.features.shared_organisations, ensure_ascii=False),
@@ -394,11 +387,10 @@ class EvidenceRepository(_Repo):
                 (status.value,
                  relationship.value if relationship else None, link_id))
 
-    # budgets --------------------------------------------------------------
     def add_budget(self, b: BudgetRecord) -> int:
         with self._connect() as conn:
-            # evidence rows upsert, so a re-run reaches here with the same
-            # evidence_id — don't insert the same figure twice
+            # evidence upserts so a re-run lands here with the same id, don't insert the figure
+            # twice
             row = conn.execute(
                 "SELECT id FROM budgets WHERE evidence_id=? AND kind=?"
                 " AND amount_raw=? AND fiscal_year IS ? AND description=?",
@@ -408,7 +400,8 @@ class EvidenceRepository(_Repo):
                 return row["id"]
             cur = conn.execute(
                 """INSERT INTO budgets(evidence_id, kind, amount_huf, amount_raw,
-                   fiscal_year, description, source_url) VALUES (?,?,?,?,?,?,?)""",
+                                       fiscal_year, description, source_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (b.evidence_id, b.kind.value, b.amount_huf, b.amount_raw,
                  b.fiscal_year, b.description, b.source_url),
             )
@@ -423,7 +416,7 @@ class EvidenceRepository(_Repo):
 
     def budgets_many(
             self, evidence_ids: list[int]) -> dict[int, list[BudgetRecord]]:
-        """Batch fetch — one query instead of one per evidence row."""
+        """batch fetch, one query not one per evidence row"""
         if not evidence_ids:
             return {}
         with self._connect() as conn:
@@ -435,4 +428,3 @@ class EvidenceRepository(_Repo):
         for r in rows:
             out.setdefault(r["evidence_id"], []).append(_budget(r))
         return out
-

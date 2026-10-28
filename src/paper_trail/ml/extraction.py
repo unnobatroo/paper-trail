@@ -47,8 +47,7 @@ class Extractor(ABC):
         ...
 
 
-# ---------------------------------------------------------------------------
-# Rule-based extraction for fixed-layout documents
+# rule-based extraction for fixed-layout docs
 
 _NOISE_RE = re.compile(r"http|www\.|%C3|%CC|wp-content|/Documents/", re.IGNORECASE)
 
@@ -112,7 +111,7 @@ class RuleBasedExtractor(Extractor):
         t = _squash(title)
         t = self._p["struct"].sub("", t)
         for m in list(self._p["goal"].finditer(page_text)) \
-                + list(self._p["pillar"].finditer(page_text)):
+                 + list(self._p["pillar"].finditer(page_text)):
             head = _squash(m.group(2)).rstrip(".")
             if head and t.startswith(head):
                 t = t[len(head):]
@@ -124,9 +123,8 @@ class RuleBasedExtractor(Extractor):
         out: list[PolicyCandidate] = []
         seen_titles: set[str] = set()
 
-        # the action-plan region: first actual goal heading or measure card
-        # to the last measure card — dated-numeric sentences outside it are
-        # background statistics (and the TOC mentions the markers as words)
+        # action-plan region = first goal heading/measure card to the last card, dated numbers
+        # outside it are background stats (toc too)
         def is_plan_page(pg: DocumentPage) -> bool:
             return bool(
                 p["goal"].search(pg.text) or p["pillar"].search(pg.text)
@@ -170,8 +168,7 @@ class RuleBasedExtractor(Extractor):
                     heading = self._heading_before(text, m.start())
                     if not heading:
                         continue
-                    # a measure card often spans pages — the metadata block
-                    # can sit one or two pages after the code
+                    # cards span pages, metadata can sit 1-2 pages after the code
                     tail = text[m.end():]
                     for np_ in pages[page.page_number: page.page_number + 2]:
                         tail += "\n" + np_.text
@@ -196,10 +193,10 @@ class RuleBasedExtractor(Extractor):
                 if len(sent) < 40 or len(sent) > 400:
                     continue
                 if any(nw in sent for nw in self._profile.noise_words):
-                    continue  # page furniture / grant identifier lines
+                    continue  # page furniture / grant ids
                 if _NOISE_RE.search(sent) or (
                         p["intent"] and not p["intent"].search(sent)):
-                    continue  # URL fragments and background statistics
+                    continue  # url fragments, background stats
                 year = re.search(r"20\d{2}", sent)
                 value = p["value"].search(sent) if p["value"] else None
                 add(document_id=0, suggested_type=CandidateType.TARGET,
@@ -224,7 +221,7 @@ class RuleBasedExtractor(Extractor):
         lines = [ln.strip() for ln in prefix.split("\n") if ln.strip()]
         if not lines:
             return None
-        # last 1–3 short lines form the heading; drop page furniture
+        # last 1-3 short lines = heading, drop furniture
         p = self._p
         head: list[str] = []
         for ln in reversed(lines):
@@ -241,14 +238,12 @@ class RuleBasedExtractor(Extractor):
         if self._profile.card_label:
             title = re.sub(
                 rf"^.*?{re.escape(self._profile.card_label)}\s*", "", title)
-        # strip glued footnote digits ("korszerűsítése11") but keep real
-        # names ending in a digit ("Zöld8", "RÉV8")
+        # strip glued footnote digits ("korszerűsítése11"), keep names like "Zöld8"
         title = p["footnote"].sub(r"\1", title)
         return title or None
 
 
-# ---------------------------------------------------------------------------
-# LLM extraction through any OpenAI-compatible endpoint
+# llm extraction via any openai-compatible endpoint
 
 class _LLMItem(BaseModel):
     type: str
@@ -268,7 +263,7 @@ JSON of the form {{"items": [...]}} where each item is:
   type: one of objective | measure | target | indicator
   normalized_title: short plain name
   text: the full commitment sentence(s)
-  page: the printed page number it appears on
+  page: the N from the "--- page N ---" marker above the text you quote
   excerpt: a verbatim quote from that page supporting it
 Rules: only report what the text actually says; never invent targets, dates
 or bodies; if unsure, omit the item. Write titles in {language} as in the
@@ -284,11 +279,12 @@ class LLMExtractor(Extractor):
     endpoint (OpenAI, Ollama, HF TGI/Endpoints, vLLM, Modal)."""
 
     def __init__(self, base_url: str, api_key: str | None, model: str,
-                 profile: LanguageProfile):
+                 profile: LanguageProfile, window: int = 4):
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._key = api_key or ""
         self._model = model
         self._profile = profile
+        self._window = max(1, window)
 
     def _ask(self, pages: list[DocumentPage]) -> _LLMResponse | None:
         """One /chat/completions call; None when the reply isn't valid
@@ -317,10 +313,9 @@ class LLMExtractor(Extractor):
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
         candidates: list[PolicyCandidate] = []
         page_text = {p.page_number: p.text for p in pages}
-        for i in range(0, len(pages), 4):
-            window = pages[i: i + 4]
-            # (pages asked, response) pairs — a malformed window reply is
-            # retried per page so one bad answer can't lose four pages
+        for i in range(0, len(pages), self._window):
+            window = pages[i: i + self._window]
+            # malformed window reply gets retried per page so one bad answer can't lose four
             responses = [(window, self._ask(window))]
             if responses[0][1] is None and len(window) > 1:
                 responses = [([p], self._ask([p])) for p in window]
@@ -336,8 +331,8 @@ class LLMExtractor(Extractor):
                     except ValueError:
                         ctype = CandidateType.UNCLEAR
                     if ctype not in (
-                        CandidateType.OBJECTIVE, CandidateType.MEASURE,
-                        CandidateType.TARGET, CandidateType.INDICATOR,
+                            CandidateType.OBJECTIVE, CandidateType.MEASURE,
+                            CandidateType.TARGET, CandidateType.INDICATOR,
                     ):
                         continue
                     excerpt = _squash(item.excerpt)
@@ -354,8 +349,8 @@ class LLMExtractor(Extractor):
 
 def get_extractor(llm_base_url: str | None, llm_api_key: str | None,
                   llm_model: str | None,
-                  profile: LanguageProfile) -> Extractor:
+                  profile: LanguageProfile, window: int = 4) -> Extractor:
     """LLM when configured, otherwise the deterministic document parser."""
     if llm_base_url and llm_model:
-        return LLMExtractor(llm_base_url, llm_api_key, llm_model, profile)
+        return LLMExtractor(llm_base_url, llm_api_key, llm_model, profile, window)
     return RuleBasedExtractor(profile)

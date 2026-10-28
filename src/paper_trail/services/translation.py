@@ -1,14 +1,8 @@
-"""Source-language → English machine translation at runtime.
+"""source language -> english machine translation
 
-The source documents are verbatim for provenance; the UI shows an optional
-machine translation underneath for orientation. Everything this module
-produces is labelled automatic translation — it is never presented as an
-official document.
-
-Backend: a Helsinki-NLP opus-mt-*-en model on the Hugging Face Inference
-API. Needs HF_TOKEN; without one the UI simply shows no translation.
-The model defaults to opus-mt-<PAPER_TRAIL_LANGUAGE>-en and can be
-overridden with PAPER_TRAIL_MT_MODEL.
+sources stay verbatim, the ui shows this underneath labelled as automatic translation.
+backend: helsinki-nlp opus-mt-<lang>-en on the hf inference api (needs HF_TOKEN, no token = no
+translation), override with PAPER_TRAIL_MT_MODEL
 """
 
 from __future__ import annotations
@@ -37,8 +31,7 @@ class Translator:
         )
 
     def translate(self, text: str) -> str | None:
-        """English rendering of `text`, or None when the service is
-        unavailable — the caller falls back to the source language."""
+        """english text, or None if the service is down (caller shows the source)"""
         if not text.strip():
             return None
         try:
@@ -51,7 +44,7 @@ class Translator:
 
 def get_translator(profile: LanguageProfile,
                    model: str | None = None) -> Translator | None:
-    """A translator when HF_TOKEN is configured, else None."""
+    """translator if HF_TOKEN is set, else None"""
     if not os.environ.get("HF_TOKEN"):
         return None
     return Translator(profile, model=model)

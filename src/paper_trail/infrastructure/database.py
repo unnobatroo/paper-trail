@@ -1,4 +1,4 @@
-"""SQLite persistence. One file, no ORM, no server."""
+"""sqlite, one file, no orm"""
 
 from __future__ import annotations
 
@@ -6,106 +6,214 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS documents (
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    publisher TEXT NOT NULL,
-    url TEXT DEFAULT ''
-);
+         CREATE TABLE IF NOT EXISTS documents
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             title
+             TEXT
+             NOT
+             NULL,
+             publisher
+             TEXT
+             NOT
+             NULL,
+             url
+             TEXT
+             DEFAULT
+             ''
+         );
 
-CREATE TABLE IF NOT EXISTS candidates (
-    id INTEGER PRIMARY KEY,
-    document_id INTEGER NOT NULL REFERENCES documents(id),
-    suggested_type TEXT NOT NULL,
-    text TEXT NOT NULL,
-    normalized_title TEXT NOT NULL,
-    source_page INTEGER NOT NULL,
-    source_excerpt TEXT NOT NULL,
-    code TEXT,
-    excerpt_on_page INTEGER,
-    responsible_org TEXT,
-    timeframe TEXT,
-    deadline_year INTEGER,
-    unit TEXT,
-    target_value REAL,
-    review_status TEXT NOT NULL DEFAULT 'unreviewed'
-);
+         CREATE TABLE IF NOT EXISTS candidates
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             document_id
+             INTEGER
+             NOT
+             NULL
+             REFERENCES
+             documents
+         (
+             id
+         ),
+             suggested_type TEXT NOT NULL,
+             text TEXT NOT NULL,
+             normalized_title TEXT NOT NULL,
+             source_page INTEGER NOT NULL,
+             source_excerpt TEXT NOT NULL,
+             code TEXT,
+             excerpt_on_page INTEGER,
+             responsible_org TEXT,
+             timeframe TEXT,
+             deadline_year INTEGER,
+             unit TEXT,
+             target_value REAL,
+             review_status TEXT NOT NULL DEFAULT 'unreviewed'
+             );
 
-CREATE TABLE IF NOT EXISTS commitments (
-    id INTEGER PRIMARY KEY,
-    candidate_id INTEGER REFERENCES candidates(id),
-    parent_id INTEGER REFERENCES commitments(id),
-    kind TEXT NOT NULL,
-    title TEXT NOT NULL,
-    summary TEXT DEFAULT '',
-    code TEXT,
-    responsible_org TEXT,
-    timeframe TEXT,
-    deadline_year INTEGER,
-    unit TEXT,
-    target_value REAL,
-    source_page INTEGER
-);
+         CREATE TABLE IF NOT EXISTS commitments
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             candidate_id
+             INTEGER
+             REFERENCES
+             candidates
+         (
+             id
+         ),
+             parent_id INTEGER REFERENCES commitments
+         (
+             id
+         ),
+             kind TEXT NOT NULL,
+             title TEXT NOT NULL,
+             summary TEXT DEFAULT '',
+             code TEXT,
+             responsible_org TEXT,
+             timeframe TEXT,
+             deadline_year INTEGER,
+             unit TEXT,
+             target_value REAL,
+             source_page INTEGER
+             );
 
-CREATE TABLE IF NOT EXISTS evidence (
-    id INTEGER PRIMARY KEY,
-    commitment_id INTEGER NOT NULL REFERENCES commitments(id),
-    url TEXT NOT NULL,
-    title TEXT NOT NULL,
-    publisher TEXT DEFAULT '',
-    published_on TEXT,
-    snippet TEXT DEFAULT '',
-    organisations TEXT DEFAULT '[]',
-    locations TEXT DEFAULT '[]',
-    dates_mentioned TEXT DEFAULT '[]',
-    status_hint TEXT DEFAULT 'unknown',
-    status_excerpt TEXT,
-    UNIQUE(commitment_id, url)
-);
+         CREATE TABLE IF NOT EXISTS evidence
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             commitment_id
+             INTEGER
+             NOT
+             NULL
+             REFERENCES
+             commitments
+         (
+             id
+         ),
+             url TEXT NOT NULL,
+             title TEXT NOT NULL,
+             publisher TEXT DEFAULT '',
+             published_on TEXT,
+             snippet TEXT DEFAULT '',
+             organisations TEXT DEFAULT '[]',
+             locations TEXT DEFAULT '[]',
+             dates_mentioned TEXT DEFAULT '[]',
+             status_hint TEXT DEFAULT 'unknown',
+             status_excerpt TEXT,
+             UNIQUE
+         (
+             commitment_id,
+             url
+         )
+             );
 
-CREATE TABLE IF NOT EXISTS links (
-    id INTEGER PRIMARY KEY,
-    commitment_id INTEGER NOT NULL REFERENCES commitments(id),
-    evidence_id INTEGER NOT NULL REFERENCES evidence(id),
-    score REAL DEFAULT 0,
-    similarity REAL DEFAULT 0,
-    shared_organisations TEXT DEFAULT '[]',
-    shared_locations TEXT DEFAULT '[]',
-    shared_dates TEXT DEFAULT '[]',
-    suggested_relationship TEXT NOT NULL,
-    reasons TEXT DEFAULT '[]',
-    relationship TEXT,
-    review_status TEXT NOT NULL DEFAULT 'unreviewed',
-    UNIQUE(commitment_id, evidence_id)
-);
+         CREATE TABLE IF NOT EXISTS links
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             commitment_id
+             INTEGER
+             NOT
+             NULL
+             REFERENCES
+             commitments
+         (
+             id
+         ),
+             evidence_id INTEGER NOT NULL REFERENCES evidence
+         (
+             id
+         ),
+             score REAL DEFAULT 0,
+             similarity REAL DEFAULT 0,
+             shared_organisations TEXT DEFAULT '[]',
+             shared_locations TEXT DEFAULT '[]',
+             shared_dates TEXT DEFAULT '[]',
+             suggested_relationship TEXT NOT NULL,
+             reasons TEXT DEFAULT '[]',
+             relationship TEXT,
+             review_status TEXT NOT NULL DEFAULT 'unreviewed',
+             UNIQUE
+         (
+             commitment_id,
+             evidence_id
+         )
+             );
 
-CREATE TABLE IF NOT EXISTS budgets (
-    id INTEGER PRIMARY KEY,
-    evidence_id INTEGER NOT NULL REFERENCES evidence(id),
-    kind TEXT NOT NULL,
-    amount_huf INTEGER,
-    amount_raw TEXT DEFAULT '',
-    fiscal_year INTEGER,
-    description TEXT DEFAULT '',
-    source_url TEXT DEFAULT ''
-);
+         CREATE TABLE IF NOT EXISTS budgets
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             evidence_id
+             INTEGER
+             NOT
+             NULL
+             REFERENCES
+             evidence
+         (
+             id
+         ),
+             kind TEXT NOT NULL,
+             amount_huf INTEGER,
+             amount_raw TEXT DEFAULT '',
+             fiscal_year INTEGER,
+             description TEXT DEFAULT '',
+             source_url TEXT DEFAULT ''
+             );
 
--- The evidence-search source catalogue. Seeded in Postgres by migration
+         -- The evidence-search source catalogue. Seeded in Postgres by migration
 -- 005; the local backend leaves it empty and search relies on the web
 -- provider alone.
-CREATE TABLE IF NOT EXISTS official_sources (
-    id INTEGER PRIMARY KEY,
-    url TEXT NOT NULL UNIQUE,
-    title TEXT NOT NULL DEFAULT '',
-    publisher TEXT NOT NULL DEFAULT '',
-    sort_order INTEGER NOT NULL DEFAULT 0
-);
+         CREATE TABLE IF NOT EXISTS official_sources
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY,
+             url
+             TEXT
+             NOT
+             NULL
+             UNIQUE,
+             title
+             TEXT
+             NOT
+             NULL
+             DEFAULT
+             '',
+             publisher
+             TEXT
+             NOT
+             NULL
+             DEFAULT
+             '',
+             sort_order
+             INTEGER
+             NOT
+             NULL
+             DEFAULT
+             0
+         );
 
--- Enforce the natural key add_document dedupes on (also upgrades DBs
+         -- Enforce the natural key add_document dedupes on (also upgrades DBs
 -- created before this index existed).
-CREATE UNIQUE INDEX IF NOT EXISTS documents_natural_uq
-    ON documents(title, publisher, url);
-"""
+         CREATE UNIQUE INDEX IF NOT EXISTS documents_natural_uq
+             ON documents(title, publisher, url); \
+         """
 
 
 def connect(db_path: Path | str) -> sqlite3.Connection:

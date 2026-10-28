@@ -1,14 +1,7 @@
-"""Language profiles — every locale-specific word list and document label
-the deterministic parsers need, as data tables selected by
-PAPER_TRAIL_LANGUAGE at startup.
+"""per-locale word lists and doc labels, picked by PAPER_TRAIL_LANGUAGE
 
-The algorithm modules (`entities`, `extraction`, `evidence_service`) hold
-no literals: they compile their patterns from the profile they are handed.
-A new deployment language = a new entry in `PROFILES`, nothing else.
-
-Registry-of-record note: the source catalogue (URLs/publishers) is *not*
-here — that is application data and lives in the `official_sources` table.
-These are linguistic resources, the same category as gettext catalogs.
+parsers hold no literals, they compile from the profile. new language = new `PROFILES` entry.
+the source catalogue lives in the `official_sources` table, not here
 """
 
 from __future__ import annotations
@@ -20,31 +13,30 @@ from ..domain.enums import BudgetKind, Status
 
 @dataclass(frozen=True)
 class LanguageProfile:
-    """One locale's cue tables. All string tuples are matched
-    case-insensitively against lowered text unless noted."""
+    """one locale's cue tables, matched case-insensitively against lowered text"""
 
-    code: str                     # ISO-ish tag, e.g. "hu"
-    name: str                     # "Hungarian" — used in LLM prompts
-    stemmer: str                  # py_rust_stemmers / Snowball language
-    ts_config: str                # Postgres regconfig for tsvector columns
+    code: str  # ISO-ish tag, e.g. "hu"
+    name: str  # "Hungarian" — used in LLM prompts
+    stemmer: str  # py_rust_stemmers / Snowball language
+    ts_config: str  # Postgres regconfig for tsvector columns
 
     # money
-    currency_words: tuple[str, ...] = ()        # ("Ft", "forint")
+    currency_words: tuple[str, ...] = ()  # ("Ft", "forint")
     multiplier_words: dict[str, int] = field(default_factory=dict)
-    decimal_comma: bool = False                 # "2,5" = 2.5
+    decimal_comma: bool = False  # "2,5" = 2.5
     budget_cues: dict[BudgetKind, tuple[str, ...]] = field(
         default_factory=dict)
 
     # dates
-    months_re: str = ""           # alternation of month names
+    months_re: str = ""  # alternation of month names
 
     # organisations / locations
-    upper_chars: str = "A-Z"      # uppercase-start character class body
-    lower_chars: str = "a-z"      # word-body lowercase class
-    org_suffixes_re: str = ""     # legal-form suffixes (Zrt|Kft|Ltd|…)
-    org_names_re: str = ""        # literal known names (alternation)
-    place_words_re: str = ""      # tér|utca|park|…
-    place_drop_suffixes: tuple[str, ...] = ()   # inflections _norm_place strips
+    upper_chars: str = "A-Z"  # uppercase-start character class body
+    lower_chars: str = "a-z"  # word-body lowercase class
+    org_suffixes_re: str = ""  # legal-form suffixes (Zrt|Kft|Ltd|…)
+    org_names_re: str = ""  # literal known names (alternation)
+    place_words_re: str = ""  # tér|utca|park|…
+    place_drop_suffixes: tuple[str, ...] = ()  # inflections _norm_place strips
 
     # document/report classification
     report_cues: tuple[str, ...] = ()
@@ -52,23 +44,22 @@ class LanguageProfile:
     title_stopwords: frozenset[str] = frozenset()
 
     # document-layout extraction (fixed-layout policy PDFs)
-    code_pattern: str = r""                     # e.g. [AMS][a-z]?\d+(\.\d+)*
-    goal_labels: tuple[str, ...] = ()           # "Stratégiai cél"
-    pillar_labels: tuple[str, ...] = ()         # "Tematikus cél"
-    card_label: str = ""                        # "Intézkedés kódja"
-    responsible_label: str = ""                 # "Felelős"
-    timeframe_label: str = ""                   # "Időtáv"
-    indicator_label: str = ""                   # "Indikátor"
-    noise_words: tuple[str, ...] = ()           # grant codes / furniture
-    intent_re: str = ""                         # target-sentence verbs
-    units_re: str = ""                          # m2|%|db|fő|mm|°C|kWh|Ft
+    code_pattern: str = r""  # e.g. [AMS][a-z]?\d+(\.\d+)*
+    goal_labels: tuple[str, ...] = ()  # "Stratégiai cél"
+    pillar_labels: tuple[str, ...] = ()  # "Tematikus cél"
+    card_label: str = ""  # "Intézkedés kódja"
+    responsible_label: str = ""  # "Felelős"
+    timeframe_label: str = ""  # "Időtáv"
+    indicator_label: str = ""  # "Indikátor"
+    noise_words: tuple[str, ...] = ()  # grant codes / furniture
+    intent_re: str = ""  # target-sentence verbs
+    units_re: str = ""  # m2|%|db|fő|mm|°C|kWh|Ft
 
     def __hash__(self) -> int:  # dict fields are unhashable — key on code
         return hash(self.code)
 
 
-# ---------------------------------------------------------------------------
-# Hungarian — Józsefváros deployment
+# hungarian (józsefváros)
 
 HU = LanguageProfile(
     code="hu",
@@ -163,11 +154,7 @@ HU = LanguageProfile(
     units_re=r"m2|m²|%|db|fő/év|fő|mm|°C|kWh|Ft|m-en",
 )
 
-
-# ---------------------------------------------------------------------------
-# English — generic municipal/official-document baseline. The rule extractor
-# covers common strategy-document phrasing; unusual layouts should use the
-# LLM extractor instead.
+# english baseline, odd layouts should use the llm extractor
 
 EN = LanguageProfile(
     code="en",
@@ -247,12 +234,9 @@ EN = LanguageProfile(
     units_re=r"m2|m²|%|km|km2|ha|mm|°C|kWh|MWh|tCO2|EUR|USD|GBP|€|\$|£",
 )
 
-
 PROFILES: dict[str, LanguageProfile] = {"hu": HU, "en": EN}
 
 
 def get_profile(code: str) -> LanguageProfile:
-    """The profile for `code`; unknown codes fall back to `en` (the
-    baseline) rather than crashing — a missing profile means the
-    deterministic parsers run with generic cues."""
+    """profile for `code`, unknown codes fall back to `en`"""
     return PROFILES.get((code or "").lower().split("-")[0], EN)

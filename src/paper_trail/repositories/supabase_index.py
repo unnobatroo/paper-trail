@@ -1,12 +1,8 @@
-"""Postgres-backed system caches — the Supabase side of `cache.py`.
+"""postgres side of `cache.py` (needs migration 002)
 
-`pages`  replaces the fetched/*.txt page cache (one row per URL, text is
-         immutable once stored);
-`chunks` + the `match_chunks` RPC replace embeddings/*.json *and* the
-         in-Python cosine loop — top-k runs inside Postgres via pgvector.
-
-Needs `supabase/migrations/002_pgvector.sql`. Like `supabase_store.py`,
-the client is stateless HTTP and safe to share across threads.
+`pages` = page cache, one immutable row per url
+`chunks` + `match_chunks` rpc = vectors, top-k runs in pgvector
+client is stateless http, thread-safe
 """
 
 from __future__ import annotations
@@ -24,13 +20,12 @@ from .supabase_store import select_all
 
 log = logging.getLogger(__name__)
 
-# rows per insert batch — chunk rows carry ~20 KB of vector text each
+# rows per insert, chunk rows are ~20 KB of vector text
 _BATCH = 200
 
 
 def _vec_literal(vec: list[float]) -> str:
-    """pgvector's text form: '[0.1,0.2,...]'. Sending a string avoids
-    PostgREST JSON-array coercion edge cases."""
+    """pgvector text form '[0.1,0.2,...]', dodges postgrest array coercion quirks"""
     return "[" + ",".join(repr(float(x)) for x in vec) + "]"
 
 
@@ -80,8 +75,7 @@ class SupabaseVectorIndex(VectorIndex):
         self._page_ids: dict[str, int] = {}
 
     def _page_id(self, url: str) -> int | None:
-        # cache hits only — a miss may precede the row's creation, and a
-        # cached None would make a later put() silently drop its vectors
+        # cache hits only, a cached miss would make a later put() drop its vectors
         if url in self._page_ids:
             return self._page_ids[url]
         res = (self._db.table("pages").select("id")
@@ -92,9 +86,8 @@ class SupabaseVectorIndex(VectorIndex):
         return res.data[0]["id"]
 
     def has(self, page: FetchedPage, model: str, chunk_size: int) -> bool:
-        # put() writes chunk 0 last, so its presence means every batch
-        # landed. any chunk existing used to count, and a put that died
-        # halfway left the page half-indexed for good
+        # put() writes chunk 0 last so it doubles as the commit marker, any-chunk used to leave
+        # half-indexed pages forever
         pid = self._page_id(page.url)
         if pid is None:
             return False
@@ -108,8 +101,7 @@ class SupabaseVectorIndex(VectorIndex):
         pid = self._page_id(page.url)
         if pid is None:
             return None
-        # paginate — PostgREST caps each response (default 1000 rows) and
-        # a big document can hold more chunks than that
+        # paginate, postgrest caps responses at 1000 rows
         res = select_all(
             self._db.table("chunks")
             .select("text,embedding")
@@ -131,7 +123,7 @@ class SupabaseVectorIndex(VectorIndex):
             "text": text,
             "embedding": _vec_literal(pad_vector(vec)),
         } for i, (text, vec) in enumerate(pairs)]
-        # highest indices first: chunk 0 is the commit marker has() reads
+        # highest first, chunk 0 is the commit marker
         rows.reverse()
         for i in range(0, len(rows), _BATCH):
             (self._db.table("chunks")
@@ -154,8 +146,7 @@ class SupabaseVectorIndex(VectorIndex):
                 "lex_config": self._ts_config,
             }).execute()
         except Exception as exc:
-            # PGRST202: function missing — migration 006 not applied yet.
-            # Degrade to dense-only rather than failing the evidence run.
+            # PGRST202 = migration 006 missing, go dense-only instead of failing
             if getattr(exc, "code", "") != "PGRST202":
                 raise
             log.warning("match_chunks_hybrid missing — run "

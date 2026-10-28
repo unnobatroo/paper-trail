@@ -1,9 +1,4 @@
-"""Request/response shapes for the REST API.
-
-Domain objects (PolicyCandidate, Commitment, EvidenceLink, …) are already
-pydantic models and serialize directly — these are only the extra shapes:
-request bodies, the link+evidence joined view, and the trail row.
-"""
+"""request/response shapes, domain models already serialize so this is just bodies + joined views"""
 
 from __future__ import annotations
 
@@ -52,7 +47,7 @@ class BulkLinksRequest(BaseModel):
 
 
 class LinkView(BaseModel):
-    """A proposed link plus everything needed to review it in one shot."""
+    """link + everything needed to review it"""
     link: EvidenceLink
     evidence: EvidenceItem | None = None
     budgets: list[BudgetRecord] = Field(default_factory=list)
@@ -81,8 +76,7 @@ class TrailRowView(BaseModel):
 
 
 class TranslateRequest(BaseModel):
-    # the endpoint is open (reads stay public), so it's bounded instead:
-    # one page of ui strings, not a free translation api
+    # endpoint is public so it's bounded: one page of ui strings, not a free translator
     texts: list[Annotated[str, StringConstraints(max_length=4000)]] = Field(max_length=50)
 
 

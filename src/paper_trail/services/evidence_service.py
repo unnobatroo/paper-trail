@@ -1,11 +1,8 @@
-"""Evidence discovery: commitment → official sources → ranked, reviewable links.
+"""evidence discovery: commitment -> official sources -> ranked links for review
 
-Fixed pipeline, no agent behaviour: site-restricted queries plus the
-official document registry → fetch each hit once → chunk the FULL
-document (never silently truncated) → embed once and cache by content
-hash → retrieve the top chunks → cross-encoder rerank → deterministic
-entity/money extraction → heuristic relationship suggestion → human
-review.
+fixed pipeline, no agents: site-restricted search + registry -> fetch once ->
+chunk the full doc -> embed once (cached by content hash) -> top chunks ->
+rerank -> rule-based entities/money -> suggested relationship -> human review
 """
 
 from __future__ import annotations
@@ -36,20 +33,18 @@ from ..repositories.cache import (
     PageStore,
     VectorIndex,
 )
-from ..repositories.store import EvidenceRepository
+from ..repositories.ports import EvidenceStore
 from ..sources import fetch as fetching
 from ..sources.fetch import FetchedPage
 from ..sources.web_search import SearchProvider, allowed
 
 TOP_K = 5
-_CHUNK = 2400  # evaluated: larger semantic units retrieve better
-_CHUNK_STRIDE = _CHUNK - 400  # overlap so evidence at chunk edges isn't split
-# Emergency bound against corrupt/pathological input only — hitting it
-# truncates AND warns; normal official documents are processed in full.
+_CHUNK = 2400  # bigger chunks retrieved better in evals
+_CHUNK_STRIDE = _CHUNK - 400  # overlap so edge evidence isn't split
+# panic bound for corrupt input only, truncates and warns, real docs go through in full
 _DEFAULT_MAX_DOC_CHARS = 4_000_000
 
-# per-run state — two evidence jobs running on the shared service must not
-# overwrite each other's progress callback or warnings list
+# per-run state so concurrent jobs don't stomp each other's progress/warnings
 _run_warnings: ContextVar[list[str] | None] = ContextVar(
     "pt_warnings", default=None)
 _run_progress: ContextVar[Callable[[str], None] | None] = ContextVar(
@@ -57,9 +52,7 @@ _run_progress: ContextVar[Callable[[str], None] | None] = ContextVar(
 
 
 def _key(commitment: Commitment) -> str:
-    """The web-search query. Full sentences (e.g. unedited target titles)
-    return nothing on site:-restricted search — keep the first ~10 words
-    plus the document code."""
+    """full sentences return nothing on site: search, keep ~10 words + the doc code"""
     words = commitment.title.split()[:10]
     parts = [" ".join(words)]
     if commitment.code:
@@ -69,20 +62,20 @@ def _key(commitment: Commitment) -> str:
 
 class EvidenceService:
     def __init__(
-        self,
-        repo: EvidenceRepository,
-        search: SearchProvider,
-        embedder: EmbeddingProvider,
-        cache_dir: Path | str | None = None,
-        fetcher=None,
-        reranker: Reranker | None = None,
-        candidates: int = 20,
-        max_doc_chars: int = _DEFAULT_MAX_DOC_CHARS,
-        page_store: PageStore | None = None,
-        vector_index: VectorIndex | None = None,
-        baseline_year: int | None = None,
-        profile: LanguageProfile | None = None,
-        allowed_domains: tuple[str, ...] = (),
+            self,
+            repo: EvidenceStore,
+            search: SearchProvider,
+            embedder: EmbeddingProvider,
+            cache_dir: Path | str | None = None,
+            fetcher=None,
+            reranker: Reranker | None = None,
+            candidates: int = 20,
+            max_doc_chars: int = _DEFAULT_MAX_DOC_CHARS,
+            page_store: PageStore | None = None,
+            vector_index: VectorIndex | None = None,
+            baseline_year: int | None = None,
+            profile: LanguageProfile | None = None,
+            allowed_domains: tuple[str, ...] = (),
     ):
         self._repo = repo
         self._search = search
@@ -92,12 +85,11 @@ class EvidenceService:
         self._candidates = candidates
         self._max_doc_chars = max_doc_chars
         self._baseline_year = baseline_year
-        # language profile: every locale-specific cue list lives in lang.py
+        # locale cues all live in lang.py
         from ..ml.lang import get_profile
         self._profile = profile or get_profile("")
         self._extra_domains = {d.lower() for d in allowed_domains}
-        # caches: explicit stores win (Supabase/pgvector); otherwise the
-        # original on-disk layout under cache_dir
+        # explicit stores (supabase/pgvector) win, else files under cache_dir
         if page_store is None or vector_index is None:
             if cache_dir is None:
                 raise ValueError(
@@ -109,7 +101,6 @@ class EvidenceService:
         self.warnings: list[str] = []
         self._progress = lambda msg: None
 
-    # -- public ------------------------------------------------------------
 
     def _say(self, msg: str) -> None:
         progress = _run_progress.get()
@@ -120,17 +111,15 @@ class EvidenceService:
         (warnings if warnings is not None else self.warnings).append(msg)
 
     def find_evidence(
-        self,
-        commitment: Commitment,
-        progress=None,
-        warnings: list[str] | None = None,
+            self,
+            commitment: Commitment,
+            progress=None,
+            warnings: list[str] | None = None,
     ) -> list[EvidenceLink]:
-        """Run the bounded discovery pipeline for one commitment.
+        """run discovery for one commitment
 
-        `progress(msg)` is called at each stage so the UI can show that a
-        cold first run is working, not hung. `warnings` collects truncation
-        notices for this run — pass a list when running jobs concurrently;
-        otherwise they land on `self.warnings` as before.
+        `progress(msg)` fires per stage so a cold run doesn't look hung,
+        pass `warnings` when jobs run concurrently, else they land on `self.warnings`
         """
         if warnings is None:
             self.warnings = warnings = []
@@ -152,8 +141,7 @@ class EvidenceService:
                        "PAPER_TRAIL_ALLOWED_DOMAINS is unset.")
         urls = self._collect_urls(commitment, registry, domains)
         self._say(f"Found {len(urls)} official pages to check — reading them…")
-        # fetches are pure I/O waits — run them concurrently so a few slow
-        # official servers don't stall the whole search
+        # fetches are pure io, run them concurrently so slow servers don't stall the search
         with ThreadPoolExecutor(max_workers=6) as pool:
             pages = [
                 p for p in pool.map(
@@ -166,8 +154,7 @@ class EvidenceService:
 
         links: list[EvidenceLink] = []
         for page, snippet, sim in self._rank(commitment, pages)[:TOP_K]:
-            # a reviewer already decided on this source: the evidence row,
-            # its budgets and the link all stay as they saw them
+            # reviewer already decided on this source, leave row/budgets/link alone
             if self._repo.reviewed_evidence_id(commitment.id, page.url) is not None:
                 continue
             ev = EvidenceItem(
@@ -184,9 +171,7 @@ class EvidenceService:
                 dates_mentioned=entities.extract_dates(
                     page.text, self._profile),
             )
-            # status and money are judged on the matched excerpt, not the
-            # whole document — a 100-page report always contains every cue
-            # and dozens of unrelated figures somewhere
+            # judge status/money on the matched excerpt, a 100-page report has every cue somewhere
             mentions = self._relevant_money(snippet)
             is_report = entities.is_report_doc(page.url, page.title, self._profile)
             stale = self._predates_strategy(page)
@@ -210,7 +195,7 @@ class EvidenceService:
                 ))
 
             features = matching.compute_features(commitment, ev, sim,
-                                             self._profile)
+                                                 self._profile)
             has_budget = bool(self._repo.budgets_for_evidence(ev.id))
             rel, reasons = matching.suggest_relationship(features, has_budget)
             if stale:
@@ -229,12 +214,9 @@ class EvidenceService:
             links.append(link)
         return links
 
-    # -- internals ----------------------------------------------------------
 
     def _allowed(self, registry: list[OfficialSource]) -> set[str]:
-        """The SSRF allowlist = configured domains ∪ every host in the
-        official-source registry. The registry is DB data, so the allowlist
-        follows the data, not the code."""
+        """ssrf allowlist = configured domains + every host in the registry"""
         return self._extra_domains | {
             urlsplit(d.url).netloc.lower() for d in registry
             if urlsplit(d.url).netloc
@@ -252,7 +234,7 @@ class EvidenceService:
                 hits = []
             urls.extend(h.url for h in hits)
         urls.extend(d.url for d in registry)
-        # de-dupe, keep order, allowlist only
+        # dedupe, keep order, allowlist only
         seen, out = set(), []
         for u in urls:
             u = u.split("#")[0]
@@ -263,7 +245,7 @@ class EvidenceService:
 
     def _fetch_page(self, url: str, registry: list[OfficialSource],
                     domains: set[str]) -> FetchedPage | None:
-        """Fetch once; the page store caches text + title + date."""
+        """fetch once, the page store caches text/title/date"""
         cached = self._pages.get(url)
         if cached is not None:
             return cached
@@ -278,8 +260,7 @@ class EvidenceService:
     @staticmethod
     def _better_title(url: str, fetched: str,
                       registry: list[OfficialSource]) -> str:
-        """Registry docs have human titles; file downloads often only
-        yield a filename."""
+        """registry docs have real titles, file downloads often just a filename"""
         if fetched == url or _FILENAME_RE.search(fetched):
             for d in registry:
                 if d.url.split("?")[0] == url.split("?")[0]:
@@ -287,16 +268,14 @@ class EvidenceService:
         return fetched
 
     def _predates_strategy(self, page: FetchedPage) -> bool:
-        """Published before the tracked strategy existed — it can provide
-        context, but its 'completed/under way' cues can't be progress."""
+        """predates the strategy, fine as context but its 'done/under way' cues aren't progress"""
         return (self._baseline_year is not None
                 and page.published_on is not None
                 and page.published_on.year < self._baseline_year)
 
     @staticmethod
     def _publisher(url: str, registry: list[OfficialSource]) -> str:
-        """Publisher is registry data (the official_sources rows); a host
-        with no registry entry gets its own hostname — never a guess."""
+        """publisher from the registry, unknown hosts get their hostname, never a guess"""
         host = urlsplit(url).netloc.lower()
         for d in registry:
             shost = urlsplit(d.url).netloc.lower()
@@ -305,13 +284,11 @@ class EvidenceService:
                 return d.publisher or host
         return host
 
-    # -- money ---------------------------------------------------------------
 
-    _MIN_AMOUNT_HUF = 10_000  # municipal context — smaller scraps are noise
+    _MIN_AMOUNT_HUF = 10_000  # municipal scale, smaller is noise
 
     def _relevant_money(self, snippet: str) -> list:
-        """Money figures from the matched excerpt only — explicit currency,
-        plausible amount, deduplicated by (value, kind)."""
+        """money from the matched excerpt only: explicit currency, sane amount, deduped"""
         out, seen = [], set()
         for m in entities.extract_money(snippet, self._profile):
             if m.kind is None or m.amount_huf is None:
@@ -325,11 +302,9 @@ class EvidenceService:
             out.append(m)
         return out
 
-    # -- retrieval -----------------------------------------------------------
 
     def _doc_chunks(self, page: FetchedPage) -> list[str]:
-        """Chunk the full document; only the emergency bound may cut it —
-        and it always leaves a visible warning."""
+        """chunk the full doc, only the panic bound cuts it and it always warns"""
         text = page.text
         if len(text) > self._max_doc_chars:
             text = text[: self._max_doc_chars]
@@ -337,7 +312,7 @@ class EvidenceService:
                 for i in range(0, len(text), _CHUNK_STRIDE)]
 
     def _warn_if_oversized(self, page: FetchedPage) -> None:
-        """The emergency bound truncates — the user must always see it."""
+        """truncation must be visible to the user"""
         if len(page.text) > self._max_doc_chars:
             self._warn(
                 f"{page.title or page.url} is larger than the safety "
@@ -352,15 +327,13 @@ class EvidenceService:
         return pairs
 
     def _ensure_indexed(self, page: FetchedPage) -> None:
-        """Populate the vector index for a page without pulling cached
-        vectors back — the remote index only needs a 1-row `has()` check."""
+        """fill the vector index without pulling vectors back, remote only needs a `has()` check"""
         self._warn_if_oversized(page)
         if not self._index.has(page, self._embed.model_name, _CHUNK):
             self._embed_and_store(page)
 
     def _doc_vectors(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
-        """Chunks + embeddings for a document, cached in the vector index
-        so re-running 'Find evidence' never re-embeds unchanged text."""
+        """chunks + embeddings, cached so re-runs never re-embed unchanged text"""
         self._warn_if_oversized(page)
         cached = self._index.get(page, self._embed.model_name, _CHUNK)
         if cached is not None:
@@ -369,8 +342,7 @@ class EvidenceService:
 
     def _rank(self, commitment: Commitment, pages: list[FetchedPage],
               ) -> list[tuple[FetchedPage, str, float]]:
-        """All chunks → hybrid (dense+lexical) top-k → cross-encoder
-        rerank → best per doc."""
+        """all chunks -> hybrid top-k -> rerank -> best per doc"""
         query_text = " ".join(
             [commitment.title, commitment.summary, commitment.code or ""]
         )
@@ -389,8 +361,7 @@ class EvidenceService:
             self._warn(
                 "Ranked by text similarity only — no reranker is loaded.")
         elif top:
-            # a hosted reranker can 429 or time out; losing the job over it
-            # is worse than falling back to the retrieval order
+            # hosted reranker can 429/time out, retrieval order beats losing the job
             try:
                 ce = self._reranker.score(query_text, [c[1] for c in top])
             except Exception as exc:
@@ -400,9 +371,8 @@ class EvidenceService:
                 top = [c for _, c in sorted(zip(ce, top, strict=True),
                                             key=lambda r: -r[0])]
 
-        # one evidence candidate per source document: its best chunk —
-        # and drop effectively redundant pages so broad reports don't
-        # crowd out more specific results
+        # one candidate per doc (best chunk), drop near-dupes so broad reports don't crowd out
+        # specific ones
         seen, out = set(), []
         seen_texts: set[str] = set()
         kept_titles: list[set[str]] = []
@@ -425,7 +395,7 @@ class EvidenceService:
         return out
 
 
-# a "title" that is just a document filename — any office/archive type
+# a "title" that is just a filename, any office/archive type
 _FILENAME_RE = re.compile(
     r"\.(pdf|docx?|xlsx?|pptx?|odt|ods|rtf|csv|txt|zip)$", re.I)
 
@@ -436,9 +406,7 @@ def _title_tokens(title: str, stopwords) -> set[str]:
 
 
 def _titles_same_doc(a: set[str], b: set[str]) -> bool:
-    """Near-identical titles describing the same period = same document at
-    two URLs (e.g. a report PDF linked from two pages). Years differing
-    means a *different* edition — keep both."""
+    """same title + period = same doc at two urls, different years = keep both"""
     if not a or not b:
         return False
     ya, yb = {t for t in a if t.isdigit()}, {t for t in b if t.isdigit()}

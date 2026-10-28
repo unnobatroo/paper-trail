@@ -74,7 +74,10 @@ class Settings(BaseSettings):
         validation_alias="PAPER_TRAIL_DB")
     embed_model: str = Field(
         default=DEFAULT_EMBED_MODEL, validation_alias="PAPER_TRAIL_EMBED_MODEL")
-    # "auto" = hosted Jina when JINA_API_KEY is set, else embedding-only
+    # endpoint for PAPER_TRAIL_EMBED_MODEL=openai:<model> / bge-m3
+    embed_base_url: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_EMBED_BASE_URL")
+    # "auto" = jina if JINA_API_KEY is set, else embedding-only
     reranker_model: str = Field(
         default="auto", validation_alias="PAPER_TRAIL_RERANKER")
     rerank_candidates: int = Field(
@@ -89,10 +92,12 @@ class Settings(BaseSettings):
         default=None, validation_alias="PAPER_TRAIL_LLM_API_KEY")
     llm_model: str = Field(
         default="", validation_alias="PAPER_TRAIL_LLM_MODEL")
+    # pages per llm call, small models/servers want 1
+    llm_window_pages: int = Field(
+        default=4, validation_alias="PAPER_TRAIL_LLM_WINDOW")
     fixture_dir: Path = PROJECT_ROOT / "data" / "fixtures"
     seed_dir: Path = PROJECT_ROOT / "data" / "source_documents"
-    # stable on-disk model cache — fastembed's default is $TMPDIR,
-    # which macOS cleans and which broke downloaded models
+    # fastembed defaults to $TMPDIR, macos cleans it and breaks models
     model_cache: Path = Field(
         default=PROJECT_ROOT / "data" / "models",
         validation_alias="PAPER_TRAIL_MODEL_CACHE")

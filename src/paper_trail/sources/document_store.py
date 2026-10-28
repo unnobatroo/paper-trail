@@ -46,7 +46,7 @@ class LocalDocumentStore(DocumentStore):
         self._root = Path(root)
 
     def _path(self, name: str) -> Path:
-        # names come from the api; keep them inside the store
+        # names come from the api, keep them inside the store
         path = (self._root / name).resolve()
         if not path.is_relative_to(self._root.resolve()):
             raise ValueError(f"document name escapes the store: {name!r}")
@@ -78,7 +78,7 @@ class StorageDocumentStore(DocumentStore):
     def read(self, name: str) -> bytes | None:
         try:
             return self._files.download(name)
-        except Exception as exc:  # storage errors aren't typed per-cause
+        except Exception as exc:  # storage errors aren't typed
             log.warning("storage download %s failed: %s", name, exc)
             return None
 

@@ -15,10 +15,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 import requests
 
-# Benchmarked stage-1 retriever (see experiments/), ~220MB ONNX —
-# small enough for free-tier hosts; e5-large is stronger but needs ~2GB.
+# benchmarked stage-1 retriever (experiments/), ~220MB onnx, e5-large is better but needs ~2GB
 DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 JINA_EMBED_MODEL = "jina-embeddings-v3"
+OPENAI_EMBED_MODEL = "bge-m3"
 
 
 class EmbeddingProvider(ABC):
@@ -34,9 +34,7 @@ class FastEmbedProvider(EmbeddingProvider):
 
     def __init__(self, model: str, cache_dir: str | None = None,
                  providers: list[str] | None = None):
-        # Lazy: TextEmbedding() downloads ~220MB and loads ONNX — too heavy
-        # to run at service-construction time on a 1GB free tier (it wedged
-        # every request). Load on first embed(), inside the worker thread.
+        # lazy: TextEmbedding() pulls ~220MB, at construction it wedged every request on a 1GB tier
         os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
         self.model_name = model
         self._cache_dir = cache_dir
@@ -52,9 +50,7 @@ class FastEmbedProvider(EmbeddingProvider):
                     self._model = TextEmbedding(
                         model_name=self.model_name,
                         cache_dir=self._cache_dir,
-                        # e5-large on one core is far too slow for document
-                        # batches, but max threads spikes memory — 4 is the
-                        # safe middle
+                        # 1 thread is too slow for doc batches, max spikes memory
                         threads=min(4, os.cpu_count() or 1),
                         providers=self._providers,
                     )
@@ -100,6 +96,38 @@ class JinaEmbeddingProvider(EmbeddingProvider):
         return [list(map(float, d["embedding"])) for d in data]
 
 
+class OpenAICompatEmbeddingProvider(EmbeddingProvider):
+    """any openai-compatible /embeddings endpoint (llama.cpp, vllm, tei, ollama)
+
+    model_name is prefixed so cached vectors never mix with another model's
+    """
+
+    def __init__(self, base_url: str, model: str = OPENAI_EMBED_MODEL,
+                 api_key: str | None = None, batch_size: int = 16):
+        if not base_url:
+            raise ValueError("PAPER_TRAIL_EMBED_BASE_URL is not set")
+        self.model_name = f"openai:{model}"
+        self._model = model
+        self._url = base_url.rstrip("/") + "/embeddings"
+        self._headers = {"Authorization": f"Bearer {api_key or 'local'}"}
+        self._batch = batch_size
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        out: list[list[float]] = []
+        for i in range(0, len(texts), self._batch):
+            batch = texts[i:i + self._batch]
+            resp = requests.post(
+                self._url, headers=self._headers,
+                json={"model": self._model, "input": batch}, timeout=120)
+            resp.raise_for_status()
+            data = sorted(resp.json()["data"], key=lambda d: d["index"])
+            if len(data) != len(batch):
+                raise ValueError(
+                    f"embeddings: sent {len(batch)} texts, got {len(data)} vectors")
+            out.extend(list(map(float, d["embedding"])) for d in data)
+        return out
+
+
 class HashingProvider(EmbeddingProvider):
     """Deterministic token-hash vectors. For tests and fully offline runs —
     not semantically meaningful, but keeps the pipeline exercisable."""
@@ -126,12 +154,19 @@ def cosine(a: list[float], b: list[float]) -> float:
 
 def get_provider(model: str | None = None,
                  cache_dir: str | None = None,
-                 providers: list[str] | None = None) -> EmbeddingProvider:
-    """Default provider: fastembed locally; "jina" for the hosted Jina API;
-    hashing only when explicitly asked."""
+                 providers: list[str] | None = None,
+                 base_url: str | None = None) -> EmbeddingProvider:
+    """fastembed locally by default, "jina" for the hosted api, "openai:<model>" or
+    "bge-m3" for an openai-compatible endpoint (PAPER_TRAIL_EMBED_BASE_URL),
+    hashing only when asked"""
     model = model or os.environ.get("PAPER_TRAIL_EMBED_MODEL")
     if model == "hashing":
         return HashingProvider()
+    if model and (model.startswith("openai:") or model == "bge-m3"):
+        return OpenAICompatEmbeddingProvider(
+            base_url or os.environ.get("PAPER_TRAIL_EMBED_BASE_URL", ""),
+            model.removeprefix("openai:"),
+            api_key=os.environ.get("PAPER_TRAIL_EMBED_API_KEY"))
     if model == "jina" or (model or "").startswith("jina-embeddings"):
         return JinaEmbeddingProvider(
             model if model != "jina" else JINA_EMBED_MODEL)
