@@ -45,8 +45,10 @@ wiki page covers the setup and conventions in more depth.
    existing test files before adding new ones.
 4. New backends go behind the existing interfaces (`EmbeddingProvider`,
    `SearchProvider`, and friends) rather than being wired into the
-   services directly.
-5. `uv run pytest` has to be green. If you added a dependency, run
+   services directly. Storage is typed by the `PolicyStore` and
+   `EvidenceStore` protocols in `repositories/ports.py`; services depend
+   on those, never on the SQLite or Supabase classes.
+5. `make test` has to be green (`uv run pytest` and `npm test` in `web/`). If you added a dependency, run
    `uv lock` and regenerate `requirements.txt`:
    `uv export --format requirements-txt --no-hashes --no-dev --no-group ml`.
 
