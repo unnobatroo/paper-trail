@@ -26,9 +26,10 @@ export function MatchCard({ view, commitment }: { view: Full; commitment?: Commi
   const invalidate = useInvalidateDomain();
   const [open, setOpen] = useState(false);
   const [rel, setRel] = useState<RelationshipType>(view.link.suggested_relationship);
-  const full = useLink(open ? view.link.id : null);
+  // the list is fetched lite (no snippet, no budgets), so each card loads its full record
+  const full = useLink(view.link.id);
   const detail = (full.data ?? view) as Full;
-  const ev = view.evidence;
+  const ev = detail.evidence;
 
   const decide = useMutation({
     mutationFn: (accept: boolean) => api.decideLink(view.link.id, accept, accept ? rel : undefined),

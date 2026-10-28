@@ -41,11 +41,14 @@ npm install && npm run dev                             # interface on :3000
 
 Or `make setup && make dev` for both at once. `make check` runs what CI does.
 
-Open http://localhost:3000 and walk the three steps in the sidebar:
-check the extracted commitments, find evidence for them, then read the
-resulting trail. Everything works offline with stub providers — the
-first real search downloads a ~220 MB open-source embedding model, and
-that's the only heavyweight thing the app ever does.
+Open http://localhost:3000. Everything happens in one workspace: each
+commitment is a row that moves through confirm, search, review and done,
+and the panel next to it shows the quote, the matches and the trail.
+Everything works offline with stub providers — the first real search
+downloads a ~220 MB open-source embedding model, and that's the only
+heavyweight thing the app ever does. If you have your own GPU box, the
+embeddings and the extraction LLM can run there instead (any
+OpenAI-compatible server, see [Running](https://github.com/unnobatroo/paper-trail/wiki/Running)).
 
 ## Where things stand
 
