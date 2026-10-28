@@ -13,9 +13,11 @@ export function PageTitle({
 }: {
   title: string;
   hint: string;
-  guide?: keyof typeof PAGE_GUIDES;
+  guide?: keyof typeof PAGE_GUIDES | (keyof typeof PAGE_GUIDES)[];
 }) {
-  const g = guide ? PAGE_GUIDES[guide] : null;
+  const keys = guide ? [guide].flat() : [];
+  const terms = keys.flatMap((k) => PAGE_GUIDES[k].terms);
+  const g = terms.length ? { terms } : null;
   return (
     <div className="flex items-start justify-between gap-4">
       <div>

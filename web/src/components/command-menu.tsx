@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   FileCheck2,
+  LayoutDashboard,
+  ListChecks,
   SearchCheck,
   Route,
   Moon,
@@ -22,9 +24,11 @@ import {
 import { useTranslate } from "./en";
 
 const NAV = [
-  { href: "/commitments", label: "Commitments", icon: FileCheck2 },
-  { href: "/evidence", label: "Evidence", icon: SearchCheck },
-  { href: "/trail", label: "Trail", icon: Route },
+  { href: "/", label: "Workspace: everything", icon: LayoutDashboard },
+  { href: "/?stage=confirm", label: "To confirm", icon: FileCheck2 },
+  { href: "/?stage=search", label: "To search", icon: SearchCheck },
+  { href: "/?stage=review", label: "To review", icon: ListChecks },
+  { href: "/?stage=done", label: "Done", icon: Route },
 ];
 
 export function CommandMenu() {
