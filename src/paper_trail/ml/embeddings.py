@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import requests
 
-# benchmarked stage-1 retriever (experiments/), ~220MB onnx, e5-large is better but needs ~2GB
+# benchmarked stage-1 retriever, ~220MB onnx, e5-large is better but needs ~2GB
 DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 JINA_EMBED_MODEL = "jina-embeddings-v3"
 OPENAI_EMBED_MODEL = "bge-m3"
