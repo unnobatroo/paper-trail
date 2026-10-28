@@ -7,7 +7,6 @@ import {
   FileCheck2,
   SearchCheck,
   Route,
-  LayoutDashboard,
   Moon,
   Sun,
   Languages,
@@ -23,10 +22,9 @@ import {
 import { useTranslate } from "./en";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/commitments", label: "Check commitments", icon: FileCheck2 },
-  { href: "/evidence", label: "Find evidence", icon: SearchCheck },
-  { href: "/trail", label: "Paper trail", icon: Route },
+  { href: "/commitments", label: "Commitments", icon: FileCheck2 },
+  { href: "/evidence", label: "Evidence", icon: SearchCheck },
+  { href: "/trail", label: "Trail", icon: Route },
 ];
 
 export function CommandMenu() {
