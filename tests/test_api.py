@@ -11,9 +11,9 @@ from paper_trail.sources.fetch import FetchedPage
 
 EVIDENCE_URL = "https://rev8.hu/utcafasitas/"
 EVIDENCE_TEXT = (
-    "Utcafásítás Józsefvárosban. A RÉV8 Zrt. 2024-ben mintegy 100 fa "
-    "ültetését tervezi. A programra 2 000 000 Ft költségkeret áll "
-    "rendelkezésre. A munkák elkészültek. " * 5
+        "Utcafásítás Józsefvárosban. A RÉV8 Zrt. 2024-ben mintegy 100 fa "
+        "ültetését tervezi. A programra 2 000 000 Ft költségkeret áll "
+        "rendelkezésre. A munkák elkészültek. " * 5
 )
 
 

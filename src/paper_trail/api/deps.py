@@ -7,8 +7,8 @@ from functools import lru_cache
 
 from fastapi import Depends, HTTPException, Request
 
-from ..bootstrap import AppState, build_state
 from .jobs import JobRunner, SupabaseJobRunner
+from ..bootstrap import AppState, build_state
 
 
 @lru_cache

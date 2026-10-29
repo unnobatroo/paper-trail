@@ -10,12 +10,38 @@
 
 begin;
 
-create table if not exists official_sources (
-    id bigint generated always as identity primary key,
-    url text unique not null,
-    title text not null default '',
-    publisher text not null default '',
-    sort_order integer not null default 0
+create table if not exists official_sources
+(
+    id
+    bigint
+    generated
+    always as
+    identity
+    primary
+    key,
+    url
+    text
+    unique
+    not
+    null,
+    title
+    text
+    not
+    null
+    default
+    '',
+    publisher
+    text
+    not
+    null
+    default
+    '',
+    sort_order
+    integer
+    not
+    null
+    default
+    0
 );
 
 alter table public.official_sources enable row level security;

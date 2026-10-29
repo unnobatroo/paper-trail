@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..deps import get_state, require_review_key
+from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
 from ...domain.models import PolicyCandidate
-from ..deps import get_state, require_review_key
-from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 

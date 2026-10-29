@@ -12,7 +12,6 @@ class ReviewService:
         self._policy = policy
         self._evidence = evidence
 
-
     def accept_candidate(
             self,
             candidate_id: int,
@@ -65,7 +64,6 @@ class ReviewService:
 
     def queue(self) -> list[PolicyCandidate]:
         return self._policy.candidates(ReviewStatus.UNREVIEWED)
-
 
     def accept_link(self, link_id: int,
                     relationship: RelationshipType | None = None) -> None:

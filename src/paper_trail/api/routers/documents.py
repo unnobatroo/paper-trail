@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ...bootstrap import AppState
-from ...domain.models import SourceDocument
 from ..deps import get_jobs, get_state, require_review_key
 from ..jobs import JobRunner
 from ..schemas import IngestRequest, JobOut
+from ...bootstrap import AppState
+from ...domain.models import SourceDocument
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 

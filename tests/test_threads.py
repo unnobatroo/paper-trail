@@ -20,7 +20,7 @@ def _seed(policy: PolicyRepository) -> int:
 
 
 def test_repo_created_on_one_thread_used_on_another(db_path):
-    policy = PolicyRepository(db_path)          # created on this thread
+    policy = PolicyRepository(db_path)  # created on this thread
     evidence = EvidenceRepository(db_path)
     cand_id = _seed(policy)
 
@@ -32,7 +32,7 @@ def test_repo_created_on_one_thread_used_on_another(db_path):
             assert [c.id for c in cands] == [cand_id]
             assert policy.documents()[0].title == "Strategy"
             assert evidence.links() == []
-        except Exception as e:                  # sqlite3.ProgrammingError
+        except Exception as e:  # sqlite3.ProgrammingError
             errors.append(e)
 
     t = threading.Thread(target=work)

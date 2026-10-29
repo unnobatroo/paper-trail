@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import httpx
 from httpx_retries import Retry, RetryTransport
-
 from supabase import Client, ClientOptions, create_client
 
 TRANSIENT = (

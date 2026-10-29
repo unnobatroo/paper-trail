@@ -30,7 +30,8 @@ create index if not exists chunks_tsv_gin on chunks using gin(tsv);
 -- signal across the candidate set. Degenerate cases degrade cleanly: an
 -- empty/zero-hit lexical side collapses to dense-only and vice versa.
 
-create or replace function match_chunks_hybrid(
+create
+or replace function match_chunks_hybrid(
     query_embedding vector(1024),
     query_text text,
     model text,
@@ -61,15 +62,15 @@ as $$
                min(lex) as lmin, max(lex) as lmax
           from scored
     )
-    select scored.page_id,
-           scored.page_url,
-           scored.chunk_text,
-           lex_weight * (scored.lex - bounds.lmin)
-               / greatest(bounds.lmax - bounds.lmin, 1e-9)
-         + (1 - lex_weight) * (scored.dense - bounds.dmin)
-               / greatest(bounds.dmax - bounds.dmin, 1e-9)
+select scored.page_id,
+       scored.page_url,
+       scored.chunk_text,
+       lex_weight * (scored.lex - bounds.lmin)
+           / greatest(bounds.lmax - bounds.lmin, 1e-9)
+           + (1 - lex_weight) * (scored.dense - bounds.dmin)
+           / greatest(bounds.dmax - bounds.dmin, 1e-9)
            as similarity
-      from scored, bounds
-     order by similarity desc
-     limit match_count;
+from scored,
+     bounds
+order by similarity desc limit match_count;
 $$;

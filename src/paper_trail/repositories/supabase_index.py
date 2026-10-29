@@ -13,10 +13,10 @@ from datetime import date
 
 from supabase import Client
 
-from ..infrastructure.supabase_client import create as create_supabase
-from ..sources.fetch import FetchedPage
 from .cache import LEX_WEIGHT, PageStore, VectorIndex, fit_vector
 from .supabase_store import select_all
+from ..infrastructure.supabase_client import create as create_supabase
+from ..sources.fetch import FetchedPage
 
 log = logging.getLogger(__name__)
 

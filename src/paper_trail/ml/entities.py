@@ -12,8 +12,8 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
-from ..domain.enums import BudgetKind, Status
 from .lang import LanguageProfile
+from ..domain.enums import BudgetKind, Status
 
 # money
 

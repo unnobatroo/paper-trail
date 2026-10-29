@@ -9,11 +9,11 @@ in annual reports, procurement notices, budget resolutions — but it's
 scattered across official websites in PDFs and news posts that nobody has
 time to cross-reference by hand.
 
-So Paper Trail does the tedious part for you. It reads the Józsefváros
-(Budapest District VIII) climate strategy, pulls out every commitment it
+So Paper Trail does the tedious part for you. It reads the Józsefváros (Budapest District VIII) climate strategy, pulls
+out every commitment it
 finds, then searches the district's official websites for pages and
-documents that look like follow-through — the municipality's own site
-(jozsefvaros.hu, including the participatory-budget votes), the district
+documents that look like follow-through — the municipality's own site (jozsefvaros.hu, including the
+participatory-budget votes), the district
 developer RÉV8 (rev8.hu), and Budapest's city portal (budapest.hu). It
 ranks the best candidates, quotes the passages it thinks matter, and lays
 it all out for review.
@@ -71,7 +71,8 @@ where the detail lives — how the pieces fit together, how evidence is
 actually ranked, what the database looks like, and how to deploy your
 own:
 
-- [How It Works](https://github.com/unnobatroo/paper-trail/wiki/How-It-Works) — the pipeline from PDF to reviewed trail, step by step
+- [How It Works](https://github.com/unnobatroo/paper-trail/wiki/How-It-Works) — the pipeline from PDF to reviewed trail,
+  step by step
 - [Reference](https://github.com/unnobatroo/paper-trail/wiki/Reference) — the schema, every endpoint, every env var
 - [Running](https://github.com/unnobatroo/paper-trail/wiki/Running) — local setup, offline mode, and deployment
 

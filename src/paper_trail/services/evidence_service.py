@@ -101,7 +101,6 @@ class EvidenceService:
         self.warnings: list[str] = []
         self._progress = lambda msg: None
 
-
     def _say(self, msg: str) -> None:
         progress = _run_progress.get()
         (progress if progress is not None else self._progress)(msg)
@@ -214,7 +213,6 @@ class EvidenceService:
             links.append(link)
         return links
 
-
     def _allowed(self, registry: list[OfficialSource]) -> set[str]:
         """ssrf allowlist = configured domains + every host in the registry"""
         return self._extra_domains | {
@@ -284,7 +282,6 @@ class EvidenceService:
                 return d.publisher or host
         return host
 
-
     _MIN_AMOUNT_HUF = 10_000  # municipal scale, smaller is noise
 
     def _relevant_money(self, snippet: str) -> list:
@@ -301,7 +298,6 @@ class EvidenceService:
             seen.add(key)
             out.append(m)
         return out
-
 
     def _doc_chunks(self, page: FetchedPage) -> list[str]:
         """chunk the full doc, only the panic bound cuts it and it always warns"""

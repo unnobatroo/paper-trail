@@ -13,14 +13,14 @@ A human still decides.
 
 from __future__ import annotations
 
-from ..domain.enums import RelationshipType
-from ..domain.models import Commitment, EvidenceItem, MatchFeatures
 from .entities import (
     _norm_place,
     extract_locations,
     extract_organisations,
 )
 from .lang import LanguageProfile
+from ..domain.enums import RelationshipType
+from ..domain.models import Commitment, EvidenceItem, MatchFeatures
 
 W_SIMILARITY = 0.60
 W_ORG = 0.15

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ...bootstrap import AppState
-from ...domain.enums import ReviewStatus
 from ..deps import get_state, require_review_key
 from ..schemas import BulkLinksRequest, LinkDecisionRequest, LinkView
+from ...bootstrap import AppState
+from ...domain.enums import ReviewStatus
 
 router = APIRouter(prefix="/api/links", tags=["links"])
 

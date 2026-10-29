@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
 
 concurrency:
@@ -68,7 +68,7 @@ jobs:
               - .github/workflows/ci.yml
 
   deploy-api:
-    needs: [hooks, backend, frontend, changes]
+    needs: [ hooks, backend, frontend, changes ]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     concurrency: deploy-api

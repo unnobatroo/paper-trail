@@ -66,8 +66,8 @@ wiki page covers the setup and conventions in more depth.
 
 ## Style
 
-Match the file you're in. The codebase is compact and comments explain
-*why* something is done, not what the line does — keep that balance.
+Match the file you're in. The codebase is compact and comments explain *why* something is done, not what the line does —
+keep that balance.
 Code and comments are in English; Hungarian stays in fixtures and domain
 strings. Reuse existing components and utilities instead of building
 parallel versions. And please don't pull in a new dependency for

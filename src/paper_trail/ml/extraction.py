@@ -25,9 +25,9 @@ from functools import lru_cache
 import requests
 from pydantic import BaseModel, ValidationError
 
+from .lang import LanguageProfile
 from ..domain.enums import CandidateType
 from ..domain.models import DocumentPage, PolicyCandidate
-from .lang import LanguageProfile
 
 log = logging.getLogger(__name__)
 

@@ -20,7 +20,8 @@ alter table public.jobs enable row level security;
 
 -- Pin match_chunks to the public schema so role-mutable search_path can't
 -- redirect its table/operator resolution (Supabase advisor lint 0011).
-create or replace function match_chunks(
+create
+or replace function match_chunks(
     query_embedding vector(1024),
     model text,
     match_count integer,
@@ -31,15 +32,15 @@ returns table(page_id bigint, page_url text,
 language sql stable
 set search_path = public
 as $$
-    select c.page_id,
-           p.url as page_url,
-           c.text as chunk_text,
-           1 - (c.embedding <=> query_embedding) as similarity
-      from chunks c
-      join pages p on p.id = c.page_id
-     where c.embed_model = model
-       and (page_urls is null or p.url = any(page_urls))
-     order by c.embedding <=> query_embedding
+select c.page_id,
+       p.url                                 as page_url,
+       c.text                                as chunk_text,
+       1 - (c.embedding <=> query_embedding) as similarity
+from chunks c
+         join pages p on p.id = c.page_id
+where c.embed_model = model
+  and (page_urls is null or p.url = any (page_urls))
+order by c.embedding <=> query_embedding
      limit match_count;
 $$;
 

@@ -9,20 +9,20 @@ reviewer types in themselves, on deployments that enable the write gate.
 
 ## What it's built with
 
-| What for | Library |
-|---|---|
-| Fetching, caching, job polling | TanStack Query |
-| Forms and validation | react-hook-form + zod |
-| Filters and search state | nuqs (keeps them in the URL, so views are shareable) |
-| Tables | TanStack Table v9 |
-| Components and app shell | shadcn/ui (Base UI + Tailwind) |
-| Toasts, icons, dark mode | sonner · lucide · next-themes |
+| What for                       | Library                                              |
+|--------------------------------|------------------------------------------------------|
+| Fetching, caching, job polling | TanStack Query                                       |
+| Forms and validation           | react-hook-form + zod                                |
+| Filters and search state       | nuqs (keeps them in the URL, so views are shareable) |
+| Tables                         | TanStack Table v9                                    |
+| Components and app shell       | shadcn/ui (Base UI + Tailwind)                       |
+| Toasts, icons, dark mode       | sonner · lucide · next-themes                        |
 
 ## The workspace
 
 There is one screen. Each row is a commitment and shows where it is in
-the pipeline: **to confirm** (check the promise against the strategy),
-**to search** (find official sources), **to review** (confirm or reject
+the pipeline: **to confirm** (check the promise against the strategy), **to search** (find official sources), **to
+review** (confirm or reject
 suggested matches), **done** or **rejected**. The filter pills above the
 table carry live counts, and rows are grouped by type (objectives,
 targets, measures) in collapsible sections.

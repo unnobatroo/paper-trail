@@ -6,20 +6,52 @@
 -- workers. updated_at is rewritten on every progress/result write; a
 -- running job that stops updating is assumed dead by the sweeper.
 
-create table if not exists jobs (
-    id text primary key,
-    kind text not null,
-    payload jsonb not null default '{}',
-    dedupe_key text not null,
-    status text not null default 'queued'
-        check (status in ('queued', 'running', 'done', 'failed')),
+create table if not exists jobs
+(
+    id
+    text
+    primary
+    key,
+    kind
+    text
+    not
+    null,
+    payload
+    jsonb
+    not
+    null
+    default
+    '{}',
+    dedupe_key
+    text
+    not
+    null,
+    status
+    text
+    not
+    null
+    default
+    'queued'
+    check (
+    status
+    in
+(
+    'queued',
+    'running',
+    'done',
+    'failed'
+)),
     progress text not null default '',
     result jsonb,
     error text,
     claimed_by text,
-    created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
-);
+    created_at timestamptz not null default now
+(
+),
+    updated_at timestamptz not null default now
+(
+)
+    );
 
 -- one job of a given kind+payload in flight at a time — resubmitting
 -- "Find evidence" for the same commitment attaches to the in-flight job
