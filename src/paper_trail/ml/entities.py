@@ -21,9 +21,11 @@ _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 @lru_cache(maxsize=8)
 def _compiled(profile: LanguageProfile):
     """every regex a profile needs, compiled once"""
-    cur = "|".join(re.escape(c) for c in profile.currency_words) or r"(?!)"
-    mult = ("|".join(re.escape(m) for m in profile.multiplier_words)
-            or r"(?!)")
+    # longest first, or "m" eats the start of "million"
+    cur = "|".join(re.escape(c) for c in sorted(profile.currency_words, key=len, reverse=True))
+    cur = cur or r"(?!)"
+    mult = ("|".join(re.escape(m) for m in sorted(profile.multiplier_words, key=len,
+                                                   reverse=True)) or r"(?!)")
     # "2,5 millió Ft" or "£2.5 million"
     money = re.compile(
         rf"(?P<pre>{cur})\s*(?P<a1>\d[\d\s.,]*\d|\d)\s*(?:(?P<m1>{mult})\b)?"

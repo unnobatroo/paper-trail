@@ -49,13 +49,13 @@ def matches(gold: dict, cand) -> bool:
     return SequenceMatcher(None, title, norm(cand.normalized_title)).ratio() >= 0.6
 
 
-def gold_from_export(export: Path, pdf: Path) -> list[dict]:
+def gold_from_export(export: Path, pdf: Path, lang: str) -> list[dict]:
     rows = [json.loads(line) for line in
             (export / "commitments.jsonl").read_text().splitlines() if line]
     first = {}
     for row in sorted(rows, key=lambda r: r["id"]):
         first.setdefault(row["candidate_id"], row)  # duplicates from double accepts
-    return [{"doc": pdf.stem, "pdf": pdf.name, "lang": "hu", "split": "train",
+    return [{"doc": pdf.stem, "pdf": pdf.name, "lang": lang, "split": "train",
              "page": r["source_page"], "title": r["title"], "code": r.get("code")}
             for r in first.values()]
 
@@ -65,6 +65,9 @@ def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
     for g in golds:
         by_page.setdefault(g["page"], []).append(g)
     pages = {p.page_number: p for p in read_pages(pdf)}
+    missing = sorted(set(by_page) - set(pages))
+    if missing:
+        raise SystemExit(f"{pdf.name} has no page(s) {missing}, gold doesn't match the pdf")
     returned = 0
     real_ask = extractor._ask
 
@@ -101,6 +104,7 @@ def main() -> None:
     ap.add_argument("--docs", type=Path, default=Path("."), help="where gold pdfs live")
     ap.add_argument("--export", type=Path)
     ap.add_argument("--pdf", type=Path)
+    ap.add_argument("--lang", default="hu", help="profile for --export gold")
     ap.add_argument("--profiles", type=Path, default=PROFILES, help="dir of <lang>.json")
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--model", required=True)
@@ -114,7 +118,7 @@ def main() -> None:
     if args.gold:
         gold = [json.loads(line) for line in args.gold.read_text().splitlines() if line]
     elif args.export and args.pdf:
-        gold, args.docs = gold_from_export(args.export, args.pdf), args.pdf.parent
+        gold, args.docs = gold_from_export(args.export, args.pdf, args.lang), args.pdf.parent
     else:
         raise SystemExit("give --gold, or --export with --pdf")
 
