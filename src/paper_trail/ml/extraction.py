@@ -275,6 +275,12 @@ PAGES:
 """
 
 
+def extraction_prompt(profile: LanguageProfile, pages: list[DocumentPage]) -> str:
+    """the exact user turn the llm sees, fine-tuning builds its data with this too"""
+    body = "\n\n".join(f"--- page {p.page_number} ---\n{p.text[:6000]}" for p in pages)
+    return _PROMPT.format(language=profile.name, pages=body)
+
+
 class LLMExtractor(Extractor):
     """structured extraction via any openai-style /chat/completions endpoint"""
 
@@ -291,12 +297,9 @@ class LLMExtractor(Extractor):
 
     def _ask(self, pages: list[DocumentPage]) -> _LLMResponse | None:
         """one chat call. None if the reply isn't valid json for the schema, http errors raise"""
-        body = "\n\n".join(
-            f"--- page {p.page_number} ---\n{p.text[:6000]}" for p in pages)
         request = {
             "model": self._model,
-            "messages": [{"role": "user", "content": _PROMPT.format(
-                language=self._profile.name, pages=body)}],
+            "messages": [{"role": "user", "content": extraction_prompt(self._profile, pages)}],
             "temperature": 0,
             "max_tokens": self._max_tokens,
             "response_format": {"type": "json_schema", "json_schema": {
