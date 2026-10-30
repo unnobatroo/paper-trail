@@ -24,7 +24,12 @@ def test_score_doc_counts_hits_and_misses_per_page(monkeypatch):
              {"page": 3, "title": "Napelemek az iskolákon", "code": "M1.1.9"}]
     out = eval_extraction.score_doc(extractor, Path("x.pdf"), golds)
     assert (out["found"], out["recall"], out["returned"]) == (1, 0.5, 1)
+    assert (out["precision"], out["f1"]) == (1.0, 0.667)
     assert out["missed"] == [{"page": 3, "title": "Napelemek az iskolákon"}]
+    assert out["answers"] == [{"page": 3, "type": "measure",
+                               "title": "M1.1.2 Távhőszolgáltatás fejlesztése",
+                               "text": "Távhőszolgáltatás fejlesztése",
+                               "excerpt": "Távhőszolgáltatás fejlesztése"}]
 
 
 def test_gate_ships_only_on_holdout_gain(capsys):
@@ -40,3 +45,21 @@ def test_gate_ships_only_on_holdout_gain(capsys):
     # hard holdout doc swapped for an easy one: higher macro, but not comparable
     swapped = {"c": {"recall": 0.9, "split": "holdout"}}
     assert eval_extraction.gate(base, {"recall_macro_holdout": 0.9}, swapped) == 1
+
+
+def test_same_quote_matches_even_with_a_useless_title():
+    from types import SimpleNamespace
+    gold = {"title": "Carbon Literacy training – decision makers", "code": "1.02",
+            "quote": "Provide ‘carbon literacy’ training to key decision-makers in the council."}
+    cand = SimpleNamespace(text="x", normalized_title="M1.02", source_excerpt=(
+        "Provide ‘carbon literacy’ training to key decision-makers in the council."))
+    assert eval_extraction.matches(gold, cand)
+    # same sentence, conflicting target number: not the gold commitment
+    twenty = {**gold, "quote": "Provide training to 20 key decision-makers in the council."}
+    forty = SimpleNamespace(text="x", normalized_title="M1.02", source_excerpt=(
+        "Provide training to 40 key decision-makers in the council."))
+    assert not eval_extraction.matches(twenty, forty)
+    # sharing a few common words isn't the same passage
+    other = SimpleNamespace(text="x", normalized_title="M1.03",
+                            source_excerpt="Establish a climate emergency board in the council.")
+    assert not eval_extraction.matches(gold, other)

@@ -27,4 +27,16 @@ def test_only_verbatim_quotes_and_clean_empty_pages_survive(tmp_path, monkeypatc
     kept = [json.loads(line) for line in out.read_text().splitlines()]
     assert kept == [rows[0], rows[3]]
     # empty labels show up in the spot check too
-    assert "CHECK a p1 (nothing to extract)" in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert "CHECK a p1 (nothing to extract)" in printed
+
+
+def test_spot_check_falls_back_to_the_title_without_english(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(check_gold, "read_pages",
+                        lambda _: [DocumentPage(page_number=1, text="A fák ültetése.")])
+    src, out = tmp_path / "in.jsonl", tmp_path / "out.jsonl"
+    src.write_text(json.dumps({"doc": "a", "pdf": "a.pdf", "page": 1, "title": "Fák",
+                               "quote": "fák ültetése"}) + "\n")
+    monkeypatch.setattr(sys, "argv", ["x", str(src), "--out", str(out), "--sample", "1"])
+    check_gold.main()
+    assert "CHECK a p1 [-] Fák" in capsys.readouterr().out
