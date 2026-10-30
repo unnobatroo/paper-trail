@@ -12,6 +12,9 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+    # stacked prs target feature branches, not main
+    base_branches:
+      - ".*"
   path_filters:
     - "!data/**"
     - "!**/package-lock.json"
