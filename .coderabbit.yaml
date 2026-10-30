@@ -17,6 +17,8 @@ reviews:
       - ".*"
   path_filters:
     - "!data/**"
+    # the removed next.js app, its deletions alone blow the 100-file review cap
+    - "!web/**"
     - "!uv.lock"
     - "!**/*.lock"
   path_instructions:
