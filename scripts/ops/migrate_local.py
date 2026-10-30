@@ -4,8 +4,6 @@ import argparse
 import hashlib
 import json
 import os
-import sqlite3
-from contextlib import closing
 from pathlib import Path
 
 from psycopg import sql
@@ -56,21 +54,7 @@ def object_inventory(directory):
 
 def source_rows(args):
     data = {}
-    if args.source_sqlite:
-        uri = Path(args.source_sqlite).resolve(strict=True).as_uri() + "?mode=ro"
-        with closing(sqlite3.connect(uri, uri=True)) as conn:
-            conn.row_factory = sqlite3.Row
-            conn.execute("BEGIN")
-            for table in TABLES:
-                exists = conn.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-                ).fetchone()
-                data[table] = (
-                    [dict(r) for r in conn.execute(f"SELECT * FROM {table} ORDER BY id")]
-                    if exists
-                    else []
-                )
-    elif args.source_export:
+    if args.source_export:
         # jsonl per table from the read-only supabase export, pages/chunks are cache and refetched
         root = Path(args.source_export).resolve(strict=True)
         for table in TABLES:
@@ -324,7 +308,6 @@ def migrate(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--source-sqlite", help="read-only SQLite source path")
     source.add_argument("--source-export", help="read-only supabase jsonl export directory")
     source.add_argument(
         "--source-postgres",

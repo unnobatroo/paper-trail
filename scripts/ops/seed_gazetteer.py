@@ -1,7 +1,6 @@
 """seed the gazetteer with a district's named streets, squares and parks from openstreetmap
 
-  uv run python scripts/ops/seed_gazetteer.py "VIII. kerület" --admin-level 9   # sqlite
-  DATABASE_URL=... uv run python scripts/ops/seed_gazetteer.py "..."   # postgres
+  DATABASE_URL=... uv run python scripts/ops/seed_gazetteer.py "VIII. kerület" --admin-level 9
 
 --admin-level narrows same-named areas: 9 = budapest district, 8 = most towns
 
@@ -74,8 +73,7 @@ def places(area_name: str, admin_level: int | None = None):
 
 
 def main(area_name: str, admin_level: int | None = None) -> None:
-    settings = load()
-    repo = EvidenceRepository(settings.database_url or settings.db_path)
+    repo = EvidenceRepository(load().database_url)
     seen = set()
     for kind, name, osm_id, geojson in places(area_name, admin_level):
         # one row per name: a street drawn as 12 osm ways is still one street
