@@ -51,11 +51,102 @@ def test_llm_turns_off_qwen3_thinking_and_keeps_only_verbatim_receipts(
 def test_lead_code_comes_off_the_title():
     from paper_trail.ml.extraction import lead_code
     assert [lead_code(t) for t in ("M1.1.2 Távhő", "Ks1: szabályok", "Má-1 ÜHG", "Ms-3",
-                                   "2030-ra csökken", "Távhő fejlesztése", "A1. cél")] == [
-        "M1.1.2", "Ks1", "Má-1", "Ms-3", None, None, "A1"]
+                                   "2030-ra csökken", "Távhő fejlesztése", "A1. cél",
+                                   "1.01 Carbon roadmap", "2030 target")] == [
+        "M1.1.2", "Ks1", "Má-1", "Ms-3", None, None, "A1", "1.01", None]
 
 
 def test_profile_roundtrips_and_no_llm_finds_nothing():
     from paper_trail.ml.lang import LanguageProfile
     assert LanguageProfile.from_dict(HU.to_dict()) == HU
     assert NoExtractor().extract([DocumentPage(page_number=1, text="M1.2 Zöld középületek")]) == []
+
+
+def test_dense_page_that_blows_the_token_budget_gets_asked_in_halves():
+    from paper_trail.domain.models import DocumentPage
+    from paper_trail.ml.extraction import LLMExtractor, _Item, _Reply
+    page = DocumentPage(page_number=7, text="Fák ültetése a parkban.\nNapelemek az iskolákon.")
+    asked = []
+
+    def ask(pages):
+        asked.append(pages[0].text)
+        if "\n" in pages[0].text:
+            return None  # whole page: json cut off at max_tokens
+        line = pages[0].text.rstrip(".")
+        return _Reply(items=[_Item(type="measure", normalized_title=line, text=line,
+                                   page=7, excerpt=line)])
+    ex = LLMExtractor(None, "fake", HU, window=1)
+    ex._ask = ask
+    found = ex.extract([page])
+    assert asked == [page.text, "Fák ültetése a parkban.", "Napelemek az iskolákon."]
+    # receipts checked against the full page, both halves count
+    assert [c.source_excerpt for c in found] == ["Fák ültetése a parkban", "Napelemek az iskolákon"]
+
+
+def test_receipt_survives_pdf_spaces_inside_words():
+    from paper_trail.ml.extraction import source_excerpt
+    page = "a fejlesztések bizonyít ékalapú \ntervezése érdekében, létr e hozza"
+    # the model quotes the clean words, the page keeps its broken ones
+    assert source_excerpt(page, "bizonyítékalapú tervezése") == "bizonyít ékalapú \ntervezése"
+    assert source_excerpt(page, "létre hozza") == "létr e hozza"
+    assert source_excerpt(page, "napelemek") is None and source_excerpt(page, "  ") is None
+
+
+def test_chunks_split_on_lines_and_keep_the_page_number():
+    from paper_trail.domain.models import DocumentPage
+    from paper_trail.ml.extraction import chunk_page
+    page = DocumentPage(page_number=4, text="\n".join(f"sor {i:02}" for i in range(30)))
+    parts = chunk_page(page, 50)
+    assert len(parts) > 1 and {p.page_number for p in parts} == {4}
+    assert all(len(p.text) <= 50 for p in parts)
+    assert "\n".join(p.text for p in parts) == page.text
+    assert chunk_page(page, 0) == [page]
+
+
+def test_title_code_must_be_on_the_page():
+    from paper_trail.ml.extraction import grounded_title
+    page = "1.01 Carbon neutral roadmap for the city. Develop pathways."
+    # invented prefix: code goes, the name stays
+    assert grounded_title("M1.01 Carbon neutral roadmap", "t", page) == (
+        "Carbon neutral roadmap", None)
+    # bare made-up code, nothing left: fall back to the text
+    assert grounded_title("M1.01", "Develop pathways for the city", page) == (
+        "Develop pathways for the city", None)
+    assert grounded_title("1.01 Carbon neutral roadmap", "t", page) == (
+        "1.01 Carbon neutral roadmap", "1.01")
+    assert grounded_title("Roadmap", "t", page) == ("Roadmap", None)
+
+
+def _cand(page, quote, title="t"):
+    from paper_trail.domain.enums import CandidateType
+    from paper_trail.domain.models import PolicyCandidate
+    return PolicyCandidate(document_id=0, suggested_type=CandidateType.MEASURE, text="t",
+                           normalized_title=title, source_page=page, source_excerpt=quote,
+                           excerpt_on_page=True)
+
+
+def test_dedupe_drops_the_same_passage_twice_on_a_page():
+    from paper_trail.ml.extraction import dedupe
+    a = _cand(1, "Install green roofs on four primary schools by 2027.")
+    again = _cand(1, "green roofs on four primary schools by 2027", title="other")
+    elsewhere = _cand(2, "Install green roofs on four primary schools by 2027.")
+    different = _cand(1, "Plant 500 street trees in the district.")
+    assert dedupe([a, again, elsewhere, different]) == [a, elsewhere, different]
+
+
+def test_critic_drops_what_it_rejects_and_fails_open_on_junk():
+    from types import SimpleNamespace
+
+    from paper_trail.ml.extraction import LLMExtractor
+    replies = iter(['{"keep": [true, false]}', '{"keep": [true]}', "not json"])
+
+    def create(**_):
+        msg = SimpleNamespace(content=next(replies))
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    ex = LLMExtractor(client, "fake", HU, verify=True)
+    keep, drop = _cand(1, "a cél 2030"), _cand(1, "a város 1990-ben")
+    assert ex._check("page", [keep, drop]) == [keep]
+    # wrong length or broken json: keep everything, a human reviews them anyway
+    assert ex._check("page", [keep, drop]) == [keep, drop]
+    assert ex._check("page", [keep, drop]) == [keep, drop]

@@ -5,6 +5,8 @@ gold = jsonl, one approved commitment per line:
    "split": "train" | "holdout", "page": 31, "title": "Távhőszolgáltatás fejlesztése",
    "code": "M1.1.2"}
 recall    gold commitments matched by a kept candidate on the same page
+precision kept candidates that match some gold row on their page (a floor, gold isn't
+          guaranteed complete), f1 from the two. recall gains that tank this are junk
 kept      candidates whose receipt was verbatim on the page (ingestion keeps only these)
 returned  everything the model answered, kept or not
 
@@ -27,7 +29,7 @@ from statistics import mean
 import openai
 
 from paper_trail.ml.client import model_client
-from paper_trail.ml.extraction import LLMExtractor
+from paper_trail.ml.extraction import LLMExtractor, same_passage
 from paper_trail.ml.lang import LanguageProfile
 from paper_trail.sources.pdf import read_pages
 
@@ -39,6 +41,9 @@ def norm(text: str) -> str:
 
 
 def matches(gold: dict, cand) -> bool:
+    # same quoted passage counts even when the title is off ("M1.01" for "1.01 Carbon ...")
+    if same_passage(gold.get("quote") or "", cand.source_excerpt):
+        return True
     title, code = norm(gold["title"]), norm(gold.get("code") or "")
     hay = norm(f"{cand.text} {cand.normalized_title} {cand.source_excerpt}")
     if title and title in hay:
@@ -56,13 +61,12 @@ def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
     missing = sorted(set(by_page) - set(pages))
     if missing:
         raise SystemExit(f"{pdf.name} has no page(s) {missing}, gold doesn't match the pdf")
-    returned = 0
+    raw = []
     real_ask = extractor._ask
 
     def counting_ask(window):
-        nonlocal returned
         reply = real_ask(window)
-        returned += len(reply.items) if reply else 0
+        raw.extend(reply.items if reply else [])
         return reply
     extractor._ask = counting_ask
     numbers = sorted(by_page)
@@ -71,7 +75,7 @@ def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
     cands = extractor.extract([pages[n] for n in numbers])
     seconds = time.monotonic() - start
     extractor._ask = real_ask
-    found, missed = 0, []
+    found, missed, backed = 0, [], 0
     for number in numbers:
         here = [c for c in cands if c.source_page == number]
         for g in by_page[number]:
@@ -79,10 +83,21 @@ def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
                 found += 1
             else:
                 missed.append({"page": number, "title": g["title"]})
-    return {"gold": len(golds), "found": found, "recall": round(found / len(golds), 3),
+        backed += sum(any(matches(g, c) for g in by_page[number]) for c in here)
+    # lower bound: gold may skip a real commitment, then a right answer counts as junk
+    precision = backed / len(cands) if cands else 0.0
+    recall = found / len(golds)
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    returned = len(raw)
+    # raw answers incl. the ones dropped for a bad receipt, for --dump error digging
+    answers = [{"page": i.page, "type": i.type, "title": i.normalized_title,
+                "excerpt": i.excerpt} for i in raw]
+    return {"gold": len(golds), "found": found, "recall": round(recall, 3),
+            "precision": round(precision, 3), "f1": round(f1, 3),
             "kept": len(cands), "returned": returned,
             "receipt_rate": round(len(cands) / returned, 3) if returned else None,
-            "seconds_per_page": round(seconds / len(numbers), 1), "missed": missed}
+            "seconds_per_page": round(seconds / len(numbers), 1), "missed": missed,
+            "answers": answers}
 
 
 def main() -> None:
@@ -97,6 +112,9 @@ def main() -> None:
     ap.add_argument("--ca")
     ap.add_argument("--out")
     ap.add_argument("--concurrency", type=int, default=1)
+    ap.add_argument("--chunk-chars", type=int, default=0, help="0 = whole pages")
+    ap.add_argument("--verify", action="store_true", help="critic pass per page")
+    ap.add_argument("--dump", type=Path, help="jsonl of every raw model answer, per doc")
     ap.add_argument("--baseline", type=Path,
                     help="an earlier --out report: exit 1 unless holdout recall goes up")
     args = ap.parse_args()
@@ -116,21 +134,30 @@ def main() -> None:
         profile = LanguageProfile.from_dict(
             json.loads((args.profiles / f"{lang}.json").read_text()))
         extractor = LLMExtractor(client, args.model, profile, window=1,
-                                 concurrency=args.concurrency)
+                                 concurrency=args.concurrency, chunk_chars=args.chunk_chars,
+                                 verify=args.verify)
         try:
             per_doc[name] = score_doc(extractor, args.docs / golds[0]["pdf"], golds)
         except openai.APIError as exc:
             raise SystemExit(f"model server failed on {name}: {exc}") from exc
         per_doc[name]["split"] = golds[0].get("split", "train")
+        answers = per_doc[name].pop("answers")
+        if args.dump:
+            with args.dump.open("a") as f:
+                f.writelines(json.dumps({"doc": name, **a}, ensure_ascii=False) + "\n"
+                             for a in answers)
         print(name, json.dumps({k: v for k, v in per_doc[name].items() if k != "missed"}))
 
-    def macro(split):
-        vals = [d["recall"] for d in per_doc.values() if d["split"] == split]
+    def macro(split, key="recall"):
+        vals = [d[key] for d in per_doc.values() if d["split"] == split]
         return round(mean(vals), 3) if vals else None
     summary = {"model": args.model, "docs": len(per_doc), "gold": len(gold),
                "recall_micro": round(sum(d["found"] for d in per_doc.values()) / len(gold), 3),
                "recall_macro_train": macro("train"), "recall_macro_holdout": macro("holdout"),
-               "concurrency": args.concurrency}
+               "precision_macro_holdout": macro("holdout", "precision"),
+               "f1_macro_holdout": macro("holdout", "f1"),
+               "concurrency": args.concurrency, "chunk_chars": args.chunk_chars,
+               "verify": args.verify}
     print(json.dumps(summary, ensure_ascii=False))
     if args.out:
         Path(args.out).write_text(json.dumps({"summary": summary, "docs": per_doc},

@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
+from difflib import SequenceMatcher
 from itertools import chain
 
 import openai
@@ -28,14 +29,21 @@ _PROMPT = """You are extracting policy commitments from a municipal
 strategy document written in {language}. From the pages below, return ONLY
 JSON of the form {{"items": [...]}} where each item is:
   type: one of objective | measure | target | indicator
-  normalized_title: short plain name, keep a leading code such as "M1.2"
+  normalized_title: short plain name of the commitment. if the document prints a code
+    in front of it, keep that code exactly as printed, never invent or reuse one
   text: the commitment in one or two sentences
   page: the N from the "--- page N ---" marker above the text you quote
   excerpt: one short verbatim quote from that page supporting it
-Coded headings such as "M1.2 Zöld középületek" or "Sz1.3.1 ..." are objectives
+Numbered or coded headings are objectives
 or measures too. Rules: only report what the text actually says; never invent
 targets, dates or bodies; if unsure, omit the item. Write titles in {language}
 as in the source.
+
+Example (made up, not from these pages). Page text: "3.4 Green roofs on schools.
+Install green roofs on four primary schools by 2027."
+Item: {{"type": "measure", "normalized_title": "3.4 Green roofs on schools",
+"text": "Green roofs go on four primary schools by 2027.", "page": 1,
+"excerpt": "Install green roofs on four primary schools by 2027."}}
 
 PAGES:
 {pages}
@@ -48,11 +56,17 @@ def excerpt_found(page_text: str, excerpt: str) -> bool:
 
 
 def source_excerpt(page_text: str, excerpt: str) -> str | None:
-    """the excerpt as it really sits on the page (models squash whitespace), or None"""
-    if not excerpt.strip():
+    """the excerpt as it really sits on the page, or None. whitespace doesn't count: pdf text
+    has spaces mid-word ("bizonyít ékalapú", "létr e") and models quote the clean word"""
+    want = "".join(excerpt.split())
+    if not want:
         return None
-    match = re.search(r"\s+".join(map(re.escape, excerpt.split())), page_text)
-    return match.group(0) if match else None
+    # page chars minus whitespace, plus where each one sits in the real text
+    at = [i for i, ch in enumerate(page_text) if not ch.isspace()]
+    start = "".join(page_text[i] for i in at).find(want)
+    if start < 0:
+        return None
+    return page_text[at[start]:at[start + len(want) - 1] + 1]
 
 
 PAGE_CHARS = 6000  # per page in the prompt, build_dataset filters labels on it too
@@ -65,12 +79,24 @@ def extraction_prompt(profile: LanguageProfile, pages: list[DocumentPage]) -> st
 
 
 # leading section code the prompt asks the model to keep: "M1.2", "Ks1", "Má-1"
-_CODE = re.compile(r"^([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*)(?=[\s:.)\-]|$)")
+# or a dotted number ("1.01"); one dot minimum so a bare year isn't a code
+_CODE = re.compile(r"^([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*|\d+(?:\.\d+)+)"
+                   r"(?=[\s:.)\-]|$)")
 
 
 def lead_code(title: str) -> str | None:
     m = _CODE.match(title.strip())
     return m.group(1).rstrip(".") if m else None
+
+
+def grounded_title(title: str, text: str, page_text: str) -> tuple[str, str | None]:
+    """title + its code, minus a code the page never prints. the model likes to invent
+    "M1.01" for "1.01", or reuse codes from training docs, same rule as receipts"""
+    code = lead_code(title)
+    if code is None or "".join(code.split()) in "".join(page_text.split()):
+        return title, code
+    rest = title.strip()[len(code):].lstrip(" :.-–")
+    return (rest or text[:120]), None
 
 
 class _Item(BaseModel):
@@ -89,11 +115,67 @@ class _Reply(BaseModel):
     items: list[_Item]
 
 
+_VERIFY = """These items were pulled from one page of a municipal climate strategy
+written in {language}. For each numbered item answer true only if its quote is a
+commitment the document's own authors make (the council or municipality and its bodies):
+a goal, a concrete action, a numeric target or a progress indicator. Answer false for
+background facts, past data, plans or laws of other bodies, examples, bare headings,
+tables of contents. Return {{"keep": [...]}} with one true/false per item, in order.
+
+PAGE:
+{page}
+
+ITEMS:
+{items}
+"""
+
+
+class _Verdicts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    keep: list[bool]
+
+
+def same_passage(a: str, b: str) -> bool:
+    """two quotes of the same text: a long shared run, not a stray "a város" or two"""
+    a, b = (re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b))
+    if not a or not b:
+        return False
+    run = SequenceMatcher(None, a, b, autojunk=False).find_longest_match().size
+    return run >= 20 and run >= 0.5 * min(len(a), len(b))
+
+
+def dedupe(cands: list[PolicyCandidate]) -> list[PolicyCandidate]:
+    # same page, same quoted passage = same commitment twice (window + half retries,
+    # heading + body). first one wins, like langextract's multi-pass merge
+    out: list[PolicyCandidate] = []
+    for c in cands:
+        if not any(k.source_page == c.source_page
+                   and same_passage(k.source_excerpt, c.source_excerpt) for k in out):
+            out.append(c)
+    return out
+
+
+def chunk_page(page: DocumentPage, size: int) -> list[DocumentPage]:
+    """page -> pieces of ~size chars on line breaks, same page number. receipts get checked
+    against the whole page later, so a quote can't fall into a crack"""
+    if size <= 0 or len(page.text) <= size:
+        return [page]
+    out, cur = [], []
+    for line in page.text.splitlines():
+        if cur and sum(len(x) + 1 for x in cur) + len(line) > size:
+            out.append(cur)
+            cur = []
+        cur.append(line)
+    out.append(cur)
+    return [page.model_copy(update={"text": "\n".join(c)}) for c in out]
+
+
 class LLMExtractor:
     """any openai-style /chat/completions endpoint, json-schema constrained"""
 
     def __init__(self, client, model: str, profile: LanguageProfile, window: int = 4,
-                 concurrency: int = 1, max_tokens: int = 2048):
+                 concurrency: int = 1, max_tokens: int = 2048, chunk_chars: int = 0,
+                 verify: bool = False):
         self._client = client
         self._model = model
         self._profile = profile
@@ -102,6 +184,11 @@ class LLMExtractor:
         self._concurrency = max(1, concurrency)
         # set it ourselves, a server default can chop the json mid-object
         self._max_tokens = max_tokens
+        # 0 = whole pages. small models miss stuff deep in long inputs, langextract-style
+        # chunks trade more calls for recall
+        self._chunk_chars = chunk_chars
+        # second "is this really a commitment" pass per page, trades calls for precision
+        self._verify = verify
 
     def _ask(self, pages: list[DocumentPage]) -> _Reply | None:
         """one call. None when the reply isn't valid json for the schema, http errors raise"""
@@ -130,11 +217,28 @@ class LLMExtractor:
             log.warning("llm window failed (%s), retrying per page", exc)
             reply = None
         if reply is None and len(window) > 1:
-            return [([p], self._ask([p])) for p in window]
+            return [([p], self._ask_page(p)) for p in window]
+        if reply is None:
+            return [(window, self._ask_page(window[0], failed=True))]
         return [(window, reply)]
 
+    def _ask_page(self, page: DocumentPage, depth: int = 2,
+                  failed: bool = False) -> _Reply | None:
+        """one page; bad json is nearly always a dense page blowing max_tokens mid-object,
+        so ask about each half instead. receipts still get checked against the whole page"""
+        reply = None if failed else self._ask([page])
+        lines = page.text.splitlines()
+        if reply is not None or depth == 0 or len(lines) < 2:
+            return reply
+        mid = len(lines) // 2
+        halves = [self._ask_page(page.model_copy(update={"text": "\n".join(part)}), depth - 1)
+                  for part in (lines[:mid], lines[mid:])]
+        items = [i for h in halves if h for i in h.items]
+        return _Reply(items=items) if any(halves) else None
+
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
-        windows = [pages[i:i + self._window] for i in range(0, len(pages), self._window)]
+        parts = [c for p in pages for c in chunk_page(p, self._chunk_chars)]
+        windows = [parts[i:i + self._window] for i in range(0, len(parts), self._window)]
         with ThreadPoolExecutor(self._concurrency) as pool:
             # map keeps page order and re-raises the first http error
             answers = list(chain.from_iterable(pool.map(self._ask_window, windows)))
@@ -149,12 +253,41 @@ class LLMExtractor:
                 kind = CandidateType(item.type) if item.type in CandidateType else None
                 receipt = source_excerpt(text.get(item.page, ""), item.excerpt)
                 if kind in KINDS and receipt:
+                    title, code = grounded_title(item.normalized_title, item.text,
+                                                 text[item.page])
                     out.append(PolicyCandidate(
                         document_id=0, suggested_type=kind, text=item.text,
-                        normalized_title=item.normalized_title, source_page=item.page,
-                        code=lead_code(item.normalized_title),
+                        normalized_title=title, source_page=item.page, code=code,
                         source_excerpt=receipt, excerpt_on_page=True))
-        return out
+        out = dedupe(out)
+        if not self._verify or not out:
+            return out
+        by_page: dict[int, list[PolicyCandidate]] = {}
+        for c in out:
+            by_page.setdefault(c.source_page, []).append(c)
+        with ThreadPoolExecutor(self._concurrency) as pool:
+            kept = pool.map(lambda kv: self._check(text[kv[0]], kv[1]), by_page.items())
+        return list(chain.from_iterable(kept))
+
+    def _check(self, page_text: str, cands: list[PolicyCandidate]) -> list[PolicyCandidate]:
+        """critic pass. fails open: a broken verdict keeps everything, a human reviews anyway"""
+        items = "\n".join(f"{i}. [{c.suggested_type.value}] {c.normalized_title}: "
+                          f"\"{c.source_excerpt}\"" for i, c in enumerate(cands))
+        resp = self._client.chat.completions.create(
+            model=self._model, temperature=0, max_tokens=16 * len(cands) + 64,
+            messages=[{"role": "user", "content": _VERIFY.format(
+                language=self._profile.name, page=page_text[:PAGE_CHARS], items=items)}],
+            response_format={"type": "json_schema", "json_schema": {
+                "name": "verdicts", "strict": True, "schema": _Verdicts.model_json_schema()}},
+            extra_body=({"chat_template_kwargs": {"enable_thinking": False}}
+                        if "qwen3" in self._model.lower() else None))
+        try:
+            keep = _Verdicts.model_validate_json(resp.choices[0].message.content or "").keep
+        except ValidationError:
+            return cands
+        if len(keep) != len(cands):
+            return cands
+        return [c for c, k in zip(cands, keep, strict=True) if k]
 
 
 class NoExtractor:
