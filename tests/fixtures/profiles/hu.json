@@ -3,10 +3,14 @@
  "name": "Hungarian",
  "stemmer": "hungarian",
  "ts_config": "hungarian",
- "currency_words": [
-  "Ft",
-  "forint"
- ],
+ "currency_words": {
+  "Ft": "HUF",
+  "forint": "HUF",
+  "EUR": "EUR",
+  "euró": "EUR",
+  "euro": "EUR",
+  "€": "EUR"
+ },
  "multiplier_words": {
   "milliárd": 1000000000,
   "mrd": 1000000000,
@@ -346,5 +350,9 @@
   "Klímastratégiája"
  ],
  "intent_re": "cél|irányoz|irányít|tervez|növel|csökkent|elér|megvalós|felszámol|kialakít|fejleszt|javít|bevezet|biztosít|fenntart|ültet|korszerűsít|támogat",
- "units_re": "m2|m²|%|db|fő/év|fő|mm|°C|kWh|Ft|m-en"
+ "units_re": "m2|m²|%|db|fő/év|fő|mm|°C|kWh|Ft|m-en",
+ "currency": "HUF",
+ "min_amount": 10000,
+ "procurement_id_re": "\\bEKR\\d{9,12}\\b|\\b(?:VEKOP|KEHOP|GINOP|EFOP|TOP|TOP_PLUSZ|KEHOP_PLUSZ|VP)(?:-[\\dA-Z.]+){3,6}\\b",
+ "parcel_re": "(?:\\bhrsz\\.?\\s*:?\\s*(\\d{3,6}(?:/\\d{1,4}){0,2}))|(?:\\b(\\d{3,6}(?:/\\d{1,4}){0,2})\\s*(?:hrsz\\b|helyrajzi\\s+sz))"
 }

@@ -11,8 +11,9 @@ from ..repositories.ports import EvidenceStore
 
 
 class PlaceResolver:
-    def __init__(self, store: EvidenceStore, min_name_length: int = 5):
+    def __init__(self, store: EvidenceStore, auditor: PassageAuditor, min_name_length: int = 5):
         self._store = store
+        self._auditor = auditor
         self._min = min_name_length
         self._known: list[str] = []
 
@@ -26,7 +27,7 @@ class PlaceResolver:
         """
         low = passage.lower()
         out = [name for name in self._known if name.lower() in low]
-        for parcel in PassageAuditor.parcels(passage):
+        for parcel in self._auditor.parcels(passage):
             street = self._store.resolve_parcel(parcel)
             if street is None and streets:
                 street = streets[0]

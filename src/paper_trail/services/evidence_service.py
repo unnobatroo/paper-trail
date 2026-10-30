@@ -11,6 +11,7 @@ import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
+from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -95,7 +96,7 @@ class EvidenceService:
         # locale cues all live in lang.py
         self._profile = profile or LanguageProfile.empty()
         self._auditor = auditor or PassageAuditor(self._profile)
-        self._places = places or PlaceResolver(repo)
+        self._places = places or PlaceResolver(repo, self._auditor)
         self._extra_domains = {d.lower() for d in allowed_domains}
         # explicit stores (postgres/pgvector) win, else files under cache_dir
         if page_store is None or vector_index is None:
@@ -350,16 +351,14 @@ class EvidenceService:
                 return d.publisher or host
         return host
 
-    _MIN_AMOUNT_HUF = 10_000  # municipal scale, smaller is noise
-
     def _relevant_money(self, snippet: str) -> list:
         """money from the matched excerpt: explicit currency, sane amount, deduped"""
         out, seen = [], set()
         for m in entities.extract_money(snippet, self._profile):
             if m.kind is None or m.amount_native is None:
                 continue
-            if m.currency == "HUF" and (
-                    m.amount_huf is None or m.amount_huf < self._MIN_AMOUNT_HUF):
+            if (m.currency == self._profile.currency
+                    and Decimal(m.amount_native) < self._profile.min_amount):
                 continue
             key = (m.currency, m.amount_native, m.kind)
             if key in seen:

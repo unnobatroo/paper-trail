@@ -21,7 +21,10 @@ class LanguageProfile:
     ts_config: str  # Postgres regconfig for tsvector columns
 
     # money
-    currency_words: tuple[str, ...] = ()  # ("Ft", "forint")
+    currency: str = ""  # local ISO code, "HUF"
+    # word as written -> ISO code, {"Ft": "HUF", "€": "EUR"}. bare list = all local
+    currency_words: dict[str, str] = field(default_factory=dict)
+    min_amount: int = 0  # local-currency amounts under this are noise
     multiplier_words: dict[str, int] = field(default_factory=dict)
     decimal_comma: bool = False  # "2,5" = 2.5
     # first kind whose cue is in the sentence wins, so later budget states go first
@@ -67,6 +70,8 @@ class LanguageProfile:
     timeframe_label: str = ""  # "Időtáv"
     indicator_label: str = ""  # "Indikátor"
     noise_words: tuple[str, ...] = ()  # grant codes / furniture
+    procurement_id_re: str = ""  # tender / eu project ids, EKR\d{9,12}|…
+    parcel_re: str = ""  # land-registry numbers, group 1 or 2 = the number
     intent_re: str = ""  # target-sentence verbs
     units_re: str = ""  # m2|%|db|fő|mm|°C|kWh|Ft
 
@@ -93,6 +98,9 @@ class LanguageProfile:
                 value = tuple((Status(s), tuple(cues)) for s, cues in value)
             elif f.name == "title_stopwords":
                 value = frozenset(value)
+            elif f.name == "currency_words" and isinstance(value, list):
+                # old profiles: plain word list, all local currency
+                value = {w: data.get("currency", "") for w in value}
             elif isinstance(value, list):
                 value = tuple(value)
             kwargs[f.name] = value
