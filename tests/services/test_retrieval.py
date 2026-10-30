@@ -93,7 +93,9 @@ def test_source_catalogue_comes_from_db(policy, evidence, tmp_path):
 def test_full_document_is_chunked(policy, evidence, tmp_path):
     text = "x " * 40_000  # ~80kb, past the old 60kb cutoff
     svc, _ = _svc(tmp_path, evidence, policy, text)
-    chunks = svc._doc_chunks(FetchedPage(url=URL, title="t", text=text))
+    page = FetchedPage(url=URL, title="t", text=text)
+    svc._index_page(page)
+    chunks = [c for c, _ in svc._index.get(page, svc._embed.model_name, _CHUNK)]
     assert len(chunks) == len(text) // _CHUNK_STRIDE + (
         1 if len(text) % _CHUNK_STRIDE else 0)
     # overlapping windows: each chunk still max _CHUNK, consecutive
@@ -107,11 +109,11 @@ def test_emergency_bound_truncates_and_warns(policy, evidence, tmp_path):
     svc, _ = _svc(tmp_path, evidence, policy, "x " * 40_000,
                   max_doc_chars=1_000)
     page = FetchedPage(url=URL, title="t", text="x " * 40_000)
-    svc._doc_vectors(page)
+    svc._index_page(page)
     assert svc.warnings and "safety limit" in svc.warnings[0]
     # cached call still warns, the user always has to know
     svc.warnings = []
-    svc._doc_vectors(page)
+    svc._index_page(page)
     assert svc.warnings
 
 
