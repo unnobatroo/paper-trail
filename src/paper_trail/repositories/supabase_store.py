@@ -15,7 +15,6 @@ import logging
 from postgrest.exceptions import APIError
 from supabase import Client
 
-from .store import _budget, _candidate, _commitment, _evidence, _link
 from ..domain.enums import CandidateType, RelationshipType, ReviewStatus
 from ..domain.models import (
     BudgetRecord,
@@ -27,6 +26,7 @@ from ..domain.models import (
     SourceDocument,
 )
 from ..infrastructure.supabase_client import create as create_supabase
+from .store import _budget, _candidate, _commitment, _evidence, _link
 
 log = logging.getLogger(__name__)
 

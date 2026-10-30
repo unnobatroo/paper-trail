@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from ...bootstrap import AppState
 from ..deps import get_state
 from ..schemas import TrailRowView
-from ...bootstrap import AppState
 
 router = APIRouter(prefix="/api/trail", tags=["trail"])
 

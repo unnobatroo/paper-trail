@@ -5,11 +5,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..deps import get_state
-from ..schemas import TranslateRequest
 from ...bootstrap import AppState
 from ...ml.lang import get_profile
 from ...services.translation import get_translator
+from ..deps import get_state
+from ..schemas import TranslateRequest
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
