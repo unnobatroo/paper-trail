@@ -1,4 +1,4 @@
-"""deterministic money, dates, orgs, places, status"""
+"""deterministic money, years, status"""
 
 from paper_trail.domain.enums import BudgetKind, Status
 from paper_trail.ml import entities
@@ -37,22 +37,16 @@ def test_hungarian_number_separators():
     assert m[0].amount_huf == 881_101
 
 
-def test_dates_and_places():
-    text = "2024. március 15-én a Losonci téren és a Bérkocsis utcában."
-    dates = entities.extract_dates(text, HU)
-    assert any("2024" in d for d in dates)
-    locs = entities.extract_locations(text, HU)
-    assert any("Losonci" in l for l in locs)
-    assert any("Bérkocsis" in l for l in locs)
+def test_big_decimal_amounts_stay_exact():
+    # float made this 4 099 999 999
+    assert entities.extract_money("A keret 4,1 milliárd Ft.", HU)[0].amount_huf == 4_100_000_000
 
 
-def test_organisations():
-    orgs = entities.extract_organisations(
-        "A RÉV8 Zrt. és a Józsefvárosi Önkormányzat közreműködésével.", HU
-    )
-    joined = " ".join(orgs)
-    assert "RÉV8" in joined
-    assert "Önkormányzat" in joined
+def test_years_and_place_base_form():
+    assert entities.years("2024. március 15-én, 2030-ra, 1999 és 2024") == ["2024", "2030", "1999"]
+    # inflections fold together so passages and commitments meet
+    assert (entities.norm_place("Bérkocsis utcában", HU)
+            == entities.norm_place("Bérkocsis utcája", HU) == "bérkocsis utcá")
 
 
 def test_classify_status():
@@ -92,3 +86,12 @@ def test_gliner_ner_buckets_and_dedupes(monkeypatch):
     found = ner.find("x")
     assert (found.orgs, found.places, found.dates) == (
         ["RÉV8 Zrt."], ["Losonci téren"], ["2024. március 15-én"])
+    # bare years ride along, matching compares those
+    assert ner.find("terv 2030-ra").dates == ["2024. március 15-én", "2030"]
+
+
+def test_no_ner_keeps_only_years():
+    from paper_trail.ml.ner import NoNer, get_ner
+    assert get_ner("none").find("A RÉV8 Zrt. 2024-ben").__dict__ == {
+        "orgs": [], "places": [], "dates": ["2024"]}
+    assert isinstance(get_ner("none"), NoNer)

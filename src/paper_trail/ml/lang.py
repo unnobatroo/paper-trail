@@ -45,16 +45,8 @@ class LanguageProfile:
     # that lives in official_sources.jurisdiction
     jurisdiction_cues: dict[Jurisdiction, tuple[str, ...]] = field(default_factory=dict)
 
-    # dates
-    months_re: str = ""  # alternation of month names
-
-    # organisations / locations
-    upper_chars: str = "A-Z"  # uppercase-start character class body
-    lower_chars: str = "a-z"  # word-body lowercase class
-    org_suffixes_re: str = ""  # legal-form suffixes (Zrt|Kft|Ltd|…)
-    org_names_re: str = ""  # literal known names (alternation)
-    place_words_re: str = ""  # tér|utca|park|…
-    place_drop_suffixes: tuple[str, ...] = ()  # inflections _norm_place strips
+    # places come from gliner, this just folds their inflections for matching
+    place_drop_suffixes: tuple[str, ...] = ()  # inflections norm_place strips
 
     # document/report classification
     report_cues: tuple[str, ...] = ()
@@ -64,9 +56,6 @@ class LanguageProfile:
     # tender / eu project ids and land-registry numbers, both per country
     procurement_id_re: str = ""  # EKR\d{9,12}|…
     parcel_re: str = ""  # group 1 or 2 = the number
-
-    intent_re: str = ""  # target-sentence verbs
-    units_re: str = ""  # m2|%|db|fő|mm|°C|kWh|Ft
 
     # term as it shows up in documents -> plain-english meaning, for the ui
     glossary: dict[str, str] = field(default_factory=dict)
@@ -81,6 +70,7 @@ class LanguageProfile:
 
     @classmethod
     def from_dict(cls, data: dict) -> LanguageProfile:
+        # unknown keys get skipped, older db profiles still carry the regex ner fields
         kwargs = {}
         for f in fields(cls):
             if f.name not in data:

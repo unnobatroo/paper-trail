@@ -8,8 +8,8 @@
 - **Prefer established OSS over bespoke code.** If a problem is already
   solved by a dependency in `package.json`/`pyproject.toml` (or a small,
   well-maintained addition), use it — don't hand-roll equivalents.
-  Deliberate exceptions exist (e.g. `ml/entities.py` parses deterministically
-  on purpose, `CONTRIBUTING.md` explains why); match them, don't repeat them.
+  Deliberate exceptions exist (e.g. `ml/entities.py` parses money with regexes
+  on purpose, exact and checkable); match them, don't repeat them.
 - Keep diffs focused; match the conventions of the file you're in.
 - `web/AGENTS.md` applies under `web/` — read the version-matched Next.js
   docs in `node_modules/next/dist/docs/` before Next.js-specific changes.

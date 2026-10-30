@@ -21,7 +21,7 @@ COPY scripts ./scripts
 
 FROM base AS worker
 USER root
-RUN uv sync --frozen --no-dev --extra parsing --extra hungarian
+RUN uv sync --frozen --no-dev --extra parsing --extra hungarian --extra ner
 ARG HUSPACY_MODEL_URL
 RUN if [ -n "$HUSPACY_MODEL_URL" ]; then uv pip install --python /app/.venv/bin/python "$HUSPACY_MODEL_URL"; fi
 USER papertrail

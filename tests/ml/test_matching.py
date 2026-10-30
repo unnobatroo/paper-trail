@@ -3,6 +3,7 @@
 from paper_trail.domain.enums import CandidateType, RelationshipType
 from paper_trail.domain.models import Commitment, EvidenceItem
 from paper_trail.ml.matching import compute_features, score, suggest_relationship
+from tests.ner import StubNer
 from tests.profiles import HU
 
 COM = Commitment(
@@ -12,6 +13,7 @@ COM = Commitment(
     responsible_org="RÉV8 Zrt.",
     deadline_year=2030,
 )
+NER = StubNer(orgs=["RÉV8"], places=["Bérkocsis utcában"])
 
 
 def _ev(**kw) -> EvidenceItem:
@@ -23,7 +25,7 @@ def _ev(**kw) -> EvidenceItem:
 def test_features_pick_up_shared_entities():
     ev = _ev(organisations=["RÉV8 Zrt."], locations=["Bérkocsis utcában"],
              dates_mentioned=["2030"])
-    f = compute_features(COM, ev, 0.8, HU)
+    f = compute_features(COM, ev, 0.8, HU, NER)
     assert f.shared_organisations
     assert f.shared_locations
     assert f.shared_dates == ["2030"]
@@ -32,7 +34,7 @@ def test_features_pick_up_shared_entities():
 
 def test_strong_match_with_shared_org_is_direct():
     ev = _ev(organisations=["RÉV8"], locations=[])
-    f = compute_features(COM, ev, 0.85, HU)
+    f = compute_features(COM, ev, 0.85, HU, NER)
     rel, reasons = suggest_relationship(f, has_budget=False)
     assert rel == RelationshipType.DIRECT_IMPLEMENTATION
     assert reasons

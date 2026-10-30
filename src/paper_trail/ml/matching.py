@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from ..domain.enums import RelationshipType
 from ..domain.models import Commitment, EvidenceItem, MatchFeatures
-from .entities import _norm_place
+from .entities import norm_place
 from .lang import LanguageProfile
-from .ner import RuleNer
+from .ner import NoNer
 
 W_SIMILARITY = 0.60
 W_ORG = 0.15
@@ -45,11 +45,11 @@ def _shared(a: set[str], b: set[str]) -> set[str]:
 def commitment_entities(commitment: Commitment, profile: LanguageProfile,
                         ner=None) -> dict[str, set[str]]:
     """entities right there in the commitment text"""
-    found = (ner or RuleNer(profile)).find(" ".join([commitment.title, commitment.summary]))
+    found = (ner or NoNer()).find(" ".join([commitment.title, commitment.summary]))
     orgs = _norm(found.orgs)
     if commitment.responsible_org:
         orgs |= _norm([commitment.responsible_org])
-    locs = {_norm_place(l, profile) for l in found.places}
+    locs = {norm_place(l, profile) for l in found.places}
     dates = {str(commitment.deadline_year)} if commitment.deadline_year else set()
     return {"orgs": orgs, "locations": locs, "dates": dates}
 
@@ -62,7 +62,7 @@ def compute_features(commitment: Commitment, evidence: EvidenceItem, similarity:
         shared_organisations=sorted(_shared(ce["orgs"], _norm(evidence.organisations))),
         shared_locations=sorted(
             _shared(ce["locations"],
-                    {_norm_place(l, profile) for l in evidence.locations})
+                    {norm_place(l, profile) for l in evidence.locations})
         ),
         shared_dates=sorted(ce["dates"] & set(evidence.dates_mentioned)),
     )

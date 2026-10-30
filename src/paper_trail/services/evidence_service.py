@@ -27,7 +27,7 @@ from ..ml import entities, matching
 from ..ml.accountability import PassageAuditor
 from ..ml.embeddings import EmbeddingProvider
 from ..ml.lang import LanguageProfile
-from ..ml.ner import RuleNer
+from ..ml.ner import NoNer
 from ..ml.nlp import TextAnalyzer
 from ..ml.rerank import Reranker
 from ..repositories.ports import EvidenceStore, PageStore, VectorIndex
@@ -102,8 +102,8 @@ class EvidenceService:
         self._profile = profile or LanguageProfile.empty()
         self._auditor = auditor or PassageAuditor(self._profile)
         self._places = places or PlaceResolver(repo, self._auditor)
-        # gliner in prod, the profile's regex offline (ml/ner.py)
-        self._ner = ner or RuleNer(self._profile)
+        # bootstrap passes gliner, bare years otherwise
+        self._ner = ner or NoNer()
         self._extra_domains = {d.lower() for d in allowed_domains}
         # page text + chunk vectors live next to the evidence, same database
         self._pages = page_store or PostgresPageStore(repo.dsn)
