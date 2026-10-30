@@ -5,6 +5,8 @@ mkdir -p /backups
 backup_once() {
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
   temporary=/backups/.pending-$stamp
+  # a failed run kills the script, keep only the latest partial dir for a look
+  find /backups -mindepth 1 -maxdepth 1 -type d -name '.pending-*' -exec rm -rf -- {} +
   mkdir "$temporary"
   pg_dump --format=custom --file="$temporary/database.dump"
   pg_dumpall --globals-only > "$temporary/roles.sql"
