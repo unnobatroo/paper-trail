@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from paper_trail.api.schemas import TranslateRequest
-from paper_trail.sources.document_store import LocalDocumentStore
+from paper_trail.sources.document_store import DocumentStore
 from paper_trail.sources.web_search import allowed
 
 DOMAINS = ["jozsefvaros.hu"]
@@ -23,8 +23,9 @@ def test_allowlist_uses_the_real_hostname(url, ok):
 
 
 def test_local_store_refuses_paths_outside_its_root(tmp_path):
-    store = LocalDocumentStore(tmp_path / "docs")
-    store.write("plan.pdf", b"%PDF")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "plan.pdf").write_bytes(b"%PDF")
+    store = DocumentStore(tmp_path / "docs")
     assert store.read("plan.pdf") == b"%PDF"
     with pytest.raises(ValueError):
         store.read("../secrets.env")

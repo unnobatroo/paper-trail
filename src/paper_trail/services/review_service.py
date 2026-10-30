@@ -6,7 +6,7 @@ from ..domain.enums import CandidateType, Jurisdiction, RelationshipType, Review
 from ..domain.models import Commitment, PolicyCandidate
 from ..ml.accountability import PassageAuditor
 from ..ml.lang import LanguageProfile
-from ..repositories.ports import EvidenceStore, PolicyStore
+from ..repositories.store import EvidenceRepository, PolicyRepository
 
 # what a commitment inherits from its candidate as is
 _CARRIED = {"code", "responsible_org", "timeframe", "deadline_year", "unit", "target_value",
@@ -14,7 +14,7 @@ _CARRIED = {"code", "responsible_org", "timeframe", "deadline_year", "unit", "ta
 
 
 class ReviewService:
-    def __init__(self, policy: PolicyStore, evidence: EvidenceStore,
+    def __init__(self, policy: PolicyRepository, evidence: EvidenceRepository,
                  profile: LanguageProfile | None = None):
         self._policy = policy
         self._evidence = evidence
@@ -47,7 +47,9 @@ class ReviewService:
         """batch confirm with the suggested type/title, all receipts checked before any write"""
         for cid in candidate_ids:
             self._receipted(cid)
-        return sum(1 for cid in candidate_ids if self.accept_candidate(cid))
+        for cid in candidate_ids:
+            self.accept_candidate(cid)
+        return len(candidate_ids)
 
     def reject_candidates(self, candidate_ids: list[int]) -> int:
         for cid in candidate_ids:
@@ -79,8 +81,9 @@ class ReviewService:
     def accept_links(self, link_ids: list[int],
                      relationships: dict[int, RelationshipType] | None = None) -> int:
         """batch accept, each keeps its suggested relationship unless overridden"""
+        relationships = relationships or {}
         for lid in link_ids:
-            self.accept_link(lid, (relationships or {}).get(lid))
+            self.accept_link(lid, relationships.get(lid))
         return len(link_ids)
 
     def reject_links(self, link_ids: list[int]) -> int:

@@ -3,20 +3,14 @@
 from __future__ import annotations
 
 import math
-from abc import ABC, abstractmethod
 
 from .client import model_client
 
 
-class Reranker(ABC):
-    name: str
+class Reranker:
+    """any /rerank server (goethe, infinity, tei). score() gives one number per passage:
+    rank by it, don't threshold it"""
 
-    @abstractmethod
-    def score(self, query: str, passages: list[str]) -> list[float]:
-        """one score per passage. rank by it, don't threshold it"""
-
-
-class HttpReranker(Reranker):
     def __init__(self, client, model: str = "BAAI/bge-reranker-v2-m3",
                  batch_size: int = 2):
         if batch_size < 1:
@@ -48,4 +42,4 @@ def get_reranker(kind: str, base_url: str | None, api_key: str | None, model: st
     """"none" keeps the embedding order, anything else talks to the /rerank server"""
     if kind in ("", "none", "off"):
         return None
-    return HttpReranker(model_client(base_url, api_key), model, batch_size)
+    return Reranker(model_client(base_url, api_key), model, batch_size)

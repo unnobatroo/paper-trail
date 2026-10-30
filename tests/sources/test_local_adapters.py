@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from paper_trail.ml.extraction import excerpt_found, source_excerpt
-from paper_trail.ml.rerank import HttpReranker
-from paper_trail.ml.retrieval import reciprocal_rank_fusion
+from paper_trail.ml.extraction import source_excerpt
+from paper_trail.ml.rerank import Reranker
+from paper_trail.repositories.postgres.index import reciprocal_rank_fusion
 from paper_trail.sources.chunking import structure_chunks
 from paper_trail.sources.parsers import FallbackDocumentParser, ParsedDocument
 from paper_trail.sources.web_search import SearxngSearchProvider, allowed
@@ -14,9 +14,9 @@ from paper_trail.sources.web_search import SearxngSearchProvider, allowed
 def test_receipt_restores_source_bytes():
     raw = "A  fák\nültetése."
     receipt = source_excerpt(raw, "A fák ültetése.")
-    assert receipt == raw and excerpt_found(raw, receipt)
+    assert receipt == raw
     assert source_excerpt(raw, "") is None
-    assert not excerpt_found(raw, "A fák ültetése.")
+    assert "A fák ültetése." not in raw
 
 
 def test_table_rows_and_heading_boundaries():
@@ -57,13 +57,13 @@ class _RerankServer:
 def test_rerank_maps_sorted_indices_and_bounds_batches():
     server = _RerankServer(lambda body: {"results": [
         {"index": i, "relevance_score": i + 0.5} for i in reversed(range(len(body["documents"])))]})
-    assert HttpReranker(server, batch_size=2).score("q", ["a", "b", "c"]) == [0.5, 1.5, 0.5]
+    assert Reranker(server, batch_size=2).score("q", ["a", "b", "c"]) == [0.5, 1.5, 0.5]
     assert [len(c["documents"]) for c in server.calls] == [2, 1]
 
 
 def test_rerank_reads_sglang_bare_lists():
     server = _RerankServer(lambda body: [{"index": 1, "score": 0.2}, {"index": 0, "score": 0.9}])
-    assert HttpReranker(server, model="paper-trail/bge").score("q", ["a", "b"]) == [0.9, 0.2]
+    assert Reranker(server, model="paper-trail/bge").score("q", ["a", "b"]) == [0.9, 0.2]
     assert server.calls[0]["model"] == "paper-trail/bge"
 
 
@@ -71,7 +71,7 @@ def test_rerank_rejects_duplicate_index():
     server = _RerankServer(lambda body: {"results": [
         {"index": 0, "relevance_score": 1}, {"index": 0, "relevance_score": 1}]})
     with pytest.raises(ValueError, match="indices"):
-        HttpReranker(server).score("q", ["a", "b"])
+        Reranker(server).score("q", ["a", "b"])
 
 
 def test_searxng_enforces_allowlist_and_domain_scope(monkeypatch):

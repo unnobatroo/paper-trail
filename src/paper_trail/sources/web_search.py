@@ -6,12 +6,14 @@ providers are dumb, the evidence service owns the ssrf allowlist
 from __future__ import annotations
 
 import json
-from abc import ABC, abstractmethod
+import re
 from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 from urllib.parse import urlparse
 
+import requests
 from tenacity import retry, stop_after_attempt, wait_incrementing
 
 
@@ -32,13 +34,11 @@ def allowed(url: str, domains: Collection[str]) -> bool:
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
-class SearchProvider(ABC):
-    @abstractmethod
-    def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
-        ...
+class SearchProvider(Protocol):
+    def search(self, query: str, max_results: int = 5) -> list[SearchHit]: ...
 
 
-class DdgSearch(SearchProvider):
+class DdgSearch:
     """ddgs, two retries with backoff, a total failure bubbles up so the caller skips the domain"""
 
     @retry(stop=stop_after_attempt(3), wait=wait_incrementing(start=1.5, increment=1.5),
@@ -52,7 +52,7 @@ class DdgSearch(SearchProvider):
                     for r in ddgs.text(query, max_results=max_results)]
 
 
-class FixtureSearch(SearchProvider):
+class FixtureSearch:
     """cached results, one json object per line:
 
         {"query_substring": "utcafásítás", "url": "...", "title": "...", "snippet": "..."}
@@ -61,11 +61,8 @@ class FixtureSearch(SearchProvider):
     """
 
     def __init__(self, fixture_path: Path):
-        self._rows = []
-        if fixture_path.exists():
-            for line in fixture_path.read_text(encoding="utf-8").splitlines():
-                if line.strip():
-                    self._rows.append(json.loads(line))
+        text = fixture_path.read_text(encoding="utf-8") if fixture_path.exists() else ""
+        self._rows = [json.loads(line) for line in text.splitlines() if line.strip()]
 
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
         hits = [
@@ -76,13 +73,16 @@ class FixtureSearch(SearchProvider):
         return hits[:max_results]
 
 
-def get_search_provider(name: str, fixture_dir: Path) -> SearchProvider:
+def get_search_provider(name: str, fixture_dir: Path, searxng_url: str = "",
+                        domains: Collection[str] = ()) -> SearchProvider:
     if name == "fixture":
         return FixtureSearch(fixture_dir / "search_results.jsonl")
+    if name == "searxng":
+        return SearxngSearchProvider(searxng_url, domains)
     return DdgSearch()
 
 
-class SearxngSearchProvider(SearchProvider):
+class SearxngSearchProvider:
     """private searxng, one request per scoped domain
 
     the evidence service scopes each query with site:<domain> from its allowlist. first
@@ -96,9 +96,6 @@ class SearxngSearchProvider(SearchProvider):
         self.timeout = timeout
 
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
-        import re
-
-        import requests
         scope = re.match(r"\s*site:(\S+)", query)
         terms = re.sub(r"\bsite:\S+", "", query).strip()
         domains = (scope.group(1).lower(),) if scope else self.domains

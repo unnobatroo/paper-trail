@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+
+from pydantic import Field
 
 from ..domain.enums import BudgetKind, EvidenceFlag, RelationshipType, ReviewStatus, Status
-from ..domain.models import BudgetRecord, Commitment, EvidenceItem
+from ..domain.models import BudgetRecord, Commitment, DomainModel, EvidenceItem
 from ..ml.accountability import FinancialAuditor, PassageAuditor
 from ..ml.lang import LanguageProfile
-from ..repositories.ports import EvidenceStore, PolicyStore
+from ..repositories.store import EvidenceRepository, PolicyRepository
 
 
-def with_effective_flags(store: EvidenceStore, ev_map: dict[int, EvidenceItem]) -> None:
+def with_effective_flags(store: EvidenceRepository, ev_map: dict[int, EvidenceItem]) -> None:
     """regression warnings come from artifacts other passages changed, add on read"""
     artifacts = store.artifacts_many(sorted(ev_map))
     for ev_id, ev in ev_map.items():
@@ -36,25 +37,24 @@ _STATUS_ORDER = [
 ]
 
 
-@dataclass
-class TrailRow:
-    """a commitment + everything verified about it"""
+class TrailRow(DomainModel):
+    """a commitment + everything verified about it, the api returns it as is"""
 
     commitment: Commitment
-    evidence: list[EvidenceItem] = field(default_factory=list)
-    relationships: list[RelationshipType] = field(default_factory=list)
-    budgets: list[BudgetRecord] = field(default_factory=list)
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+    relationships: list[RelationshipType] = Field(default_factory=list)
+    budgets: list[BudgetRecord] = Field(default_factory=list)
     status: Status = Status.UNKNOWN
     status_excerpt: str | None = None
-    gaps: list[str] = field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
     # money accepted evidence proves, one entry per state, never a sum
-    financial_states: list[BudgetKind] = field(default_factory=list)
+    financial_states: list[BudgetKind] = Field(default_factory=list)
     financially_executed: bool = False
-    findings: list[str] = field(default_factory=list)
+    findings: list[str] = Field(default_factory=list)
 
 
 class MetricsService:
-    def __init__(self, policy: PolicyStore, evidence: EvidenceStore,
+    def __init__(self, policy: PolicyRepository, evidence: EvidenceRepository,
                  profile: LanguageProfile | None = None):
         self._policy = policy
         self._evidence = evidence
@@ -133,8 +133,8 @@ class MetricsService:
         ranked = [e for e in items if e.status_hint in _STATUS_ORDER]
         if not ranked:
             return Status.UNKNOWN, None
-        # first item wins a tie, like reading the evidence in order
-        best = max(ranked, key=lambda e: (_STATUS_ORDER.index(e.status_hint), -items.index(e)))
+        # max keeps the first of equals, so a tie goes to the earlier evidence
+        best = max(ranked, key=lambda e: _STATUS_ORDER.index(e.status_hint))
         if best.status_hint == Status.UNKNOWN:
             return Status.UNKNOWN, None
         return best.status_hint, best.status_excerpt

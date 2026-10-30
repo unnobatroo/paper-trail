@@ -30,13 +30,8 @@ from ..domain.models import (
 from .mapping import (
     ARTIFACT_RANK,
     POLARITY_STATUS,
-    to_artifact,
-    to_budget,
-    to_candidate,
-    to_commitment,
-    to_evidence,
     to_link,
-    to_official_source,
+    to_model,
 )
 
 
@@ -122,16 +117,14 @@ class PolicyRepository(Repo):
                  else bool(cand.excerpt_on_page)}).scalar_one()
 
     def candidates(self, status: ReviewStatus | None = None) -> list[PolicyCandidate]:
-        if status:
-            rows = self._all("SELECT * FROM candidates WHERE review_status=:s ORDER BY source_page",
-                             s=status.value)
-        else:
-            rows = self._all("SELECT * FROM candidates ORDER BY source_page")
-        return [to_candidate(r) for r in rows]
+        where = " WHERE review_status=:s" if status else ""
+        rows = self._all(f"SELECT * FROM candidates{where} ORDER BY source_page",
+                         s=status and status.value)
+        return [to_model(PolicyCandidate, r) for r in rows]
 
     def candidate(self, candidate_id: int) -> PolicyCandidate | None:
         row = self._one("SELECT * FROM candidates WHERE id=:id", id=candidate_id)
-        return to_candidate(row) if row else None
+        return to_model(PolicyCandidate, row) if row else None
 
     def set_candidate_status(self, candidate_id: int, status: ReviewStatus) -> None:
         self._exec("UPDATE candidates SET review_status=:s WHERE id=:id",
@@ -191,23 +184,21 @@ class PolicyRepository(Repo):
                    " author=excluded.author, updated_at=excluded.updated_at", **p)
 
     def commitments(self, kind: CandidateType | None = None) -> list[Commitment]:
-        if kind:
-            rows = self._all("SELECT * FROM commitments WHERE kind=:k ORDER BY code, id",
-                             k=kind.value)
-        else:
-            rows = self._all("SELECT * FROM commitments ORDER BY code, id")
-        return [to_commitment(r) for r in rows]
+        where = " WHERE kind=:k" if kind else ""
+        rows = self._all(f"SELECT * FROM commitments{where} ORDER BY code, id",
+                         k=kind and kind.value)
+        return [to_model(Commitment, r) for r in rows]
 
     def commitment(self, commitment_id: int) -> Commitment | None:
         row = self._one("SELECT * FROM commitments WHERE id=:id", id=commitment_id)
-        return to_commitment(row) if row else None
+        return to_model(Commitment, row) if row else None
 
 
 class EvidenceRepository(Repo):
     """sources, evidence, links, budgets, artifacts, gazetteer"""
 
     def official_sources(self) -> list[OfficialSource]:
-        return [to_official_source(r) for r in
+        return [to_model(OfficialSource, r) for r in
                 self._all("SELECT * FROM official_sources ORDER BY sort_order, id")]
 
     def upsert_official_source(self, src: OfficialSource) -> None:
@@ -257,12 +248,12 @@ class EvidenceRepository(Repo):
 
     def evidence(self, evidence_id: int) -> EvidenceItem | None:
         row = self._one("SELECT * FROM evidence WHERE id=:id", id=evidence_id)
-        return to_evidence(row) if row else None
+        return to_model(EvidenceItem, row) if row else None
 
     def evidence_many(self, ids: list[int]) -> dict[int, EvidenceItem]:
         if not ids:
             return {}
-        return {r["id"]: to_evidence(r)
+        return {r["id"]: to_model(EvidenceItem, r)
                 for r in self._all("SELECT * FROM evidence WHERE id IN :ids", ids=list(ids))}
 
     def add_link(self, link: EvidenceLink) -> int:
@@ -288,11 +279,9 @@ class EvidenceRepository(Repo):
                                 {"c": link.commitment_id, "e": link.evidence_id}).scalar_one()
 
     def links(self, status: ReviewStatus | None = None) -> list[EvidenceLink]:
-        if status:
-            rows = self._all("SELECT * FROM links WHERE review_status=:s ORDER BY score DESC",
-                             s=status.value)
-        else:
-            rows = self._all("SELECT * FROM links ORDER BY score DESC")
+        where = " WHERE review_status=:s" if status else ""
+        rows = self._all(f"SELECT * FROM links{where} ORDER BY score DESC",
+                         s=status and status.value)
         return [to_link(r) for r in rows]
 
     def links_for(self, commitment_id: int) -> list[EvidenceLink]:
@@ -328,7 +317,7 @@ class EvidenceRepository(Repo):
                  "native": b.amount_native}).scalar_one()
 
     def budgets_for_evidence(self, evidence_id: int) -> list[BudgetRecord]:
-        return [to_budget(r) for r in self._all(
+        return [to_model(BudgetRecord, r) for r in self._all(
             "SELECT * FROM budgets WHERE evidence_id=:e ORDER BY id", e=evidence_id)]
 
     def budgets_many(self, evidence_ids: list[int]) -> dict[int, list[BudgetRecord]]:
@@ -336,7 +325,7 @@ class EvidenceRepository(Repo):
         if evidence_ids:
             for r in self._all("SELECT * FROM budgets WHERE evidence_id IN :ids ORDER BY id",
                                ids=list(evidence_ids)):
-                out.setdefault(r["evidence_id"], []).append(to_budget(r))
+                out.setdefault(r["evidence_id"], []).append(to_model(BudgetRecord, r))
         return out
 
     # artifacts (m:n through evidence) + gazetteer
@@ -344,12 +333,11 @@ class EvidenceRepository(Repo):
     def link_artifact(self, procurement_id: str, evidence_id: int,
                       polarity: EvidencePolarity) -> ImplementationArtifact:
         status = POLARITY_STATUS[polarity]
-        lock = " FOR UPDATE"
         with self._engine.begin() as conn:
             conn.execute(text("INSERT INTO implementation_artifacts(procurement_id) VALUES (:p)"
                               " ON CONFLICT(procurement_id) DO NOTHING"), {"p": procurement_id})
             row = conn.execute(text("SELECT * FROM implementation_artifacts"
-                                    f" WHERE procurement_id=:p{lock}"),
+                                    " WHERE procurement_id=:p FOR UPDATE"),
                                {"p": procurement_id}).mappings().one()
             # status only ever escalates: active -> amended -> terminated
             if ARTIFACT_RANK[status] > ARTIFACT_RANK[ArtifactStatus(row["status"])]:
@@ -360,7 +348,7 @@ class EvidenceRepository(Repo):
             conn.execute(text("INSERT INTO artifact_evidence(artifact_id, evidence_id)"
                               " VALUES (:a, :e) ON CONFLICT DO NOTHING"),
                          {"a": row["id"], "e": evidence_id})
-        return to_artifact(row)
+        return to_model(ImplementationArtifact, row)
 
     def artifacts_many(self, evidence_ids: list[int]) -> dict[int, list[ImplementationArtifact]]:
         out: dict[int, list[ImplementationArtifact]] = {}
@@ -368,7 +356,7 @@ class EvidenceRepository(Repo):
             for r in self._all("SELECT ae.evidence_id, a.* FROM artifact_evidence ae"
                                " JOIN implementation_artifacts a ON a.id = ae.artifact_id"
                                " WHERE ae.evidence_id IN :ids", ids=list(evidence_ids)):
-                out.setdefault(r["evidence_id"], []).append(to_artifact(r))
+                out.setdefault(r["evidence_id"], []).append(to_model(ImplementationArtifact, r))
         return out
 
     def resolve_parcel(self, parcel: str) -> str | None:

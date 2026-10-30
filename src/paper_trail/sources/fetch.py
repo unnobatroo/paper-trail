@@ -6,7 +6,6 @@ html via trafilatura, pdfs via the parsers
 
 from __future__ import annotations
 
-import io
 import ipaddress
 import socket
 from collections.abc import Collection
@@ -17,8 +16,8 @@ from urllib.parse import urljoin, urlsplit
 import charset_normalizer
 import requests
 import trafilatura
-from pypdf import PdfReader
 
+from .parsers import PypdfDocumentParser
 from .web_search import allowed
 
 _HEADERS = {"User-Agent": "paper-trail/0.1 (municipal evidence research)"}
@@ -88,13 +87,7 @@ def _read_capped(resp: requests.Response) -> bytes | None:
 
 def _read_pdf(url: str, content: bytes, parser=None) -> FetchedPage | None:
     try:
-        if parser is not None:
-            text = parser.parse(content).markdown
-        else:
-            reader = PdfReader(io.BytesIO(content))
-            text = "\n\n".join(
-                f"<!-- page {i + 1} -->\n{p.extract_text() or chr(32)}"
-                for i, p in enumerate(reader.pages))
+        text = (parser or PypdfDocumentParser()).parse(content).markdown
     except Exception:
         return None
     if not text.strip():

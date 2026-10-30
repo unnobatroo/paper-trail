@@ -6,17 +6,15 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from ..domain.enums import BudgetKind, CandidateType, Jurisdiction, RelationshipType, Status
+from ..domain.enums import CandidateType, Jurisdiction, RelationshipType
 from ..domain.models import (
     BudgetRecord,
-    Commitment,
     DomainModel,
     EvidenceItem,
     EvidenceLink,
     Note,
     PolicyCandidate,
 )
-from ..services.metrics_service import TrailRow
 
 
 class IngestRequest(BaseModel):
@@ -69,34 +67,6 @@ class CandidateView(PolicyCandidate):
 class GlossaryTerm(DomainModel):
     term: str
     meaning: str
-
-
-class TrailRowView(DomainModel):
-    commitment: Commitment
-    evidence: list[EvidenceItem]
-    relationships: list[RelationshipType]
-    budgets: list[BudgetRecord]
-    status: Status
-    status_excerpt: str | None
-    gaps: list[str]
-    financial_states: list[BudgetKind]
-    financially_executed: bool
-    findings: list[str]
-
-    @classmethod
-    def from_row(cls, row: TrailRow) -> TrailRowView:
-        return cls(
-            commitment=row.commitment,
-            evidence=row.evidence,
-            relationships=row.relationships,
-            budgets=row.budgets,
-            status=row.status,
-            status_excerpt=row.status_excerpt,
-            gaps=row.gaps,
-            financial_states=row.financial_states,
-            financially_executed=row.financially_executed,
-            findings=row.findings,
-        )
 
 
 class TranslateRequest(BaseModel):

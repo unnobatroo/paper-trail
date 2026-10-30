@@ -10,9 +10,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 import openai
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..domain.models import Note
+from .client import ask_json
 from .lang import LanguageProfile
 
 log = logging.getLogger(__name__)
@@ -62,19 +63,9 @@ class NoteWriter:
 
     def _ask(self, task: str, item: str) -> _Reply | None:
         glossary = "\n".join(f"- {t}: {m}" for t, m in self._profile.glossary.items()) or "-"
-        resp = self._client.chat.completions.create(
-            model=self._model, temperature=0, max_tokens=600,
-            messages=[{"role": "user", "content": _PROMPT.format(
-                language=self._profile.name, glossary=glossary, task=task, item=item)}],
-            response_format={"type": "json_schema", "json_schema": {
-                "name": "note", "strict": True, "schema": _Reply.model_json_schema()}},
-            # hybrid qwen3 thinks the whole budget away otherwise
-            extra_body=({"chat_template_kwargs": {"enable_thinking": False}}
-                        if "qwen3" in self._model.lower() else None))
-        try:
-            return _Reply.model_validate_json(resp.choices[0].message.content or "")
-        except ValidationError:
-            return None
+        prompt = _PROMPT.format(language=self._profile.name, glossary=glossary, task=task,
+                                item=item)
+        return ask_json(self._client, self._model, prompt, _Reply, "note", 600)
 
     def _note(self, kind: str, subject_id: int, task: str, item: str) -> Note | None:
         try:

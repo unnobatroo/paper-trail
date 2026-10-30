@@ -10,12 +10,8 @@ from pypdf import PdfReader
 from ..domain.models import DocumentPage
 
 
-def read_pages(source: str | Path | bytes | io.BytesIO) -> list[DocumentPage]:
+def read_pages(source: str | Path | bytes) -> list[DocumentPage]:
     """source is a path or the raw bytes"""
-    if isinstance(source, bytes):
-        source = io.BytesIO(source)
-    reader = PdfReader(source if isinstance(source, io.BytesIO) else str(source))
-    pages = []
-    for i, page in enumerate(reader.pages):
-        pages.append(DocumentPage(page_number=i + 1, text=page.extract_text() or ""))
-    return pages
+    reader = PdfReader(io.BytesIO(source) if isinstance(source, bytes) else source)
+    return [DocumentPage(page_number=i, text=p.extract_text() or "")
+            for i, p in enumerate(reader.pages, 1)]

@@ -15,7 +15,6 @@ dependencies = [
     "fastembed>=0.8.0",
     "httpx-retries>=0.6.0",
     "huggingface-hub>=1.32.0",
-    "numpy>=2.5.3",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.10.0",
     "pypdf>=6.19.0",

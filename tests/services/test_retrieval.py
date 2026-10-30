@@ -10,13 +10,13 @@ from datetime import date
 from paper_trail.domain.enums import CandidateType, ReviewStatus, Status
 from paper_trail.domain.models import Commitment, OfficialSource
 from paper_trail.ml.embeddings import HashingProvider
-from paper_trail.ml.rerank import Reranker
 from paper_trail.repositories.postgres.index import PostgresPageStore
 from paper_trail.repositories.store import EvidenceRepository
 from paper_trail.services.evidence_service import (
     _CHUNK,
     _CHUNK_STRIDE,
     EvidenceService,
+    _Run,
 )
 from paper_trail.sources.fetch import FetchedPage
 from paper_trail.sources.web_search import SearchHit
@@ -34,7 +34,7 @@ class _CountingEmbedder(HashingProvider):
         return super().embed(texts)
 
 
-class _RecordingReranker(Reranker):
+class _RecordingReranker:
     name = "stub"
 
     def __init__(self):
@@ -81,6 +81,9 @@ def test_source_catalogue_comes_from_db(policy, evidence, tmp_path):
     registry = svc._repo.official_sources()
     urls = svc._collect_urls(com, registry, svc._allowed(registry))
     assert "https://jozsefvaros.hu/registry-doc.pdf?ver=1" in urls
+    # a registry url with a port still allowlists its host
+    assert svc._allowed([OfficialSource(url="https://Data.Example.hu:8443/x.pdf")]) >= {
+        "data.example.hu"}
     assert svc._better_title(
         "https://jozsefvaros.hu/registry-doc.pdf?ver=1",
         "registry-doc.pdf", svc._repo.official_sources()) == "Renamed"
@@ -90,7 +93,8 @@ def test_full_document_is_chunked(policy, evidence, tmp_path):
     text = "x " * 40_000  # ~80kb, past the old 60kb cutoff
     svc, _ = _svc(tmp_path, evidence, policy, text)
     page = FetchedPage(url=URL, title="t", text=text)
-    svc._index_page(page)
+    run = _Run()
+    svc._index_page(page, run)
     chunks = [c for c, _ in svc._index.get(page, svc._embed.model_name, _CHUNK)]
     assert len(chunks) == len(text) // _CHUNK_STRIDE + (
         1 if len(text) % _CHUNK_STRIDE else 0)
@@ -98,19 +102,19 @@ def test_full_document_is_chunked(policy, evidence, tmp_path):
     # chunks share a boundary region
     assert all(len(c) <= _CHUNK for c in chunks)
     assert chunks[0].endswith(chunks[1][: _CHUNK - _CHUNK_STRIDE])
-    assert not svc.warnings  # nothing truncated, nothing warned
+    assert not run.warnings  # nothing truncated, nothing warned
 
 
 def test_emergency_bound_truncates_and_warns(policy, evidence, tmp_path):
     svc, _ = _svc(tmp_path, evidence, policy, "x " * 40_000,
                   max_doc_chars=1_000)
     page = FetchedPage(url=URL, title="t", text="x " * 40_000)
-    svc._index_page(page)
-    assert svc.warnings and "safety limit" in svc.warnings[0]
+    first, cached = _Run(), _Run()
+    svc._index_page(page, first)
+    assert first.warnings and "safety limit" in first.warnings[0]
     # cached call still warns, the user always has to know
-    svc.warnings = []
-    svc._index_page(page)
-    assert svc.warnings
+    svc._index_page(page, cached)
+    assert cached.warnings
 
 
 def test_embeddings_cached_by_content(policy, evidence, tmp_path):
@@ -133,7 +137,7 @@ def test_reranker_sees_bounded_candidates(policy, evidence, tmp_path):
     assert reranker.seen and max(reranker.seen) <= 20
 
 
-class _DownReranker(Reranker):
+class _DownReranker:
     name = "down"
 
     def score(self, query, passages):

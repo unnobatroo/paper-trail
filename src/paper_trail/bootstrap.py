@@ -13,14 +13,15 @@ from .ml.extraction import get_extractor
 from .ml.lang import LanguageProfile
 from .ml.ner import get_ner
 from .ml.rerank import get_reranker
-from .repositories.ports import EvidenceStore, PolicyStore
 from .repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from .repositories.store import EvidenceRepository, PolicyRepository
 from .services.evidence_service import EvidenceService
 from .services.ingestion_service import IngestionService
 from .services.metrics_service import MetricsService
 from .services.review_service import ReviewService
-from .sources.document_store import DocumentStore, LocalDocumentStore
+from .sources.document_store import DocumentStore
+from .sources.parsers import DoclingDocumentParser, FallbackDocumentParser, PypdfDocumentParser
+from .sources.sitemaps import SitemapCrawler
 from .sources.web_search import get_search_provider
 
 log = logging.getLogger(__name__)
@@ -29,8 +30,8 @@ log = logging.getLogger(__name__)
 @dataclass
 class AppState:
     settings: Settings
-    policy: PolicyStore
-    evidence: EvidenceStore
+    policy: PolicyRepository
+    evidence: EvidenceRepository
     review: ReviewService
     ingestion: IngestionService
     evidence_svc: EvidenceService
@@ -51,7 +52,7 @@ def _baseline_year(settings: Settings, policy) -> int | None:
     return min(years) if years else None
 
 
-def load_profile(policy: PolicyStore, code: str) -> LanguageProfile:
+def load_profile(policy: PolicyRepository, code: str) -> LanguageProfile:
     """the language profile lives in the db, an empty one just means the rules find nothing"""
     data = policy.language_profile(code)
     if data is None:
@@ -73,36 +74,25 @@ def build_state(settings: Settings | None = None) -> AppState:
     policy = PolicyRepository(settings.database_url)
     evidence = EvidenceRepository(settings.database_url)
     profile = load_profile(policy, settings.language)
-    docs: DocumentStore = LocalDocumentStore(settings.document_dir or settings.seed_dir)
+    docs = DocumentStore(settings.document_dir or settings.seed_dir)
     page_store = PostgresPageStore(settings.database_url)
     vector_index = PostgresVectorIndex(settings.database_url, ts_config=profile.ts_config,
                                        analyzer=analyzer)
 
-    from .sources.parsers import (
-        DoclingDocumentParser,
-        FallbackDocumentParser,
-        PypdfDocumentParser,
-    )
     parser = PypdfDocumentParser()
     if settings.parser == "docling":
         artifact_dir = (settings.document_dir or settings.seed_dir) / "parsed"
         parser = FallbackDocumentParser(
             DoclingDocumentParser(device=settings.parser_device, artifact_dir=artifact_dir),
             parser)
-    crawler = None
-    if settings.enable_sitemaps:
-        from .sources.sitemaps import SitemapCrawler
-        crawler = SitemapCrawler()
+    crawler = SitemapCrawler() if settings.enable_sitemaps else None
 
     embedder = get_provider(settings.embed_model, settings.embed_base_url,
                             settings.embed_api_key, str(settings.model_cache))
     extractor = get_extractor(settings.llm_base_url, settings.llm_api_key, settings.llm_model,
                               profile, settings.llm_window_pages, settings.llm_concurrency)
-    if settings.search_provider == "searxng":
-        from .sources.web_search import SearxngSearchProvider
-        search = SearxngSearchProvider(settings.searxng_url, settings.allowed_domains)
-    else:
-        search = get_search_provider(settings.search_provider, settings.fixture_dir)
+    search = get_search_provider(settings.search_provider, settings.fixture_dir,
+                                 settings.searxng_url, settings.allowed_domains)
     reranker = get_reranker(settings.reranker_model, settings.rerank_base_url,
                             settings.rerank_api_key, settings.rerank_model, settings.rerank_batch)
     return AppState(

@@ -1,14 +1,46 @@
 """page/vector cache on postgres + dense/lexical rank fusion you can inspect"""
 
+import hashlib
 import json
+from collections import defaultdict
+from collections.abc import Iterable
 
 from sqlalchemy import text
 
-from ...ml.retrieval import reciprocal_rank_fusion
 from ...sources.fetch import FetchedPage
-from ..indexing import content_key, fit_vector
-from ..ports import PageStore, VectorIndex
 from ..store import Repo
+
+# pgvector column width, shorter vectors get zero-padded (cosine doesn't care)
+VECTOR_DIM = 1024
+
+
+def fit_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
+    """pad to the column width, wider vectors can't be stored so blow up loudly"""
+    if len(vec) > dim:
+        raise ValueError(
+            f"embedding has {len(vec)} dims, the pgvector column holds {dim}: "
+            "use a model with <= 1024 dims or widen the column")
+    return vec + [0.0] * (dim - len(vec))
+
+
+def content_key(model: str, chunk_size: int, text: str) -> str:
+    """key for a doc's chunk vectors: new model, chunk size or text = recompute"""
+    return hashlib.sha256(
+        f"structure-v2|{model}|{chunk_size}|{text}".encode()).hexdigest()[:24]
+
+
+def reciprocal_rank_fusion(rankings: Iterable[Iterable[int]],
+                           constant: int = 60) -> dict[int, float]:
+    if constant < 1:
+        raise ValueError("RRF constant must be positive")
+    scores: dict[int, float] = defaultdict(float)
+    for ranking in rankings:
+        seen = set()
+        for rank, key in enumerate(ranking, 1):
+            if key not in seen:
+                scores[key] += 1.0 / (constant + rank)
+                seen.add(key)
+    return dict(scores)
 
 _CHUNKS = "FROM chunks c JOIN pages p ON p.id=c.page_id"
 
@@ -17,7 +49,7 @@ def _vector(values):
     return json.dumps(fit_vector(values))
 
 
-class PostgresPageStore(Repo, PageStore):
+class PostgresPageStore(Repo):
     def get(self, url):
         row = self._one("SELECT url, title, text, published_on FROM pages WHERE url=:url", url=url)
         return FetchedPage(**row) if row else None
@@ -30,7 +62,7 @@ class PostgresPageStore(Repo, PageStore):
                    url=page.url, title=page.title, text=page.text, published_on=page.published_on)
 
 
-class PostgresVectorIndex(Repo, VectorIndex):
+class PostgresVectorIndex(Repo):
     def __init__(self, database_url: str, ts_config: str = "simple", analyzer=None):
         super().__init__(database_url)
         self.ts_config = ts_config

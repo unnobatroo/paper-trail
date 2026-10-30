@@ -1,9 +1,13 @@
-"""PageStore / VectorIndex contract on postgres + pgvector"""
+"""page cache + vector index on postgres + pgvector"""
 
 import pytest
 
-from paper_trail.repositories.indexing import content_key, fit_vector, pad_vector
-from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
+from paper_trail.repositories.postgres.index import (
+    PostgresPageStore,
+    PostgresVectorIndex,
+    content_key,
+    fit_vector,
+)
 from paper_trail.sources.fetch import FetchedPage
 
 PAGE = FetchedPage(url="https://rev8.hu/utcafasitas/", title="Utcafásítás",
@@ -46,13 +50,6 @@ def test_vector_index_roundtrip_and_match(dsn):
     top = index.match([1.0, 0.0], "ültetés", "hyb", 2400, [PAGE], k=2)
     assert top[0][1] == "ültetés szakasz"
     assert top[1][1] == "fák szakasz"
-
-
-def test_pad_vector_is_cosine_neutral():
-    a, b = [1.0, 2.0], [2.0, 1.0]
-    from paper_trail.ml.embeddings import cosine
-    assert cosine(pad_vector(a), pad_vector(b)) == cosine(a, b)
-    assert len(pad_vector([1.0])) == 1024
 
 
 def test_content_keys_stable():

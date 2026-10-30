@@ -13,11 +13,11 @@ from difflib import SequenceMatcher
 from itertools import chain
 
 import openai
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..domain.enums import CandidateType
 from ..domain.models import DocumentPage, PolicyCandidate
-from .client import model_client
+from .client import ask_json, model_client
 from .lang import LanguageProfile
 
 log = logging.getLogger(__name__)
@@ -48,11 +48,6 @@ Item: {{"type": "measure", "normalized_title": "3.4 Green roofs on schools",
 PAGES:
 {pages}
 """
-
-
-def excerpt_found(page_text: str, excerpt: str) -> bool:
-    """non-empty verbatim substring of the raw page text"""
-    return bool(excerpt.strip()) and excerpt in page_text
 
 
 def source_excerpt(page_text: str, excerpt: str) -> str | None:
@@ -129,10 +124,19 @@ def form_row(quote: str, labels: tuple[str, ...]) -> bool:
     return len(re.findall(r"[^\W\d_]{3,}", low)) < 4
 
 
+def squash(text: str) -> str:
+    return " ".join(text.split())
+
+
+def norm(text: str) -> str:
+    """casefolded words only, for comparing quotes and titles"""
+    return re.sub(r"\W+", " ", text.casefold()).strip()
+
+
 def same_passage(a: str, b: str) -> bool:
     """two quotes of the same text: a long shared run, not a stray "a város" or two.
     numbers decide: "200 fa" and "500 fa" are two commitments however alike the rest is"""
-    a, b = sorted((re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b)), key=len)
+    a, b = sorted((norm(a), norm(b)), key=len)
     if not a or not b or not set(re.findall(r"\d+", a)) <= set(re.findall(r"\d+", b)):
         return False
     run = SequenceMatcher(None, a, b, autojunk=False).find_longest_match().size
@@ -165,20 +169,8 @@ class LLMExtractor:
         self._max_tokens = max_tokens
 
     def _ask(self, pages: list[DocumentPage]) -> _Reply | None:
-        """one call. None when the reply isn't valid json for the schema, http errors raise"""
-        resp = self._client.chat.completions.create(
-            model=self._model, temperature=0, max_tokens=self._max_tokens,
-            messages=[{"role": "user", "content": extraction_prompt(self._profile, pages)}],
-            response_format={"type": "json_schema", "json_schema": {
-                "name": "policy_candidates", "strict": True,
-                "schema": _Reply.model_json_schema()}},
-            # hybrid qwen3 thinks the whole budget away and answers nothing otherwise
-            extra_body=({"chat_template_kwargs": {"enable_thinking": False}}
-                        if "qwen3" in self._model.lower() else None))
-        try:
-            return _Reply.model_validate_json(resp.choices[0].message.content or "")
-        except ValidationError:
-            return None
+        return ask_json(self._client, self._model, extraction_prompt(self._profile, pages),
+                        _Reply, "policy_candidates", self._max_tokens)
 
     def _ask_window(self, window: list[DocumentPage]) -> list[tuple[list[DocumentPage],
                                                                     _Reply | None]]:

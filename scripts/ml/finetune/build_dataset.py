@@ -19,14 +19,13 @@ from pathlib import Path
 
 from paper_trail.bootstrap import load_profile
 from paper_trail.domain.enums import ReviewStatus
-from paper_trail.ml.extraction import KINDS, PAGE_CHARS, extraction_prompt
+from paper_trail.ml.extraction import KINDS, PAGE_CHARS, extraction_prompt, squash
 from paper_trail.repositories.store import PolicyRepository
 from paper_trail.sources.pdf import read_pages
 
 
 def shown(page, excerpt: str) -> bool:
     # the prompt cuts pages at PAGE_CHARS, a label past that teaches the model to make stuff up
-    squash = lambda s: " ".join(s.split())  # noqa: E731
     return bool(excerpt.strip()) and squash(excerpt) in squash(page.text[:PAGE_CHARS])
 
 
@@ -109,7 +108,7 @@ def main() -> None:
         ap.error("nothing to build from, pass --doc and/or --gold")
     from paper_trail.infrastructure.settings import load
     settings = load()
-    repo = PolicyRepository(settings.database_url or settings.db_path)
+    repo = PolicyRepository(settings.database_url)
     profile = load_profile(repo, args.language)
     rows = []
     for spec in args.doc:
