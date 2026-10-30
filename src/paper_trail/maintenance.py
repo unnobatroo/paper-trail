@@ -10,11 +10,12 @@
   source list              the registry, with each source's asset owner
   profile import FILE      load a language profile (json) into the db
   profile export CODE      print one as json
+  notes import FILE.jsonl  plain-english notes + ai suggestions, one json Note per line
 
 run as python -m paper_trail.maintenance <command>
 
 reset/rerun/source need the owner dsn in PAPER_TRAIL_DATABASE_URL (api/worker roles
-can't delete). profile also works on the local sqlite file when that's unset
+can't delete). profile and notes also work on the local sqlite file when that's unset
 """
 
 import argparse
@@ -29,6 +30,13 @@ from .repositories.postgres.db import connect
 from .repositories.postgres.jobs import PostgresJobRunner
 from .repositories.store import EvidenceRepository, PolicyRepository
 
+
+def _gone(evidence_id: str) -> str:
+    # evidence nothing points at after links/budgets are cleared = generated, goes
+    return (f"NOT EXISTS (SELECT 1 FROM links l WHERE l.evidence_id = {evidence_id})"
+            f" AND NOT EXISTS (SELECT 1 FROM budgets b WHERE b.evidence_id = {evidence_id})")
+
+
 # anything a person decided (or that hangs off it) isn't "generated"
 # not exists, not "not in": one null in the subquery and not in matches nothing
 # budgets without evidence come from the doc itself, they stay
@@ -37,17 +45,40 @@ GENERATED = [
                 " (SELECT 1 FROM links l WHERE l.evidence_id = b.evidence_id"
                 " AND l.review_status <> 'unreviewed')"),
     ("links", "DELETE FROM links WHERE review_status = 'unreviewed'"),
-    ("evidence", "DELETE FROM evidence e WHERE"
-                 " NOT EXISTS (SELECT 1 FROM links l WHERE l.evidence_id = e.id)"
-                 " AND NOT EXISTS (SELECT 1 FROM budgets b WHERE b.evidence_id = e.id)"),
+    # artifacts hang off evidence, unhook them from the passages about to go
+    ("artifact_evidence", "DELETE FROM artifact_evidence ae WHERE " + _gone("ae.evidence_id")),
+    ("implementation_artifacts", "UPDATE implementation_artifacts SET status = 'active',"
+                                 " status_evidence_id = NULL, updated_at = now()"
+                                 " WHERE status_evidence_id IS NOT NULL AND "
+                                 + _gone("status_evidence_id")),
+    # ...then re-escalate from what's left, same rule as link_artifact
+    ("implementation_artifacts", "UPDATE implementation_artifacts a SET status = s.status,"
+                                 " status_evidence_id = s.evidence_id FROM"
+                                 " (SELECT DISTINCT ON (ae.artifact_id) ae.artifact_id, e.id"
+                                 " evidence_id, CASE e.polarity WHEN 'termination' THEN"
+                                 " 'terminated' ELSE 'amended' END status FROM artifact_evidence"
+                                 " ae JOIN evidence e ON e.id = ae.evidence_id WHERE e.polarity"
+                                 " IN ('amendment', 'termination') ORDER BY ae.artifact_id,"
+                                 " e.polarity = 'termination' DESC, e.id) s"
+                                 " WHERE a.id = s.artifact_id AND a.status_evidence_id IS NULL"),
+    ("implementation_artifacts", "DELETE FROM implementation_artifacts a WHERE NOT EXISTS"
+                                 " (SELECT 1 FROM artifact_evidence ae"
+                                 " WHERE ae.artifact_id = a.id)"),
+    ("evidence", "DELETE FROM evidence e WHERE " + _gone("e.id")),
     ("candidates", "DELETE FROM candidates c WHERE c.review_status = 'unreviewed'"
                    " AND NOT EXISTS (SELECT 1 FROM commitments m WHERE m.candidate_id = c.id)"),
     ("jobs", "DELETE FROM jobs WHERE status NOT IN ('queued', 'running')"),
+    # notes have no fk (two subject tables), drop the ones whose item just went
+    ("notes", "DELETE FROM notes n WHERE (n.subject_kind = 'candidate' AND NOT EXISTS"
+              " (SELECT 1 FROM candidates c WHERE c.id = n.subject_id)) OR"
+              " (n.subject_kind = 'link' AND NOT EXISTS"
+              " (SELECT 1 FROM links l WHERE l.id = n.subject_id))"),
 ]
 CACHE = [("chunks", "DELETE FROM chunks"), ("pages", "DELETE FROM pages")]
 # children first, fks don't cascade
-EVERYTHING = ["budgets", "links", "evidence", "commitments", "candidates", "documents",
-              "chunks", "pages", "official_sources", "jobs"]
+EVERYTHING = ["notes", "budgets", "links", "artifact_evidence", "implementation_artifacts",
+              "evidence", "commitments", "candidates", "documents", "chunks", "pages",
+              "official_sources", "jobs"]
 
 
 def reset(url: str, *, cache: bool, everything: bool, yes: bool) -> dict[str, int]:
@@ -95,6 +126,20 @@ def profile(args) -> int:
     return 0
 
 
+def notes(args) -> int:
+    from .domain.models import Note
+    from .infrastructure.settings import load
+    settings = load()
+    repo = PolicyRepository(settings.database_url or settings.db_path)
+    # validate everything first, a bad line halfway shouldn't leave half an import
+    rows = [Note.model_validate_json(line)
+            for line in args.file.read_text().splitlines() if line.strip()]
+    for note in rows:
+        repo.put_note(note)
+    print(f"imported {len(rows)} notes")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -125,9 +170,14 @@ def main(argv=None) -> int:
     pr_sub = pr.add_subparsers(dest="profile_cmd", required=True)
     pr_sub.add_parser("import", help="load a profile json").add_argument("file", type=Path)
     pr_sub.add_parser("export", help="print a profile as json").add_argument("code")
+    nt = sub.add_parser("notes", help="plain-english notes and ai suggestions")
+    nt.add_subparsers(dest="notes_cmd", required=True).add_parser(
+        "import", help="load a jsonl of notes").add_argument("file", type=Path)
     args = parser.parse_args(argv)
     if args.cmd == "profile":
         return profile(args)
+    if args.cmd == "notes":
+        return notes(args)
     url = os.environ.get("PAPER_TRAIL_DATABASE_URL")
     if not url:
         parser.error("PAPER_TRAIL_DATABASE_URL is not set")
