@@ -26,3 +26,10 @@ def test_old_profiles_with_a_word_list_still_load():
                                    "ts_config": "hungarian", "currency": "HUF",
                                    "currency_words": ["Ft", "forint"]})
     assert p.currency_words == {"Ft": "HUF", "forint": "HUF"}
+
+
+def test_profiles_in_the_db_with_the_old_regex_ner_keys_still_load():
+    p = LanguageProfile.from_dict({"code": "hu", "name": "Hungarian", "stemmer": "hungarian",
+                                   "ts_config": "hungarian", "months_re": "január",
+                                   "org_suffixes_re": "Zrt", "intent_re": "cél"})
+    assert p.code == "hu"

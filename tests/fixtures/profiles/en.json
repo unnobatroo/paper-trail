@@ -110,12 +110,6 @@
   "replacement"
  ],
  "jurisdiction_cues": {},
- "months_re": "january|february|march|april|may|june|july|august|september|october|november|december",
- "upper_chars": "A-Z",
- "lower_chars": "a-z",
- "org_suffixes_re": "Ltd\\.?|Inc\\.?|LLC|Corp\\.?|Council|Municipality|Authority|Department|Agency|Foundation|Association|Committee|Trust",
- "org_names_re": "",
- "place_words_re": "street|avenue|road|square|park|boulevard|lane|district|neighbourhood|neighborhood|garden|gardens",
  "place_drop_suffixes": [],
  "report_cues": [
   ".pdf",
@@ -214,8 +208,6 @@
   "to",
   "–"
  ],
- "intent_re": "aim|target|goal|increase|decrease|reduce|achieve|implement|establish|develop|improve|introduce|ensure|maintain|plant|upgrade|support|create|deliver",
- "units_re": "m2|m²|%|km|km2|ha|mm|°C|kWh|MWh|tCO2|EUR|USD|GBP|€|\\$|£",
  "currency": "GBP",
  "min_amount": 100,
  "procurement_id_re": "\\b(?:ocds-[a-z0-9]{6}-[\\w-]+|CF-\\d{4}-\\d{6,})\\b"

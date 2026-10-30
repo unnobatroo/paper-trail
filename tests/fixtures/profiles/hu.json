@@ -192,12 +192,6 @@
    "országos"
   ]
  },
- "months_re": "január|február|március|április|május|június|július|augusztus|szeptember|október|november|december",
- "upper_chars": "A-ZÁÉÍÓÖŐÚÜŰ",
- "lower_chars": "a-záéíóöőúüű",
- "org_suffixes_re": "Zrt\\.?|Kft\\.?|Önkormányzat[a-záéíóöőúüű]*|Iroda|Központ|Egyesület|Alapítvány|Hivatal[a-záéíóöőúüű]*",
- "org_names_re": "RÉV8|Rév8|JGK|FŐKERT|Főkert|BKV|BKK|Józsefvárosi Önkormányzat|Budapest Főváros Önkormányzat[a-záéíóöőúüű]*",
- "place_words_re": "tér|tere|téren|téri|utca|utcában|utcába|utcáján|utcai|út|úton|köz|sétány|sétányt|park|parkja|kert|kertje|lakótelep",
  "place_drop_suffixes": [
   "ban",
   "ba",
@@ -334,8 +328,6 @@
   "és",
   "–"
  ],
- "intent_re": "cél|irányoz|irányít|tervez|növel|csökkent|elér|megvalós|felszámol|kialakít|fejleszt|javít|bevezet|biztosít|fenntart|ültet|korszerűsít|támogat",
- "units_re": "m2|m²|%|db|fő/év|fő|mm|°C|kWh|Ft|m-en",
  "currency": "HUF",
  "min_amount": 10000,
  "procurement_id_re": "\\bEKR\\d{9,12}\\b|\\b(?:VEKOP|KEHOP|GINOP|EFOP|TOP|TOP_PLUSZ|KEHOP_PLUSZ|VP)(?:-[\\dA-Z.]+){3,6}\\b",

@@ -32,6 +32,7 @@ def state(dsn, monkeypatch):
     PolicyRepository(dsn).put_language_profile("hu", HU.to_dict())
     monkeypatch.setenv("EMBED_MODEL", "hashing")
     monkeypatch.setenv("RERANKER", "none")
+    monkeypatch.setenv("NER", "none")
     monkeypatch.setenv("SEARCH_PROVIDER", "fixture")
     from paper_trail.api.deps import get_state
     get_state.cache_clear()

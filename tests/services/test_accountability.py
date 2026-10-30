@@ -26,6 +26,7 @@ from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.metrics_service import MetricsService, with_effective_flags
 from paper_trail.services.review_service import ReviewService
 from paper_trail.sources.fetch import FetchedPage
+from tests.ner import StubNer
 from tests.profiles import HU
 
 AUDIT = PassageAuditor(HU)
@@ -100,7 +101,7 @@ def test_appropriation_is_not_spending_until_final_accounts():
 
 def _service(evidence, tmp_path, pages):
     svc = EvidenceService(evidence, SimpleNamespace(search=lambda *a, **kw: []),
-                          HashingProvider(), profile=HU)
+                          HashingProvider(), profile=HU, ner=StubNer(places=["Kálvária tér"]))
     svc._collect_urls = lambda *a: [p.url for p in pages]
     svc._fetch_page = lambda url, *a: next(p for p in pages if p.url == url)
     return svc

@@ -123,7 +123,7 @@ def build_state(settings: Settings | None = None) -> AppState:
             baseline_year=_baseline_year(settings, policy),
             profile=profile,
             allowed_domains=settings.allowed_domains,
-            ner=get_ner(settings.ner, profile, str(settings.model_cache)),
+            ner=get_ner(settings.ner, str(settings.model_cache)),
         ),
         metrics=MetricsService(policy, evidence, profile),
         docs=docs,
