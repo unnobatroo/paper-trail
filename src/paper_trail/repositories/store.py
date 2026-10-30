@@ -339,12 +339,11 @@ class EvidenceRepository(Repo):
     def link_artifact(self, procurement_id: str, evidence_id: int,
                       polarity: EvidencePolarity) -> ImplementationArtifact:
         status = POLARITY_STATUS[polarity]
-        lock = " FOR UPDATE"
         with self._engine.begin() as conn:
             conn.execute(text("INSERT INTO implementation_artifacts(procurement_id) VALUES (:p)"
                               " ON CONFLICT(procurement_id) DO NOTHING"), {"p": procurement_id})
             row = conn.execute(text("SELECT * FROM implementation_artifacts"
-                                    f" WHERE procurement_id=:p{lock}"),
+                                    " WHERE procurement_id=:p FOR UPDATE"),
                                {"p": procurement_id}).mappings().one()
             # status only ever escalates: active -> amended -> terminated
             if ARTIFACT_RANK[status] > ARTIFACT_RANK[ArtifactStatus(row["status"])]:

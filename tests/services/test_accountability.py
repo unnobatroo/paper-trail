@@ -120,11 +120,11 @@ def test_umbrella_contract_cancellation_reaches_every_commitment(policy, evidenc
                             "Az EKR001234562021 szerződést az önkormányzat felmondta.")
     first, second = _commitment(policy, "Vízvezeték A"), _commitment(policy, "Vízvezeték B")
     svc = _service(evidence, tmp_path, [framework, cancelled])
-    svc._rank = lambda com, pages: [(framework, framework.text, 0.9)]
+    svc._rank = lambda com, pages, run: [(framework, framework.text, 0.9)]
     [link_a] = svc.find_evidence(first)
     # a person accepts the first link before anyone notices the cancellation
     evidence.decide_link(link_a.id, ReviewStatus.ACCEPTED, RelationshipType.DIRECT_IMPLEMENTATION)
-    svc._rank = lambda com, pages: [(cancelled, cancelled.text, 0.9)]
+    svc._rank = lambda com, pages, run: [(cancelled, cancelled.text, 0.9)]
     [link_b] = svc.find_evidence(second)
     assert link_b.suggested_relationship != RelationshipType.DIRECT_IMPLEMENTATION
     ev_map = evidence.evidence_many([link_a.evidence_id, link_b.evidence_id])
@@ -148,10 +148,10 @@ def test_parcel_numbers_resolve_to_the_street_that_matching_sees(policy, evidenc
                            "A 36542/1 hrsz. ingatlan felújítása elkészült.")
     com = _commitment(policy, "Kálvária tér megújítása")
     svc = _service(evidence, tmp_path, [first, contract])
-    svc._rank = lambda c, pages: [(first, first.text, 0.5)]
+    svc._rank = lambda c, pages, run: [(first, first.text, 0.5)]
     svc.find_evidence(com)
     assert evidence.resolve_parcel("36542/1") == "Kálvária tér"
-    svc._rank = lambda c, pages: [(contract, contract.text, 0.5)]
+    svc._rank = lambda c, pages, run: [(contract, contract.text, 0.5)]
     [link] = svc.find_evidence(com)
     # the contract never names the square, the gazetteer adds it
     assert "Kálvária tér" in evidence.evidence(link.evidence_id).locations
