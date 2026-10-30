@@ -1,17 +1,18 @@
-"""Fetch and read allow-listed official pages and PDFs.
+"""fetch + read allowlisted official pages and pdfs
 
-Not a crawler: given a URL already found by search (or listed in the official
-document registry), download once and return plain text. HTML goes through
-trafilatura, PDFs through pypdf. The allowlist is supplied by the caller —
-it derives from the source registry, not from code.
+not a crawler: a url from search or the registry, downloaded once, plain text out.
+html via trafilatura, pdfs via the parsers
 """
 
 from __future__ import annotations
 
 import io
+import ipaddress
+import socket
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
+from urllib.parse import urljoin, urlsplit
 
 import charset_normalizer
 import requests
@@ -22,7 +23,7 @@ from .web_search import allowed
 
 _HEADERS = {"User-Agent": "paper-trail/0.1 (municipal evidence research)"}
 _TIMEOUT = 30
-_MAX_BYTES = 25 * 1024 * 1024  # biggest strategy pdfs are ~10 MB
+_MAX_BYTES = 25 * 1024 * 1024  # biggest strategy pdfs are ~10mb
 
 
 @dataclass
@@ -33,33 +34,33 @@ class FetchedPage:
     published_on: date | None = None
 
 
-def fetch(url: str, allowed_domains: Collection[str]) -> FetchedPage | None:
-    """Fetch one allow-listed URL. Returns None when unreadable/off-list."""
+def fetch(url: str, allowed_domains: Collection[str], parser=None) -> FetchedPage | None:
+    """fetch one allowlisted url, None if unreadable or off-list"""
     if not allowed(url, allowed_domains):
         return None
     try:
-        resp = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT, stream=True)
+        resp = safe_get(url, allowed_domains)
         resp.raise_for_status()
         content = _read_capped(resp)
     except requests.RequestException:
         return None
     if content is None:
         return None
-    # redirects are followed, recheck the allowlist on the final url
+    # redirects get followed, so recheck the allowlist on the final url
     if not allowed(resp.url, allowed_domains):
         return None
 
     if url.lower().endswith(".pdf") or resp.headers.get("content-type", "").startswith(
             "application/pdf"
     ):
-        return _read_pdf(url, content)
+        return _read_pdf(url, content, parser)
     return _read_html(url, _decode(content, resp.encoding))
 
 
 def _decode(content: bytes, declared: str | None) -> str:
-    """Declared charset when python knows it, else let charset_normalizer
-    (already a requests dependency) guess. A bogus header shouldn't sink
-    the whole search."""
+    """declared charset if python knows it, else let charset_normalizer guess.
+    a bogus header shouldn't sink the whole search
+    """
     if declared:
         try:
             return content.decode(declared, errors="replace")
@@ -70,8 +71,7 @@ def _decode(content: bytes, declared: str | None) -> str:
 
 
 def _read_capped(resp: requests.Response) -> bytes | None:
-    """Body up to _MAX_BYTES, None past it — a runaway download shouldn't
-    pin a worker or its memory."""
+    """body up to _MAX_BYTES, None past it, a runaway download shouldn't pin a worker"""
     buf = bytearray()
     for chunk in resp.iter_content(64 * 1024):
         buf += chunk
@@ -81,10 +81,15 @@ def _read_capped(resp: requests.Response) -> bytes | None:
     return bytes(buf)
 
 
-def _read_pdf(url: str, content: bytes) -> FetchedPage | None:
+def _read_pdf(url: str, content: bytes, parser=None) -> FetchedPage | None:
     try:
-        reader = PdfReader(io.BytesIO(content))
-        text = "\n\n".join(p.extract_text() or "" for p in reader.pages)
+        if parser is not None:
+            text = parser.parse(content).markdown
+        else:
+            reader = PdfReader(io.BytesIO(content))
+            text = "\n\n".join(
+                f"<!-- page {i + 1} -->\n{p.extract_text() or chr(32)}"
+                for i, p in enumerate(reader.pages))
     except Exception:
         return None
     if not text.strip():
@@ -94,7 +99,7 @@ def _read_pdf(url: str, content: bytes) -> FetchedPage | None:
 
 
 def _read_html(url: str, html: str) -> FetchedPage | None:
-    # htmldate chokes on junk dates (+25:00 offsets), a bad date shouldn't cost us the page
+    # htmldate chokes on junk dates (+25:00 lol), a bad date shouldn't cost the page
     try:
         meta = trafilatura.extract_metadata(html)
     except Exception:
@@ -117,3 +122,25 @@ def _read_html(url: str, html: str) -> FetchedPage | None:
         text=text,
         published_on=published,
     )
+
+
+def safe_get(url: str, domains: Collection[str]) -> requests.Response:
+    for _ in range(6):
+        if not allowed(url, domains):
+            raise requests.RequestException("off-domain source redirect")
+        host = urlsplit(url).hostname
+        try:
+            addresses = socket.getaddrinfo(host, None)
+        except OSError as exc:
+            raise requests.RequestException("source DNS failed") from exc
+        if not addresses or any(not ipaddress.ip_address(a[4][0]).is_global for a in addresses):
+            raise requests.RequestException("source resolves to a private address")
+        response = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT,
+                                stream=True, allow_redirects=False)
+        if response.is_redirect or response.is_permanent_redirect:
+            following = urljoin(url, response.headers.get("Location", ""))
+            response.close()
+            url = following
+        else:
+            return response
+    raise requests.RequestException("too many source redirects")

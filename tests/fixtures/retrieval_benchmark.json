@@ -1,0 +1,14 @@
+{
+  "documents": [
+    {"id": "trees", "text": "Józsefváros utcafásítási programjában új fákat ültettek az utcákban, növelve a zöldfelületeket."},
+    {"id": "energy", "text": "Az önkormányzati épületek energetikai korszerűsítése keretében hőszigetelés és napelem telepítés valósult meg."},
+    {"id": "budget", "text": "A zöldfelületi program költségvetési előirányzata 100 millió forint. Ez tervezett keret, nem igazolt kiadás."},
+    {"id": "transport", "text": "Kerékpáros közlekedés fejlesztése, új kerékpártárolók és biztonságos gyalogos átkelőhelyek létesítése."}
+  ],
+  "queries": [
+    {"text": "utcafásítás fák ültetése zöldfelületek", "relevant": ["trees"]},
+    {"text": "energetikai korszerűsítés hőszigetelés napelem", "relevant": ["energy"]},
+    {"text": "zöldfelületi program költségvetési előirányzata", "relevant": ["budget"]},
+    {"text": "kerékpáros közlekedés kerékpártárolók", "relevant": ["transport"]}
+  ]
+}

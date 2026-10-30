@@ -1,19 +1,17 @@
-"""Deterministic parsing of municipal text — language-agnostic engine.
+"""deterministic parsing: orgs, places, dates, money from per-language patterns (lang.py)
 
-Orgs, locations, dates and money are extracted with patterns compiled from
-a `LanguageProfile` (see `lang.py`) — a language model is not needed for
-this and would be harder to verify. Every returned mention keeps the
-verbatim text it came from.
+no model on purpose, regexes are easy to check
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 
-from .lang import LanguageProfile
 from ..domain.enums import BudgetKind, Status
+from .lang import LanguageProfile
 
 # money
 
@@ -23,12 +21,12 @@ _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 
 @lru_cache(maxsize=8)
 def _compiled(profile: LanguageProfile):
-    """All regexes a profile needs, built once per profile."""
-    cur = "|".join(re.escape(c) for c in profile.currency_words) or r"(?!)"
+    """every regex a profile needs, compiled once"""
+    cur = "|".join(re.escape(c) for c in (*profile.currency_words, "EUR", "euró", "euro", "€"))
     mult = ("|".join(re.escape(m) for m in profile.multiplier_words)
             or r"(?!)")
     money = re.compile(
-        _AMOUNT + rf"\s*({mult})?\s*({cur})\b", re.IGNORECASE)
+        _AMOUNT + rf"\s*({mult})?\s*({cur})(?!\w)", re.IGNORECASE)
 
     date = None
     if profile.months_re:
@@ -69,8 +67,7 @@ def _compiled(profile: LanguageProfile):
 
 def _to_number(profile: LanguageProfile, number: str,
                multiplier_word: str | None) -> int | None:
-    """Locale-aware amount normalisation: '300.000 Ft' is 300 000 with a
-    decimal-comma profile, '2,5 milliárd' is 2.5 billion."""
+    """'300.000 Ft' = 300 000 with decimal commas, '2,5 milliárd' = 2.5 billion"""
     raw = number.replace(" ", "").replace("\u00a0", "")
     if profile.decimal_comma:
         raw = raw.replace(".", "").replace(",", ".")
@@ -99,6 +96,8 @@ class BudgetMention:
     kind: BudgetKind | None  # None = money stated, kind unclear
     sentence: str
     year: int | None
+    currency: str = "HUF"
+    amount_native: str | None = None
 
 
 def extract_money(text: str,
@@ -113,9 +112,20 @@ def extract_money(text: str,
             None,
         )
         y = _YEAR_RE.search(sentence)
+        currency = "EUR" if m.group(3).lower() in {"eur", "euró", "euro", "€"} else "HUF"
+        number = re.sub(r"\s+", "", m.group(1))
+        number = (number.replace(".", "").replace(",", ".") if profile.decimal_comma
+                  else number.replace(",", ""))
+        try:
+            native = format(Decimal(number) * Decimal(str(profile.multiplier_words.get(
+                (m.group(2) or "").lower(), 1))), "f")
+        except InvalidOperation:
+            native = None
         mentions.append(
             BudgetMention(
-                amount_huf=_to_number(profile, m.group(1), m.group(2)),
+                amount_huf=(_to_number(profile, m.group(1), m.group(2))
+                            if currency == "HUF" else None),
+                currency=currency, amount_native=native,
                 amount_raw=" ".join(m.group(0).split()),
                 kind=kind,
                 sentence=sentence,
@@ -128,8 +138,7 @@ def extract_money(text: str,
 # dates
 
 def extract_dates(text: str, profile: LanguageProfile) -> list[str]:
-    """Verbatim date mentions: full dates like '2024. március 15.' and
-    bare years like '2030-ra' / '2024-ben'."""
+    """dates as written: '2024. március 15.', '2030-ra', '2024-ben'"""
     _, date_re, _, _, _, _ = _compiled(profile)
     found = []
     if date_re is not None:
@@ -146,7 +155,7 @@ def extract_dates(text: str, profile: LanguageProfile) -> list[str]:
 # orgs and locations
 
 def _norm_place(raw: str, profile: LanguageProfile) -> str:
-    """Rough base form for matching: 'Losonci téren' → 'losonci tér'."""
+    """rough base form for matching: 'Losonci téren' -> 'losonci tér'"""
     words = raw.lower().split()
     last = words[-1]
     for suffix in profile.place_drop_suffixes:
@@ -187,12 +196,11 @@ def extract_locations(text: str,
     return out
 
 
-# what the source supports: keyword rules on the matched chunk, never the whole doc
+# what the source backs up: keyword rules on the matched chunk, never the whole doc
 
 def is_report_doc(url: str, title: str,
                   profile: LanguageProfile) -> bool:
-    """Broad planning documents vs concrete pages — cues like file
-    extensions and report-type words from the profile."""
+    """big planning docs vs concrete pages, by file type and report words"""
     blob = f"{url} {title}".lower()
     return any(c in blob for c in profile.report_cues)
 
@@ -200,12 +208,10 @@ def is_report_doc(url: str, title: str,
 def classify_status(text: str, profile: LanguageProfile, *,
                     is_report: bool = False,
                     has_money: bool = False) -> tuple[Status, str | None]:
-    """What this excerpt itself supports.
+    """what this excerpt itself backs up
 
-    First lifecycle cue wins, strongest claim first. With no lifecycle cue:
-    money-only text is budget evidence; a broad report without cues is
-    background material; anything else is honestly unclear. Conservative by
-    design — a missed status is better than a claimed one.
+    first lifecycle cue wins, strongest first. no cue: money-only = budget evidence,
+    a broad report = background, anything else = honestly unclear. conservative on purpose
     """
     lower = text.lower()
     for status, cues in profile.status_rules:

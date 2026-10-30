@@ -1,0 +1,350 @@
+{
+ "code": "hu",
+ "name": "Hungarian",
+ "stemmer": "hungarian",
+ "ts_config": "hungarian",
+ "currency_words": [
+  "Ft",
+  "forint"
+ ],
+ "multiplier_words": {
+  "milliárd": 1000000000,
+  "mrd": 1000000000,
+  "millió": 1000000,
+  "ezer": 1000
+ },
+ "decimal_comma": true,
+ "budget_cues": {
+  "actual_expenditure": [
+   "zárszámadás",
+   "tényleges kiadás",
+   "teljesítési adat",
+   "pénzügyi teljesítés",
+   "kiadási teljesítés",
+   "teljesült kiadás"
+  ],
+  "contracted_price": [
+   "szerződéses ár",
+   "szerződéses összeg",
+   "szerződés értéke",
+   "szerződés összege",
+   "vállalási ár",
+   "ajánlati ár",
+   "nettó ellenszolgáltatás",
+   "ellenszolgáltatás összege",
+   "megkötött szerződés"
+  ],
+  "amended_appropriation": [
+   "módosított előirányzat",
+   "költségvetés módosítás",
+   "költségvetésének módosítás",
+   "előirányzat-módosítás",
+   "előirányzat módosítás",
+   "átcsoportosít"
+  ],
+  "initial_appropriation": [
+   "eredeti előirányzat",
+   "költségvetési rendelet",
+   "előirányzat",
+   "támogatást nyert",
+   "támogatást kap",
+   "elnyert",
+   "nyert összeg",
+   "költségkeret",
+   "keretösszeg",
+   "keretből",
+   "pályázati keret",
+   "támogatási szerződés",
+   "forint támogatás",
+   "forintra",
+   "igényelhető",
+   "megállapított",
+   "jóváhagyott",
+   "különített el",
+   "forintot különít"
+  ],
+  "reported_expenditure": [
+   "kifizetés",
+   "kifizetésre került",
+   "költöttek",
+   "elköltött",
+   "elszámolt",
+   "felmerült költség",
+   "került sor"
+  ],
+  "estimated_cost": [
+   "becsült",
+   "várható költség",
+   "tervezett költség"
+  ]
+ },
+ "completion_certificate_cues": [
+  "műszaki átadás-átvétel",
+  "műszaki átadás–átvétel",
+  "átadás-átvételi jegyzőkönyv",
+  "műszaki átadás átvétel",
+  "sikeres műszaki átadás"
+ ],
+ "termination_cues": [
+  "meghiúsult",
+  "eredménytelen",
+  "eredménytelennek nyilvánít",
+  "felmondta",
+  "felmondták",
+  "szerződés felmondás",
+  "elállt a szerződés",
+  "elállás",
+  "visszavont",
+  "visszavonták",
+  "megszüntették a szerződés",
+  "szerződés megszűn",
+  "nem valósul meg",
+  "nem valósult meg",
+  "leállították",
+  "törölték a projekt"
+ ],
+ "amendment_cues": [
+  "szerződésmódosítás",
+  "szerződés módosítás",
+  "módosították a szerződés",
+  "határidő-módosítás",
+  "határidő módosítás",
+  "határidőt módosít",
+  "műszaki tartalom módosítás",
+  "csökkentett műszaki tartalom",
+  "átütemez",
+  "elhalaszt",
+  "elhalasztották"
+ ],
+ "maintenance_cues": [
+  "hibaelhárítás",
+  "csőtörés",
+  "kátyú",
+  "kátyúzás",
+  "javítás",
+  "javították",
+  "karbantartás",
+  "állagmegóvás",
+  "szükségmegoldás",
+  "eseti javítás",
+  "hibajavítás",
+  "burkolatjavítás"
+ ],
+ "upgrade_cues": [
+  "rekonstrukció",
+  "energetikai korszerűsítés",
+  "korszerűsítés",
+  "felújítás",
+  "teljes körű felújítás",
+  "hőszigetelés",
+  "nyílászárócsere",
+  "napelem",
+  "zöldtető",
+  "esővízgyűjt",
+  "zöldfelület növel",
+  "fásítás",
+  "csapadékvíz-gazdálkodás",
+  "kapacitásbővítés",
+  "új vezeték",
+  "vezetékcsere",
+  "átépítés",
+  "mélyépítés"
+ ],
+ "jurisdiction_cues": {
+  "public_utility_water": [
+   "vízmű",
+   "vízvezeték",
+   "ivóvíz",
+   "csatorna",
+   "szennyvíz",
+   "csapadékcsatorna",
+   "vízhálózat",
+   "vízközmű"
+  ],
+  "public_utility_heating": [
+   "távhő",
+   "főtáv",
+   "távfűtés",
+   "hőközpont"
+  ],
+  "metropolitan_municipality": [
+   "főváros",
+   "fővárosi",
+   "budapest közút",
+   "bkk",
+   "bkv",
+   "villamos",
+   "főútvonal",
+   "fő útvonal",
+   "körút",
+   "rakpart",
+   "duna-part"
+  ],
+  "national_government": [
+   "kormány",
+   "minisztérium",
+   "állami",
+   "nemzeti",
+   "országos"
+  ]
+ },
+ "months_re": "január|február|március|április|május|június|július|augusztus|szeptember|október|november|december",
+ "upper_chars": "A-ZÁÉÍÓÖŐÚÜŰ",
+ "lower_chars": "a-záéíóöőúüű",
+ "org_suffixes_re": "Zrt\\.?|Kft\\.?|Önkormányzat[a-záéíóöőúüű]*|Iroda|Központ|Egyesület|Alapítvány|Hivatal[a-záéíóöőúüű]*",
+ "org_names_re": "RÉV8|Rév8|JGK|FŐKERT|Főkert|BKV|BKK|Józsefvárosi Önkormányzat|Budapest Főváros Önkormányzat[a-záéíóöőúüű]*",
+ "place_words_re": "tér|tere|téren|téri|utca|utcában|utcába|utcáján|utcai|út|úton|köz|sétány|sétányt|park|parkja|kert|kertje|lakótelep",
+ "place_drop_suffixes": [
+  "ban",
+  "ba",
+  "ján",
+  "ja",
+  "én",
+  "re",
+  "n",
+  "t",
+  "i",
+  "e"
+ ],
+ "report_cues": [
+  ".pdf",
+  "beszámoló",
+  "secap",
+  "stratégia",
+  "akcióterv",
+  "tanulmány",
+  "intézkedési terv",
+  "koncepcio",
+  "koncepció",
+  "program 20",
+  "program-",
+  "melleklet",
+  "tervezet"
+ ],
+ "status_rules": [
+  [
+   "completed",
+   [
+    "elkészült",
+    "megvalósult",
+    "átadták",
+    "átadásra került",
+    "megújult",
+    "fejeződtek be",
+    "befejeződött",
+    "ültettek el",
+    "elültetésre került",
+    "elültették",
+    "ültetésre került",
+    "telepítettünk",
+    "létesült",
+    "megnyílt",
+    "jött létre",
+    "létrejött",
+    "megépült",
+    "készült el",
+    "megvalósítottuk",
+    "megnyitottuk",
+    "átadtuk",
+    "átadását"
+   ]
+  ],
+  [
+   "in_implementation",
+   [
+    "kivitelezés folyamatban",
+    "kivitelezése folyamatban",
+    "munkálatok",
+    "a munkák megkezdődtek",
+    "munka megkezdődött",
+    "felbontjuk",
+    "feltörjük",
+    "megújítása zajlik",
+    "felújítás zajlik",
+    "építkezés",
+    "kivitelezés zajlik",
+    "kivitelezését"
+   ]
+  ],
+  [
+   "in_preparation",
+   [
+    "tervezés folyamatban",
+    "előkészítés",
+    "tervezzük",
+    "véleményezhetik",
+    "koncepcióterv",
+    "lakossági fórum",
+    "kiviteli terv",
+    "engedélyeztetés",
+    "előkészítése folyamatban",
+    "közösségi tervezés",
+    "tervezik meg",
+    "egyeztetésre kerül",
+    "társadalmi egyeztetés"
+   ]
+  ],
+  [
+   "announced",
+   [
+    "bejelentette",
+    "bejelentés",
+    "kiírjuk",
+    "kiírásra kerül",
+    "meghirdette",
+    "meghirdetésre kerül",
+    "pályázatot indít",
+    "pályázatot hirdet",
+    "indul a pályázat",
+    "indul a program",
+    "pályázni lehet",
+    "nyílt pályázat"
+   ]
+  ],
+  [
+   "planned",
+   [
+    "tervezett",
+    "tervei szerint",
+    "nyertes ötlet",
+    "javaslat",
+    "tervezik",
+    "valósuljon meg",
+    "megvalósításra kerül",
+    "megvalósítását tervezi"
+   ]
+  ]
+ ],
+ "title_stopwords": [
+  "-",
+  "a",
+  "az",
+  "downloads",
+  "egy",
+  "es",
+  "hogy",
+  "letoltes",
+  "of",
+  "pdf",
+  "the",
+  "és",
+  "–"
+ ],
+ "code_pattern": "[AMS][a-z]?\\d+(?:\\.\\d+)*",
+ "goal_labels": [
+  "Stratégiai cél"
+ ],
+ "pillar_labels": [
+  "Tematikus cél"
+ ],
+ "card_label": "Intézkedés kódja",
+ "responsible_label": "Felelős",
+ "timeframe_label": "Időtáv",
+ "indicator_label": "Indikátor",
+ "noise_words": [
+  "KEHOP",
+  "Klímastratégiája"
+ ],
+ "intent_re": "cél|irányoz|irányít|tervez|növel|csökkent|elér|megvalós|felszámol|kialakít|fejleszt|javít|bevezet|biztosít|fenntart|ültet|korszerűsít|támogat",
+ "units_re": "m2|m²|%|db|fő/év|fő|mm|°C|kWh|Ft|m-en"
+}

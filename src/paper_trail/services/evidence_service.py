@@ -1,8 +1,7 @@
-"""evidence discovery: commitment -> official sources -> ranked links for review
+"""evidence search: commitment -> official sources -> ranked links for a person
 
-fixed pipeline, no agents: site-restricted search + registry -> fetch once ->
-chunk the full doc -> embed once (cached by content hash) -> top chunks ->
-rerank -> rule-based entities/money -> suggested relationship -> human review
+fixed pipeline, no agents: route -> search + registry -> fetch once -> chunk ->
+embed once -> hybrid top-k -> rerank -> read the passage -> suggest
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from ..domain.enums import Status
+from ..domain.enums import EvidenceFlag, EvidencePolarity, Status
 from ..domain.models import (
     BudgetRecord,
     Commitment,
@@ -24,27 +23,26 @@ from ..domain.models import (
     OfficialSource,
 )
 from ..ml import entities, matching
+from ..ml.accountability import PassageAuditor
 from ..ml.embeddings import EmbeddingProvider
 from ..ml.lang import LanguageProfile
+from ..ml.nlp import TextAnalyzer
 from ..ml.rerank import Reranker
-from ..repositories.cache import (
-    FilePageStore,
-    FileVectorIndex,
-    PageStore,
-    VectorIndex,
-)
-from ..repositories.ports import EvidenceStore
+from ..repositories.ports import EvidenceStore, PageStore, VectorIndex
+from ..repositories.sqlite.files import FilePageStore, FileVectorIndex
 from ..sources import fetch as fetching
+from ..sources.chunking import structure_chunks
 from ..sources.fetch import FetchedPage
 from ..sources.web_search import SearchProvider, allowed
+from .gazetteer import PlaceResolver
 
 TOP_K = 5
-_CHUNK = 2400  # bigger chunks retrieved better in evals
-_CHUNK_STRIDE = _CHUNK - 400  # overlap so edge evidence isn't split
-# panic bound for corrupt input only, truncates and warns, real docs go through in full
+_CHUNK = 2400  # bigger chunks won the evals
+_CHUNK_STRIDE = _CHUNK - 400  # overlap so edge evidence doesn't get cut
+# panic bound for corrupt input only, truncates + warns, real docs go in full
 _DEFAULT_MAX_DOC_CHARS = 4_000_000
 
-# per-run state so concurrent jobs don't stomp each other's progress/warnings
+# per-run state so parallel jobs don't stomp each other's progress/warnings
 _run_warnings: ContextVar[list[str] | None] = ContextVar(
     "pt_warnings", default=None)
 _run_progress: ContextVar[Callable[[str], None] | None] = ContextVar(
@@ -52,7 +50,7 @@ _run_progress: ContextVar[Callable[[str], None] | None] = ContextVar(
 
 
 def _key(commitment: Commitment) -> str:
-    """full sentences return nothing on site: search, keep ~10 words + the doc code"""
+    """full sentences find nothing on site: search, ~10 words + the code"""
     words = commitment.title.split()[:10]
     parts = [" ".join(words)]
     if commitment.code:
@@ -76,20 +74,30 @@ class EvidenceService:
             baseline_year: int | None = None,
             profile: LanguageProfile | None = None,
             allowed_domains: tuple[str, ...] = (),
+            analyzer: TextAnalyzer | None = None,
+            crawler=None,
+            max_fetch_workers: int = 2,
+            parser=None,
+            auditor: PassageAuditor | None = None,
+            places: PlaceResolver | None = None,
     ):
+        self._analyzer = analyzer
+        self._crawler = crawler
+        self._fetch_workers = max(1, min(max_fetch_workers, 8))
         self._repo = repo
         self._search = search
         self._embed = embedder
-        self._fetch = fetcher or fetching.fetch
+        self._fetch = fetcher or (lambda url, domains: fetching.fetch(url, domains, parser=parser))
         self._reranker = reranker
         self._candidates = candidates
         self._max_doc_chars = max_doc_chars
         self._baseline_year = baseline_year
         # locale cues all live in lang.py
-        from ..ml.lang import get_profile
-        self._profile = profile or get_profile("")
+        self._profile = profile or LanguageProfile.empty()
+        self._auditor = auditor or PassageAuditor(self._profile)
+        self._places = places or PlaceResolver(repo)
         self._extra_domains = {d.lower() for d in allowed_domains}
-        # explicit stores (supabase/pgvector) win, else files under cache_dir
+        # explicit stores (postgres/pgvector) win, else files under cache_dir
         if page_store is None or vector_index is None:
             if cache_dir is None:
                 raise ValueError(
@@ -115,10 +123,10 @@ class EvidenceService:
             progress=None,
             warnings: list[str] | None = None,
     ) -> list[EvidenceLink]:
-        """run discovery for one commitment
+        """run the search for one commitment
 
-        `progress(msg)` fires per stage so a cold run doesn't look hung,
-        pass `warnings` when jobs run concurrently, else they land on `self.warnings`
+        progress(msg) fires per stage so a cold run doesn't look frozen. pass warnings when
+        jobs run in parallel, else they land on self.warnings
         """
         if warnings is None:
             self.warnings = warnings = []
@@ -132,16 +140,22 @@ class EvidenceService:
 
     def _discover(self, commitment: Commitment) -> list[EvidenceLink]:
         self._say("Finding official sources…")
-        registry = self._repo.official_sources()
-        domains = self._allowed(registry)
+        registry, domains, routed, owner_term = self._sources(commitment)
         if not domains:
             self._warn("No evidence sources configured — the "
                        "official_sources registry is empty and "
                        "PAPER_TRAIL_ALLOWED_DOMAINS is unset.")
-        urls = self._collect_urls(commitment, registry, domains)
+        if self._crawler is not None:
+            try:
+                for source in self._crawler.discover(domains):
+                    self._repo.upsert_official_source(source)
+                registry, domains, routed, owner_term = self._sources(commitment)
+            except Exception as exc:
+                self._warn(f"Source discovery failed ({type(exc).__name__})")
+        urls = self._collect_urls(commitment, registry, domains, routed, owner_term)
         self._say(f"Found {len(urls)} official pages to check — reading them…")
-        # fetches are pure io, run them concurrently so slow servers don't stall the search
-        with ThreadPoolExecutor(max_workers=6) as pool:
+        # fetching is pure io, go parallel so one slow server doesn't stall everything
+        with ThreadPoolExecutor(max_workers=self._fetch_workers) as pool:
             pages = [
                 p for p in pool.map(
                     lambda u: self._fetch_page(u, registry, domains),
@@ -151,70 +165,121 @@ class EvidenceService:
         if not pages:
             return []
 
+        self._places.refresh()
         links: list[EvidenceLink] = []
         for page, snippet, sim in self._rank(commitment, pages)[:TOP_K]:
-            # reviewer already decided on this source, leave row/budgets/link alone
+            # a reviewer already decided on this source, hands off
             if self._repo.reviewed_evidence_id(commitment.id, page.url) is not None:
                 continue
-            ev = EvidenceItem(
-                commitment_id=commitment.id,
-                url=page.url,
-                title=page.title,
-                publisher=self._publisher(page.url, registry),
-                published_on=page.published_on,
-                snippet=snippet,
-                organisations=entities.extract_organisations(
-                    page.text, self._profile),
-                locations=entities.extract_locations(
-                    page.text, self._profile),
-                dates_mentioned=entities.extract_dates(
-                    page.text, self._profile),
-            )
-            # judge status/money on the matched excerpt, a 100-page report has every cue somewhere
-            mentions = self._relevant_money(snippet)
-            is_report = entities.is_report_doc(page.url, page.title, self._profile)
-            stale = self._predates_strategy(page)
-            hint, excerpt = entities.classify_status(
-                snippet, self._profile,
-                is_report=is_report, has_money=bool(mentions))
-            if stale:
-                hint, excerpt = Status.BACKGROUND, None
-            ev.status_hint, ev.status_excerpt = hint, excerpt
-            ev.id = self._repo.add_evidence(ev)
-
-            for mention in mentions:
-                self._repo.add_budget(BudgetRecord(
-                    evidence_id=ev.id,
-                    kind=mention.kind,
-                    amount_huf=mention.amount_huf,
-                    amount_raw=mention.amount_raw,
-                    fiscal_year=mention.year,
-                    description=mention.sentence,
-                    source_url=page.url,
-                ))
-
-            features = matching.compute_features(commitment, ev, sim,
-                                                 self._profile)
-            has_budget = bool(self._repo.budgets_for_evidence(ev.id))
-            rel, reasons = matching.suggest_relationship(features, has_budget)
-            if stale:
-                reasons.append(
-                    f"published {page.published_on.year} — predates the "
-                    "strategy, so it can only be context")
-            link = EvidenceLink(
-                commitment_id=commitment.id,
-                evidence_id=ev.id,
-                features=features,
-                score=matching.score(features),
-                suggested_relationship=rel,
-                reasons=reasons,
-            )
-            link.id = self._repo.add_link(link)
-            links.append(link)
+            links.append(self._record(commitment, page, snippet, sim, registry))
         return links
 
+    def _record(self, commitment: Commitment, page: FetchedPage, snippet: str, sim: float,
+                registry: list[OfficialSource]) -> EvidenceLink:
+        """one matched passage -> evidence row, money, artifacts, suggested link
+
+        all of it reads the matched excerpt, a 100-page report has every cue somewhere
+        """
+        ev = self._evidence(commitment, page, snippet, registry)
+        mentions = self._relevant_money(snippet)
+        stale = self._predates_strategy(page)
+        ev.status_hint, ev.status_excerpt = self._status(page, snippet, ev, mentions, stale)
+        ev.id = self._repo.add_evidence(ev)
+        artifacts = [a for pid in ev.procurement_ids
+                     if (a := self._repo.link_artifact(pid, ev.id, ev.polarity))]
+        for mention in mentions:
+            self._repo.add_budget(BudgetRecord(
+                evidence_id=ev.id,
+                kind=mention.kind,
+                amount_huf=mention.amount_huf,
+                currency=mention.currency, amount_native=mention.amount_native,
+                amount_raw=mention.amount_raw,
+                fiscal_year=mention.year,
+                description=mention.sentence,
+                source_url=page.url,
+            ))
+        features = matching.compute_features(commitment, ev, sim, self._profile)
+        has_budget = bool(self._repo.budgets_for_evidence(ev.id))
+        rel, reasons = matching.suggest_relationship(features, has_budget)
+        rel, reasons = self._audited_hint(ev, artifacts, rel, reasons)
+        if stale:
+            reasons.append(
+                f"published {page.published_on.year} — predates the "
+                "strategy, so it can only be context")
+        link = EvidenceLink(
+            commitment_id=commitment.id,
+            evidence_id=ev.id,
+            features=features,
+            score=matching.score(features),
+            suggested_relationship=rel,
+            reasons=reasons,
+        )
+        link.id = self._repo.add_link(link)
+        return link
+
+    def _evidence(self, commitment: Commitment, page: FetchedPage, snippet: str,
+                  registry: list[OfficialSource]) -> EvidenceItem:
+        """entities, places and audit cues, passage only"""
+        analysis = self._analyzer.analyze(snippet) if self._analyzer else None
+        streets = entities.extract_locations(snippet, self._profile)
+        audit = self._auditor.audit(snippet)
+        return EvidenceItem(
+            commitment_id=commitment.id,
+            url=page.url,
+            title=page.title,
+            publisher=self._publisher(page.url, registry),
+            published_on=page.published_on,
+            snippet=snippet,
+            organisations=list(dict.fromkeys(
+                entities.extract_organisations(snippet, self._profile)
+                + (analysis.organisations if analysis else []))),
+            locations=list(dict.fromkeys(
+                streets + (analysis.locations if analysis else [])
+                + self._places.resolve(snippet, page.url, streets))),
+            dates_mentioned=list(dict.fromkeys(
+                entities.extract_dates(snippet, self._profile)
+                + (analysis.dates if analysis else []))),
+            polarity=audit.polarity,
+            flags=audit.flags,
+            procurement_ids=audit.procurement_ids,
+            parcels=audit.parcels,
+        )
+
+    def _status(self, page: FetchedPage, snippet: str, ev: EvidenceItem, mentions: list,
+                stale: bool) -> tuple[Status, str | None]:
+        is_report = entities.is_report_doc(page.url, page.title, self._profile)
+        hint, excerpt = entities.classify_status(
+            snippet, self._profile, is_report=is_report, has_money=bool(mentions))
+        if stale:
+            return Status.BACKGROUND, None
+        if ev.polarity == EvidencePolarity.TERMINATION:
+            # "works started ... then the contract got cancelled" isn't progress
+            return Status.UNKNOWN, None
+        return hint, excerpt
+
+    def _audited_hint(self, ev: EvidenceItem, artifacts: list, rel, reasons: list[str]):
+        """amendments, cancellations and maintenance-only talk cap the auto hint"""
+        flags = self._auditor.effective_flags(ev, artifacts)
+        if ev.polarity != EvidencePolarity.AFFIRMATIVE:
+            reasons.append(f"the passage reports a {ev.polarity.value}, not progress")
+            if EvidenceFlag.REGRESSION_WARNING not in flags:
+                flags.append(EvidenceFlag.REGRESSION_WARNING)
+        return self._auditor.cap(rel, reasons, flags)
+
+    def _sources(self, commitment: Commitment):
+        """registry rows for this commitment: the municipality's own + the asset owner's,
+        a district-only search makes fake gaps for a water main.
+        gives (rows, allowed domains, owner-only domains, owner name)
+        """
+        owner = commitment.asset_owner_jurisdiction
+        rows = [s for s in self._repo.official_sources() if s.jurisdiction in (None, owner)]
+        general = self._allowed([s for s in rows if s.jurisdiction is None])
+        routed = self._allowed([s for s in rows if s.jurisdiction == owner]) - general
+        term = next((s.publisher for s in rows if s.jurisdiction == owner and s.publisher), "")
+        return rows, general | routed, routed, term
+
     def _allowed(self, registry: list[OfficialSource]) -> set[str]:
-        """ssrf allowlist = configured domains + every host in the registry"""
+        """ssrf allowlist = configured domains + every registry host"""
         return self._extra_domains | {
             urlsplit(d.url).netloc.lower() for d in registry
             if urlsplit(d.url).netloc
@@ -222,12 +287,15 @@ class EvidenceService:
 
     def _collect_urls(self, commitment: Commitment,
                       registry: list[OfficialSource],
-                      domains: set[str]) -> list[str]:
+                      domains: set[str], routed: set[str] = frozenset(),
+                      owner_term: str = "") -> list[str]:
         urls: list[str] = []
         query = _key(commitment)
         for domain in sorted(domains):
+            # owner's name narrows a big utility/city site down to the right asset
+            q = f"{query} {owner_term}".strip() if domain in routed else query
             try:
-                hits = self._search.search(f"site:{domain} {query}", max_results=TOP_K)
+                hits = self._search.search(f"site:{domain} {q}", max_results=TOP_K)
             except Exception:
                 hits = []
             urls.extend(h.url for h in hits)
@@ -258,7 +326,7 @@ class EvidenceService:
     @staticmethod
     def _better_title(url: str, fetched: str,
                       registry: list[OfficialSource]) -> str:
-        """registry docs have real titles, file downloads often just a filename"""
+        """registry docs have real titles, downloads are often just a filename"""
         if fetched == url or _FILENAME_RE.search(fetched):
             for d in registry:
                 if d.url.split("?")[0] == url.split("?")[0]:
@@ -266,7 +334,7 @@ class EvidenceService:
         return fetched
 
     def _predates_strategy(self, page: FetchedPage) -> bool:
-        """predates the strategy, fine as context but its 'done/under way' cues aren't progress"""
+        """older than the strategy: fine as context, its 'done' talk isn't progress"""
         return (self._baseline_year is not None
                 and page.published_on is not None
                 and page.published_on.year < self._baseline_year)
@@ -285,14 +353,15 @@ class EvidenceService:
     _MIN_AMOUNT_HUF = 10_000  # municipal scale, smaller is noise
 
     def _relevant_money(self, snippet: str) -> list:
-        """money from the matched excerpt only: explicit currency, sane amount, deduped"""
+        """money from the matched excerpt: explicit currency, sane amount, deduped"""
         out, seen = [], set()
         for m in entities.extract_money(snippet, self._profile):
-            if m.kind is None or m.amount_huf is None:
+            if m.kind is None or m.amount_native is None:
                 continue
-            if m.amount_huf < self._MIN_AMOUNT_HUF:
+            if m.currency == "HUF" and (
+                    m.amount_huf is None or m.amount_huf < self._MIN_AMOUNT_HUF):
                 continue
-            key = (m.amount_huf, m.kind)
+            key = (m.currency, m.amount_native, m.kind)
             if key in seen:
                 continue
             seen.add(key)
@@ -300,15 +369,14 @@ class EvidenceService:
         return out
 
     def _doc_chunks(self, page: FetchedPage) -> list[str]:
-        """chunk the full doc, only the panic bound cuts it and it always warns"""
+        """chunk the whole doc, only the panic bound cuts it and it always warns"""
         text = page.text
         if len(text) > self._max_doc_chars:
             text = text[: self._max_doc_chars]
-        return [text[i: i + _CHUNK]
-                for i in range(0, len(text), _CHUNK_STRIDE)]
+        return structure_chunks(text, _CHUNK, _CHUNK - _CHUNK_STRIDE, self._warn)
 
     def _warn_if_oversized(self, page: FetchedPage) -> None:
-        """truncation must be visible to the user"""
+        """truncation has to be visible"""
         if len(page.text) > self._max_doc_chars:
             self._warn(
                 f"{page.title or page.url} is larger than the safety "
@@ -317,19 +385,21 @@ class EvidenceService:
 
     def _embed_and_store(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
         chunks = self._doc_chunks(page)
+        if not chunks:
+            return []
         vectors = self._embed.embed(chunks)
         pairs = list(zip(chunks, vectors, strict=True))
         self._index.put(page, self._embed.model_name, _CHUNK, pairs)
         return pairs
 
     def _ensure_indexed(self, page: FetchedPage) -> None:
-        """fill the vector index without pulling vectors back, remote only needs a `has()` check"""
+        """fill the index without pulling vectors back, remote just needs has()"""
         self._warn_if_oversized(page)
         if not self._index.has(page, self._embed.model_name, _CHUNK):
             self._embed_and_store(page)
 
     def _doc_vectors(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
-        """chunks + embeddings, cached so re-runs never re-embed unchanged text"""
+        """chunks + vectors, cached so re-runs never re-embed"""
         self._warn_if_oversized(page)
         cached = self._index.get(page, self._embed.model_name, _CHUNK)
         if cached is not None:
@@ -357,7 +427,7 @@ class EvidenceService:
             self._warn(
                 "Ranked by text similarity only — no reranker is loaded.")
         elif top:
-            # hosted reranker can 429/time out, retrieval order beats losing the job
+            # reranker can 429 or time out, retrieval order beats losing the job
             try:
                 ce = self._reranker.score(query_text, [c[1] for c in top])
             except Exception as exc:
@@ -367,8 +437,8 @@ class EvidenceService:
                 top = [c for _, c in sorted(zip(ce, top, strict=True),
                                             key=lambda r: -r[0])]
 
-        # one candidate per doc (best chunk), drop near-dupes so broad reports don't crowd out
-        # specific ones
+        # best chunk per doc, drop near-dupes so broad reports don't crowd out
+        # the specific ones
         seen, out = set(), []
         seen_texts: set[str] = set()
         kept_titles: list[set[str]] = []
@@ -391,7 +461,7 @@ class EvidenceService:
         return out
 
 
-# a "title" that is just a filename, any office/archive type
+# a "title" that's just a filename
 _FILENAME_RE = re.compile(
     r"\.(pdf|docx?|xlsx?|pptx?|odt|ods|rtf|csv|txt|zip)$", re.I)
 
