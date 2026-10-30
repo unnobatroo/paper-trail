@@ -1,4 +1,6 @@
-"""raw psycopg for the postgres-only bits (vector index, job queue, ops scripts)"""
+"""raw psycopg for one-off connections: maintenance, the worker's role check, ops scripts
+the stores go through store.Repo's pooled engine
+"""
 
 
 def connect(database_url):

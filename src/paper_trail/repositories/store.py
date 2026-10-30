@@ -53,7 +53,9 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-class _Repo:
+class Repo:
+    """pooled engine + tiny query helpers, every postgres store builds on this"""
+
     def __init__(self, dsn: str):
         self.dsn = dsn
         self._engine = engine(dsn)
@@ -74,12 +76,12 @@ class _Repo:
         with self._engine.begin() as conn:
             return conn.execute(stmt, params).mappings().all()
 
-    def _exec(self, sql: str, **params) -> None:
+    def _exec(self, sql: str, **params) -> int:
         with self._engine.begin() as conn:
-            conn.execute(text(sql), params)
+            return conn.execute(text(sql), params).rowcount
 
 
-class PolicyRepository(_Repo):
+class PolicyRepository(Repo):
     """documents, candidates, commitments, language profiles"""
 
     def add_document(self, doc: SourceDocument) -> int:
@@ -201,7 +203,7 @@ class PolicyRepository(_Repo):
         return to_commitment(row) if row else None
 
 
-class EvidenceRepository(_Repo):
+class EvidenceRepository(Repo):
     """sources, evidence, links, budgets, artifacts, gazetteer"""
 
     def official_sources(self) -> list[OfficialSource]:
