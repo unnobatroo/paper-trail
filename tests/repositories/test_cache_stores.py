@@ -123,3 +123,22 @@ def test_lexical_side_uses_stored_lemmas_with_an_analyzer(dsn):
                                   ("más szakasz", [0.0, 1.0])])
     top = index.match([1.0, 0.0], "ültetés", "lem", 2400, [PAGE], k=2)
     assert [t for _, t, _ in top] == ["ültetése szakasz", "fák szakasz"]
+
+
+def test_rerun_refreshes_entities_and_link_features(policy, evidence):
+    from paper_trail.domain.models import EvidenceItem, EvidenceLink, MatchFeatures
+
+    c = _commitment(policy)
+    ev_id = evidence.add_evidence(EvidenceItem(
+        commitment_id=c, url="https://jozsefvaros.hu/z", title="t", organisations=["old"]))
+    evidence.add_link(EvidenceLink(commitment_id=c, evidence_id=ev_id, score=0.5))
+    # a rerun with another ner provider: new entities, new shared features
+    evidence.add_evidence(EvidenceItem(
+        commitment_id=c, url="https://jozsefvaros.hu/z", title="t", organisations=["RÉV8"]))
+    evidence.add_link(EvidenceLink(
+        commitment_id=c, evidence_id=ev_id, score=0.6,
+        features=MatchFeatures(semantic_similarity=0.9, shared_organisations=["RÉV8"])))
+    assert evidence.evidence(ev_id).organisations == ["RÉV8"]
+    [link] = evidence.links()
+    assert link.features.semantic_similarity == 0.9
+    assert link.features.shared_organisations == ["RÉV8"]

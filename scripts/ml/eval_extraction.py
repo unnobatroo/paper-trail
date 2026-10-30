@@ -145,6 +145,11 @@ def gate(baseline: dict, summary: dict, per_doc: dict) -> int:
         old = baseline["docs"].get(name, {}).get("recall")
         if old is not None:
             print(f"{name:30} {d['split']:8} {old:.3f} -> {d['recall']:.3f}")
+    # macro over a different holdout set isn't comparable, dropping a hard doc "wins"
+    held = lambda docs: {n for n, d in docs.items() if d.get("split") == "holdout"}  # noqa: E731
+    if held(baseline["docs"]) != held(per_doc):
+        print(f"holdout docs differ: {sorted(held(baseline['docs']) ^ held(per_doc))}, can't gate")
+        return 1
     old, new = (baseline["summary"]["recall_macro_holdout"], summary["recall_macro_holdout"])
     if old is None or new is None:
         print("no holdout docs on one side, can't gate")

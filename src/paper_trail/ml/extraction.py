@@ -55,10 +55,22 @@ def source_excerpt(page_text: str, excerpt: str) -> str | None:
     return match.group(0) if match else None
 
 
+PAGE_CHARS = 6000  # per page in the prompt, build_dataset filters labels on it too
+
+
 def extraction_prompt(profile: LanguageProfile, pages: list[DocumentPage]) -> str:
     """the exact user turn the llm sees, fine-tuning builds its data with this too"""
-    body = "\n\n".join(f"--- page {p.page_number} ---\n{p.text[:6000]}" for p in pages)
+    body = "\n\n".join(f"--- page {p.page_number} ---\n{p.text[:PAGE_CHARS]}" for p in pages)
     return _PROMPT.format(language=profile.name, pages=body)
+
+
+# leading section code the prompt asks the model to keep: "M1.2", "Ks1", "Má-1"
+_CODE = re.compile(r"^([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*)(?=[\s:.)\-]|$)")
+
+
+def lead_code(title: str) -> str | None:
+    m = _CODE.match(title.strip())
+    return m.group(1).rstrip(".") if m else None
 
 
 class _Item(BaseModel):
@@ -140,6 +152,7 @@ class LLMExtractor:
                     out.append(PolicyCandidate(
                         document_id=0, suggested_type=kind, text=item.text,
                         normalized_title=item.normalized_title, source_page=item.page,
+                        code=lead_code(item.normalized_title),
                         source_excerpt=receipt, excerpt_on_page=True))
         return out
 

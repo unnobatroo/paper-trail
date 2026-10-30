@@ -27,18 +27,27 @@ def test_only_human_decisions_become_labels(dsn, monkeypatch):
     cand(1, "Bevezetés", ReviewStatus.REJECTED)
     cand(2, "Tartalomjegyzék", ReviewStatus.REJECTED)
     cand(3, "Napelemek", ReviewStatus.UNREVIEWED)
-    pages = [DocumentPage(page_number=n, text=f"page {n}") for n in (1, 2, 3)]
+    # half-reviewed page: its answer would leave out the open one
+    cand(4, "Zöldtető", ReviewStatus.ACCEPTED)
+    cand(4, "Esővíz", ReviewStatus.UNREVIEWED)
+    # accepted, but the quote sits past the prompt's page cut
+    cand(5, "Fasor", ReviewStatus.ACCEPTED)
+    texts = {1: "Fák ültetése", 2: "page 2", 3: "Napelemek", 4: "Zöldtető Esővíz",
+             5: "x" * 6000 + " Fasor"}
+    pages = [DocumentPage(page_number=n, text=t) for n, t in texts.items()]
     monkeypatch.setattr(build_dataset, "read_pages", lambda _: pages)
 
     rows = build_dataset.examples(repo, HU, doc, Path("x.pdf"))
     answers = {r["page"]: json.loads(r["messages"][1]["content"])["items"] for r in rows}
     # accepted -> an item, rejects-only -> empty, unreviewed page -> not a label at all
     assert [i["normalized_title"] for i in answers[1]] == ["Fák ültetése"]
-    assert answers[2] == [] and 3 not in answers
+    assert answers[2] == [] and 3 not in answers and 4 not in answers
+    assert answers[5] == []
 
 
 def test_gold_only_trains_on_train_split(tmp_path, monkeypatch):
-    pages = [DocumentPage(page_number=n, text=f"page {n}") for n in (1, 2)]
+    pages = [DocumentPage(page_number=1, text="a fák ültetése"),
+             DocumentPage(page_number=2, text="page 2")]
     monkeypatch.setattr(build_dataset, "read_pages", lambda _: pages)
     profiles = Path(__file__).resolve().parents[1] / "fixtures" / "profiles"
     rows = [
@@ -47,8 +56,12 @@ def test_gold_only_trains_on_train_split(tmp_path, monkeypatch):
         {"doc": "a", "pdf": "a.pdf", "lang": "hu", "split": "train", "page": 2, "empty": True},
         {"doc": "b", "pdf": "b.pdf", "lang": "hu", "split": "holdout", "page": 1,
          "kind": "measure", "title": "x", "quote": "x"},
+        # page the pdf doesn't have: skipped, not a KeyError
+        {"doc": "a", "pdf": "a.pdf", "lang": "hu", "split": "train", "page": 9,
+         "kind": "measure", "title": "y", "quote": "y"},
     ]
     out = build_dataset.gold_examples(rows, tmp_path, profiles)
     answers = {(r["doc"], r["page"]): json.loads(r["messages"][1]["content"])["items"] for r in out}
-    assert answers == {("a", 1): [{"type": "measure", "normalized_title": "Fák", "text": "Fák",
-                                   "page": 1, "excerpt": "fák ültetése"}], ("a", 2): []}
+    assert answers == {("a", 1): [{"type": "measure", "normalized_title": "Fák",
+                                   "text": "fák ültetése", "page": 1,
+                                   "excerpt": "fák ültetése"}], ("a", 2): []}

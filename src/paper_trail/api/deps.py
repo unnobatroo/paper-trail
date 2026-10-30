@@ -39,8 +39,8 @@ def _handlers():
         if n == 0:
             # zero candidates looks like a bug, so say why
             result["warnings"] = [
-                "no commitments were extracted. is an llm configured (LLM_*) "
-                "and is goethe in the extraction phase?",
+                "no commitments were extracted. is an llm configured (LLM_*) and serving, "
+                "and did its quotes match the pdf text?",
             ]
         return result
 
