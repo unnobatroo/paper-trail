@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
+from difflib import SequenceMatcher
 from itertools import chain
 
 import openai
@@ -28,14 +29,21 @@ _PROMPT = """You are extracting policy commitments from a municipal
 strategy document written in {language}. From the pages below, return ONLY
 JSON of the form {{"items": [...]}} where each item is:
   type: one of objective | measure | target | indicator
-  normalized_title: short plain name, keep a leading code such as "M1.2"
+  normalized_title: short plain name of the commitment. if the document prints a code
+    in front of it, keep that code exactly as printed, never invent or reuse one
   text: the commitment in one or two sentences
   page: the N from the "--- page N ---" marker above the text you quote
   excerpt: one short verbatim quote from that page supporting it
-Coded headings such as "M1.2 Zöld középületek" or "Sz1.3.1 ..." are objectives
+Numbered or coded headings are objectives
 or measures too. Rules: only report what the text actually says; never invent
 targets, dates or bodies; if unsure, omit the item. Write titles in {language}
 as in the source.
+
+Example (made up, not from these pages). Page text: "3.4 Green roofs on schools.
+Install green roofs on four primary schools by 2027."
+Item: {{"type": "measure", "normalized_title": "3.4 Green roofs on schools",
+"text": "Green roofs go on four primary schools by 2027.", "page": 1,
+"excerpt": "Install green roofs on four primary schools by 2027."}}
 
 PAGES:
 {pages}
@@ -48,11 +56,17 @@ def excerpt_found(page_text: str, excerpt: str) -> bool:
 
 
 def source_excerpt(page_text: str, excerpt: str) -> str | None:
-    """the excerpt as it really sits on the page (models squash whitespace), or None"""
-    if not excerpt.strip():
+    """the excerpt as it really sits on the page, or None. whitespace doesn't count: pdf text
+    has spaces mid-word ("bizonyít ékalapú", "létr e") and models quote the clean word"""
+    want = "".join(excerpt.split())
+    if not want:
         return None
-    match = re.search(r"\s+".join(map(re.escape, excerpt.split())), page_text)
-    return match.group(0) if match else None
+    # page chars minus whitespace, plus where each one sits in the real text
+    at = [i for i, ch in enumerate(page_text) if not ch.isspace()]
+    start = "".join(page_text[i] for i in at).find(want)
+    if start < 0:
+        return None
+    return page_text[at[start]:at[start + len(want) - 1] + 1]
 
 
 PAGE_CHARS = 6000  # per page in the prompt, build_dataset filters labels on it too
@@ -65,12 +79,24 @@ def extraction_prompt(profile: LanguageProfile, pages: list[DocumentPage]) -> st
 
 
 # leading section code the prompt asks the model to keep: "M1.2", "Ks1", "Má-1"
-_CODE = re.compile(r"^([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*)(?=[\s:.)\-]|$)")
+# or a dotted number ("1.01"); one dot minimum so a bare year isn't a code
+_CODE = re.compile(r"^([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*|\d+(?:\.\d+)+)"
+                   r"(?=[\s:.)\-]|$)")
 
 
 def lead_code(title: str) -> str | None:
     m = _CODE.match(title.strip())
     return m.group(1).rstrip(".") if m else None
+
+
+def grounded_title(title: str, text: str, page_text: str) -> tuple[str, str | None]:
+    """title + its code, minus a code the page never prints. the model likes to invent
+    "M1.01" for "1.01", or reuse codes from training docs, same rule as receipts"""
+    code = lead_code(title)
+    if code is None or "".join(code.split()) in "".join(page_text.split()):
+        return title, code
+    rest = title.strip()[len(code):].lstrip(" :.-–")
+    return (rest or text[:120]), None
 
 
 class _Item(BaseModel):
@@ -87,6 +113,41 @@ class _Item(BaseModel):
 class _Reply(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[_Item]
+
+
+def form_row(quote: str, labels: tuple[str, ...]) -> bool:
+    """fact-sheet row ("Időtáv 2021-2030", "Felelős: Jegyző", "célkitűzés kódja Ms-1.3"):
+    starts with a label, or is labels + codes + numbers with barely any words left"""
+    low = " ".join(quote.casefold().split()).lstrip("•-–* :")
+    hits = [label for label in labels if label in low]
+    if not hits:
+        return False
+    if any(low.startswith(label) for label in hits):
+        return True
+    for label in sorted(hits, key=len, reverse=True):
+        low = low.replace(label, " ")
+    return len(re.findall(r"[^\W\d_]{3,}", low)) < 4
+
+
+def same_passage(a: str, b: str) -> bool:
+    """two quotes of the same text: a long shared run, not a stray "a város" or two.
+    numbers decide: "200 fa" and "500 fa" are two commitments however alike the rest is"""
+    a, b = sorted((re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b)), key=len)
+    if not a or not b or not set(re.findall(r"\d+", a)) <= set(re.findall(r"\d+", b)):
+        return False
+    run = SequenceMatcher(None, a, b, autojunk=False).find_longest_match().size
+    return run >= 20 and run >= 0.5 * len(a)
+
+
+def dedupe(cands: list[PolicyCandidate]) -> list[PolicyCandidate]:
+    # same page, same quoted passage = same commitment twice (window + half retries,
+    # heading + body). first one wins, like langextract's multi-pass merge
+    out: list[PolicyCandidate] = []
+    for c in cands:
+        if not any(k.source_page == c.source_page
+                   and same_passage(k.source_excerpt, c.source_excerpt) for k in out):
+            out.append(c)
+    return out
 
 
 class LLMExtractor:
@@ -130,8 +191,24 @@ class LLMExtractor:
             log.warning("llm window failed (%s), retrying per page", exc)
             reply = None
         if reply is None and len(window) > 1:
-            return [([p], self._ask([p])) for p in window]
+            return [([p], self._ask_page(p)) for p in window]
+        if reply is None:
+            return [(window, self._ask_page(window[0], failed=True))]
         return [(window, reply)]
+
+    def _ask_page(self, page: DocumentPage, depth: int = 2,
+                  failed: bool = False) -> _Reply | None:
+        """one page; bad json is nearly always a dense page blowing max_tokens mid-object,
+        so ask about each half instead. receipts still get checked against the whole page"""
+        reply = None if failed else self._ask([page])
+        lines = page.text.splitlines()
+        if reply is not None or depth == 0 or len(lines) < 2:
+            return reply
+        mid = len(lines) // 2
+        halves = [self._ask_page(page.model_copy(update={"text": "\n".join(part)}), depth - 1)
+                  for part in (lines[:mid], lines[mid:])]
+        items = [i for h in halves if h for i in h.items]
+        return _Reply(items=items) if any(halves) else None
 
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
         windows = [pages[i:i + self._window] for i in range(0, len(pages), self._window)]
@@ -148,13 +225,15 @@ class LLMExtractor:
             for item in reply.items:
                 kind = CandidateType(item.type) if item.type in CandidateType else None
                 receipt = source_excerpt(text.get(item.page, ""), item.excerpt)
-                if kind in KINDS and receipt:
+                if kind in KINDS and receipt and not form_row(receipt,
+                                                              self._profile.form_labels):
+                    title, code = grounded_title(item.normalized_title, item.text,
+                                                 text[item.page])
                     out.append(PolicyCandidate(
                         document_id=0, suggested_type=kind, text=item.text,
-                        normalized_title=item.normalized_title, source_page=item.page,
-                        code=lead_code(item.normalized_title),
+                        normalized_title=title, source_page=item.page, code=code,
                         source_excerpt=receipt, excerpt_on_page=True))
-        return out
+        return dedupe(out)
 
 
 class NoExtractor:

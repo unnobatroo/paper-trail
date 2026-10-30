@@ -62,7 +62,9 @@ def main() -> None:
             if r.get("empty"):
                 print(f"CHECK {doc} p{r['page']} (nothing to extract)")
                 continue
-            print(f"CHECK {doc} p{r['page']} [{r.get('code') or '-'}] {r['title_en']}"
+            # pooled rows come without an english title
+            name = r.get("title_en") or r["title"]
+            print(f"CHECK {doc} p{r['page']} [{r.get('code') or '-'}] {name}"
                   f"\n      \"{r['quote']}\"")
 
 
