@@ -20,6 +20,7 @@ from ..domain.models import (
     EvidenceItem,
     EvidenceLink,
     ImplementationArtifact,
+    Note,
     OfficialSource,
     PolicyCandidate,
     SourceDocument,
@@ -55,6 +56,10 @@ class PolicyStore(Protocol):
     def language_profile(self, code: str) -> dict | None: ...
 
     def put_language_profile(self, code: str, profile: dict) -> None: ...
+
+    def notes(self, kind: str, ids: list[int]) -> dict[int, Note]: ...
+
+    def put_note(self, note: Note) -> None: ...
 
 
 class EvidenceStore(Protocol):

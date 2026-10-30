@@ -13,6 +13,8 @@ from ..domain.models import (
     DomainModel,
     EvidenceItem,
     EvidenceLink,
+    Note,
+    PolicyCandidate,
 )
 from ..services.metrics_service import TrailRow
 
@@ -56,6 +58,17 @@ class LinkView(DomainModel):
     link: EvidenceLink
     evidence: EvidenceItem | None = None
     budgets: list[BudgetRecord] = Field(default_factory=list)
+    note: Note | None = None
+
+
+class CandidateView(PolicyCandidate):
+    """a candidate plus its plain-english note, if someone wrote one"""
+    note: Note | None = None
+
+
+class GlossaryTerm(DomainModel):
+    term: str
+    meaning: str
 
 
 class TrailRowView(DomainModel):
@@ -103,6 +116,8 @@ class MetaOut(DomainModel):
     translation: bool
     # false until `maintenance profile import`, the rules find nothing without one
     language_profile_loaded: bool
+    # source-language words and codes explained in plain english, from the profile
+    glossary: list[GlossaryTerm] = Field(default_factory=list)
 
 
 class JobOut(DomainModel):

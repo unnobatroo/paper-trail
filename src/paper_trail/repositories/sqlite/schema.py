@@ -234,6 +234,17 @@ SCHEMA = """
              profile TEXT NOT NULL,
              updated_at TEXT
          );
+         CREATE TABLE IF NOT EXISTS notes (
+             subject_kind TEXT NOT NULL CHECK (subject_kind IN ('candidate', 'link')),
+             subject_id INTEGER NOT NULL,
+             title_en TEXT NOT NULL,
+             summary_en TEXT NOT NULL,
+             suggestion TEXT NOT NULL CHECK (suggestion IN ('accept', 'reject', 'unsure')),
+             reason_en TEXT NOT NULL DEFAULT '',
+             author TEXT NOT NULL,
+             updated_at TEXT,
+             PRIMARY KEY (subject_kind, subject_id)
+         );
          CREATE TABLE IF NOT EXISTS places (
              id INTEGER PRIMARY KEY,
              kind TEXT NOT NULL,

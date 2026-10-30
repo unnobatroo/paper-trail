@@ -27,11 +27,13 @@ def _views(state: AppState, links: list,
             ev.locations = []
             ev.dates_mentioned = []
     budget_map = {} if lite else state.evidence.budgets_many(ids)
+    notes = state.policy.notes("link", [l.id for l in links])
     return [
         LinkView(link=l,
                  evidence=(ev := ev_map.get(l.evidence_id)),
                  budgets=(budget_map.get(l.evidence_id, [])
-                          if ev else []))
+                          if ev else []),
+                 note=notes.get(l.id))
         for l in links
     ]
 

@@ -140,6 +140,16 @@ def main():
             conn.rollback()
         else:
             raise AssertionError("worker confirmed a gazetteer entry")
+    with connect(worker_url) as conn:
+        try:
+            # notes are owner-written suggestions, the worker can't plant one
+            conn.execute("INSERT INTO notes(subject_kind, subject_id, title_en, summary_en,"
+                         " suggestion, author) VALUES ('link', %s, 't', 's', 'accept', 'w')",
+                         (link_id,))
+        except psycopg.errors.InsufficientPrivilege:
+            conn.rollback()
+        else:
+            raise AssertionError("worker wrote a note")
     with refused("worker changed a commitment's jurisdiction"):
         PolicyRepository(worker_url).set_commitment_jurisdiction(
             com_id, Jurisdiction.PUBLIC_UTILITY_WATER)
@@ -188,9 +198,15 @@ def main():
             ("[" + ",".join(["1"] + ["0"] * 1023) + "]",),
         ).fetchall()
         assert any("chunks_embedding_hnsw" in str(r) for r in plan)
+    # reset with artifacts hanging off unreviewed passages, the reviewed link stays
+    from paper_trail.maintenance import reset
+    assert reset(url, cache=True, everything=False, yes=False)["evidence"] >= 1
+    reset(url, cache=True, everything=False, yes=True)
+    assert evidence.link(link_id).review_status == ReviewStatus.ACCEPTED
+    assert evidence.evidence(ev_id) is not None and evidence.evidence(cancel_id) is None
     print(
         "PostgreSQL integration passed: migrations, worker permissions, repositories, index, "
-        "concurrent dedupe/claims, stale recovery, fencing and timeout retry"
+        "concurrent dedupe/claims, stale recovery, fencing, timeout retry and reset"
     )
 
 
