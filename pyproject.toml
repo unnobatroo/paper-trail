@@ -26,6 +26,7 @@ dependencies = [
     "asgi-correlation-id>=5.0.1",
     "tenacity>=9",
     "typer>=0.16",
+    "nicegui>=3",
 ]
 
 [project.optional-dependencies]

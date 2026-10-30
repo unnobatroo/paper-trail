@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from .enums import (
     ArtifactStatus,
@@ -23,13 +23,7 @@ from .enums import (
 
 
 class DomainModel(BaseModel):
-    """base for everything the api returns
-
-    defaulted fields are always sent, so mark them required in the schema,
-    otherwise the generated ts types (web/src/lib/api-schema.ts) lie
-    """
-
-    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+    """base for everything the api returns"""
 
 
 class SourceDocument(DomainModel):

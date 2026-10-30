@@ -10,7 +10,6 @@
   money typed, status quoted, MT labelled
 - [ ] New providers implement the existing ABCs (no vendor logic in services)
 - [ ] If dependencies changed: `uv lock`
-- [ ] If api models changed: frontend types regenerated (`npm run gen:api`)
 - [ ] Wiki docs updated if behaviour changed
 
 ## Test plan
