@@ -13,14 +13,13 @@ from .ml.extraction import get_extractor
 from .ml.lang import LanguageProfile
 from .ml.ner import get_ner
 from .ml.rerank import get_reranker
-from .repositories.ports import EvidenceStore, PolicyStore
 from .repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from .repositories.store import EvidenceRepository, PolicyRepository
 from .services.evidence_service import EvidenceService
 from .services.ingestion_service import IngestionService
 from .services.metrics_service import MetricsService
 from .services.review_service import ReviewService
-from .sources.document_store import DocumentStore, LocalDocumentStore
+from .sources.document_store import DocumentStore
 from .sources.web_search import get_search_provider
 
 log = logging.getLogger(__name__)
@@ -29,8 +28,8 @@ log = logging.getLogger(__name__)
 @dataclass
 class AppState:
     settings: Settings
-    policy: PolicyStore
-    evidence: EvidenceStore
+    policy: PolicyRepository
+    evidence: EvidenceRepository
     review: ReviewService
     ingestion: IngestionService
     evidence_svc: EvidenceService
@@ -51,7 +50,7 @@ def _baseline_year(settings: Settings, policy) -> int | None:
     return min(years) if years else None
 
 
-def load_profile(policy: PolicyStore, code: str) -> LanguageProfile:
+def load_profile(policy: PolicyRepository, code: str) -> LanguageProfile:
     """the language profile lives in the db, an empty one just means the rules find nothing"""
     data = policy.language_profile(code)
     if data is None:
@@ -73,7 +72,7 @@ def build_state(settings: Settings | None = None) -> AppState:
     policy = PolicyRepository(settings.database_url)
     evidence = EvidenceRepository(settings.database_url)
     profile = load_profile(policy, settings.language)
-    docs: DocumentStore = LocalDocumentStore(settings.document_dir or settings.seed_dir)
+    docs = DocumentStore(settings.document_dir or settings.seed_dir)
     page_store = PostgresPageStore(settings.database_url)
     vector_index = PostgresVectorIndex(settings.database_url, ts_config=profile.ts_config,
                                        analyzer=analyzer)

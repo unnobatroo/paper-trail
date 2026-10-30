@@ -9,10 +9,10 @@ from ..domain.enums import BudgetKind, EvidenceFlag, RelationshipType, ReviewSta
 from ..domain.models import BudgetRecord, Commitment, EvidenceItem
 from ..ml.accountability import FinancialAuditor, PassageAuditor
 from ..ml.lang import LanguageProfile
-from ..repositories.ports import EvidenceStore, PolicyStore
+from ..repositories.store import EvidenceRepository, PolicyRepository
 
 
-def with_effective_flags(store: EvidenceStore, ev_map: dict[int, EvidenceItem]) -> None:
+def with_effective_flags(store: EvidenceRepository, ev_map: dict[int, EvidenceItem]) -> None:
     """regression warnings come from artifacts other passages changed, add on read"""
     artifacts = store.artifacts_many(sorted(ev_map))
     for ev_id, ev in ev_map.items():
@@ -54,7 +54,7 @@ class TrailRow:
 
 
 class MetricsService:
-    def __init__(self, policy: PolicyStore, evidence: EvidenceStore,
+    def __init__(self, policy: PolicyRepository, evidence: EvidenceRepository,
                  profile: LanguageProfile | None = None):
         self._policy = policy
         self._evidence = evidence

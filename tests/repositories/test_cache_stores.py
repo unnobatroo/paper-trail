@@ -1,4 +1,4 @@
-"""PageStore / VectorIndex contract on postgres + pgvector"""
+"""page cache + vector index on postgres + pgvector"""
 
 import pytest
 

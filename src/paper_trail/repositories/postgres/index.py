@@ -7,7 +7,6 @@ from sqlalchemy import text
 from ...ml.retrieval import reciprocal_rank_fusion
 from ...sources.fetch import FetchedPage
 from ..indexing import content_key, fit_vector
-from ..ports import PageStore, VectorIndex
 from ..store import Repo
 
 _CHUNKS = "FROM chunks c JOIN pages p ON p.id=c.page_id"
@@ -17,7 +16,7 @@ def _vector(values):
     return json.dumps(fit_vector(values))
 
 
-class PostgresPageStore(Repo, PageStore):
+class PostgresPageStore(Repo):
     def get(self, url):
         row = self._one("SELECT url, title, text, published_on FROM pages WHERE url=:url", url=url)
         return FetchedPage(**row) if row else None
@@ -30,7 +29,7 @@ class PostgresPageStore(Repo, PageStore):
                    url=page.url, title=page.title, text=page.text, published_on=page.published_on)
 
 
-class PostgresVectorIndex(Repo, VectorIndex):
+class PostgresVectorIndex(Repo):
     def __init__(self, database_url: str, ts_config: str = "simple", analyzer=None):
         super().__init__(database_url)
         self.ts_config = ts_config

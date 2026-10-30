@@ -9,11 +9,12 @@ from __future__ import annotations
 import re
 
 from ..ml.accountability import PassageAuditor
-from ..repositories.ports import EvidenceStore
+from ..repositories.store import EvidenceRepository
 
 
 class PlaceResolver:
-    def __init__(self, store: EvidenceStore, auditor: PassageAuditor, min_name_length: int = 5):
+    def __init__(self, store: EvidenceRepository, auditor: PassageAuditor,
+                 min_name_length: int = 5):
         self._store = store
         self._auditor = auditor
         self._min = min_name_length

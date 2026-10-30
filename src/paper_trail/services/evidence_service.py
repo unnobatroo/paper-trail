@@ -30,8 +30,8 @@ from ..ml.lang import LanguageProfile
 from ..ml.ner import NoNer
 from ..ml.nlp import TextAnalyzer
 from ..ml.rerank import Reranker
-from ..repositories.ports import EvidenceStore, PageStore, VectorIndex
 from ..repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
+from ..repositories.store import EvidenceRepository
 from ..sources import fetch as fetching
 from ..sources.chunking import structure_chunks
 from ..sources.fetch import FetchedPage
@@ -67,15 +67,15 @@ def _key(commitment: Commitment) -> str:
 class EvidenceService:
     def __init__(
             self,
-            repo: EvidenceStore,
+            repo: EvidenceRepository,
             search: SearchProvider,
             embedder: EmbeddingProvider,
             fetcher=None,
             reranker: Reranker | None = None,
             candidates: int = 20,
             max_doc_chars: int = _DEFAULT_MAX_DOC_CHARS,
-            page_store: PageStore | None = None,
-            vector_index: VectorIndex | None = None,
+            page_store: PostgresPageStore | None = None,
+            vector_index: PostgresVectorIndex | None = None,
             baseline_year: int | None = None,
             profile: LanguageProfile | None = None,
             allowed_domains: tuple[str, ...] = (),

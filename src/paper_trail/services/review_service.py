@@ -6,7 +6,7 @@ from ..domain.enums import CandidateType, Jurisdiction, RelationshipType, Review
 from ..domain.models import Commitment, PolicyCandidate
 from ..ml.accountability import PassageAuditor
 from ..ml.lang import LanguageProfile
-from ..repositories.ports import EvidenceStore, PolicyStore
+from ..repositories.store import EvidenceRepository, PolicyRepository
 
 # what a commitment inherits from its candidate as is
 _CARRIED = {"code", "responsible_org", "timeframe", "deadline_year", "unit", "target_value",
@@ -14,7 +14,7 @@ _CARRIED = {"code", "responsible_org", "timeframe", "deadline_year", "unit", "ta
 
 
 class ReviewService:
-    def __init__(self, policy: PolicyStore, evidence: EvidenceStore,
+    def __init__(self, policy: PolicyRepository, evidence: EvidenceRepository,
                  profile: LanguageProfile | None = None):
         self._policy = policy
         self._evidence = evidence
