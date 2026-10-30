@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ..infrastructure.settings import load
 from .routers import (
     candidates,
     commitments,
@@ -21,7 +22,6 @@ from .routers import (
     trail,
     translate,
 )
-from ..infrastructure.settings import load
 
 
 @asynccontextmanager

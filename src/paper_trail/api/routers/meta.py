@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from ..deps import get_state
 from ...bootstrap import AppState
 from ...ml.lang import get_profile
 from ...services.translation import get_translator
+from ..deps import get_state
 
 router = APIRouter()
 

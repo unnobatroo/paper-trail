@@ -180,8 +180,9 @@ class PolicyRepository(_Repo):
                 return row["id"]
             cur = conn.execute(
                 """INSERT INTO candidates(document_id, suggested_type, text, normalized_title,
-                                          source_page, source_excerpt, code, excerpt_on_page, responsible_org,
-                                          timeframe, deadline_year, unit, target_value)
+                                          source_page, source_excerpt, code, excerpt_on_page,
+                                          responsible_org, timeframe, deadline_year, unit,
+                                          target_value)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (cand.document_id, cand.suggested_type.value, cand.text, cand.normalized_title,
                  cand.source_page, cand.source_excerpt, cand.code,
@@ -223,7 +224,8 @@ class PolicyRepository(_Repo):
                     return row["id"]
             cur = conn.execute(
                 """INSERT INTO commitments(candidate_id, parent_id, kind, title, summary, code,
-                                           responsible_org, timeframe, deadline_year, unit, target_value, source_page)
+                                           responsible_org, timeframe, deadline_year, unit,
+                                           target_value, source_page)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (com.candidate_id, com.parent_id, com.kind.value, com.title, com.summary,
                  com.code, com.responsible_org, com.timeframe, com.deadline_year,

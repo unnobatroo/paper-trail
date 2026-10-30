@@ -1,4 +1,5 @@
-version: "2"
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+version: 2
 language: "en-US"
 # shared across my repos; the path rules below are what's specific here
 tone_instructions: "Direct, warm, zero fluff. One sentence of why per finding. Comments are lowercase and terse. Flag any doc or UI claim the code doesn't back up. Here: provenance, human-in-the-loop review, honest gaps."
@@ -11,10 +12,16 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+    # stacked prs target feature branches, not main
+    base_branches:
+      - ".*"
   path_filters:
     - "!data/**"
     - "!**/package-lock.json"
     - "!uv.lock"
+    - "!**/*.lock"
+    - "!web/src/lib/api-schema.ts"
+    - "!web/openapi.json"
   path_instructions:
     - path: "src/paper_trail/**"
       instructions: |
@@ -24,7 +31,7 @@ reviews:
         - Job status writes must be guarded by status='running' and claimed_by (see api/jobs.py).
         - Mutating endpoints sit behind require_review_key. Open endpoints must be bounded.
         - Prefer an existing dependency or framework feature over new bespoke code (AGENTS.md).
-    - path: "supabase/migrations/**"
+    - path: "db/sql/**"
       instructions: |
         - Migrations are append-only. Never edit a shipped one; add the next number.
         - Lexical search must stay OR-style over stemmed lexemes (007), matching the file backend.
