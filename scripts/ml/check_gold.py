@@ -14,7 +14,7 @@ import random
 import re
 from pathlib import Path
 
-from pypdf import PdfReader
+from paper_trail.sources.pdf import read_pages
 
 
 def squash(text: str) -> str:
@@ -35,8 +35,8 @@ def main() -> None:
     kept, failed = [], []
     for row in rows:
         if row["pdf"] not in pages:
-            pages[row["pdf"]] = [squash(p.extract_text() or "")
-                                 for p in PdfReader(args.docs / row["pdf"]).pages]
+            # same reader ingestion uses, so a kept quote is one the extractor can see
+            pages[row["pdf"]] = [squash(p.text) for p in read_pages(args.docs / row["pdf"])]
         text = pages[row["pdf"]]
         on_page = 0 < row["page"] <= len(text)
         if row.get("empty"):

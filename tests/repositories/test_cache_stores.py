@@ -2,7 +2,7 @@
 
 import pytest
 
-from paper_trail.repositories.indexing import content_key, fit_vector, pad_vector, url_key
+from paper_trail.repositories.indexing import content_key, fit_vector, pad_vector
 from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from paper_trail.sources.fetch import FetchedPage
 
@@ -55,8 +55,7 @@ def test_pad_vector_is_cosine_neutral():
     assert len(pad_vector([1.0])) == 1024
 
 
-def test_content_and_url_keys_stable():
-    assert url_key(PAGE.url) == url_key(PAGE.url)
+def test_content_keys_stable():
     assert content_key("m", 2400, "t") != content_key("m", 2400, "t2")
 
 

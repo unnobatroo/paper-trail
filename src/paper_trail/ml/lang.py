@@ -17,7 +17,7 @@ class LanguageProfile:
 
     code: str  # ISO-ish tag, e.g. "hu"
     name: str  # "Hungarian" — used in LLM prompts
-    stemmer: str  # py_rust_stemmers / Snowball language
+    stemmer: str  # snowball language name
     ts_config: str  # Postgres regconfig for tsvector columns
 
     # money

@@ -9,8 +9,7 @@ kept      candidates whose receipt was verbatim on the page (ingestion keeps onl
 returned  everything the model answered, kept or not
 
 the number that matters is macro recall on holdout docs: a model that only learned
-one city's layout scores high on train and falls over there. --export DIR --pdf F
-builds gold from a db export (accepted commitments of one strategy) instead.
+one city's layout scores high on train and falls over there
 
   uv run python scripts/ml/eval_extraction.py --gold gold.jsonl --docs data/eval \\
     --base-url https://localhost:8443/v1 --model M --key-file K --ca CRT
@@ -47,17 +46,6 @@ def matches(gold: dict, cand) -> bool:
     if code and re.search(rf"\b{re.escape(code)}\b", hay) and len(code) > 1:
         return True
     return SequenceMatcher(None, title, norm(cand.normalized_title)).ratio() >= 0.6
-
-
-def gold_from_export(export: Path, pdf: Path, lang: str) -> list[dict]:
-    rows = [json.loads(line) for line in
-            (export / "commitments.jsonl").read_text().splitlines() if line]
-    first = {}
-    for row in sorted(rows, key=lambda r: r["id"]):
-        first.setdefault(row["candidate_id"], row)  # duplicates from double accepts
-    return [{"doc": pdf.stem, "pdf": pdf.name, "lang": lang, "split": "train",
-             "page": r["source_page"], "title": r["title"], "code": r.get("code")}
-            for r in first.values()]
 
 
 def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
@@ -100,11 +88,8 @@ def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--gold", type=Path)
+    ap.add_argument("--gold", type=Path, required=True, help="check_gold.py output")
     ap.add_argument("--docs", type=Path, default=Path("."), help="where gold pdfs live")
-    ap.add_argument("--export", type=Path)
-    ap.add_argument("--pdf", type=Path)
-    ap.add_argument("--lang", default="hu", help="profile for --export gold")
     ap.add_argument("--profiles", type=Path, default=PROFILES, help="dir of <lang>.json")
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--model", required=True)
@@ -117,14 +102,9 @@ def main() -> None:
     args = ap.parse_args()
     if args.ca:
         os.environ["MODEL_CA_BUNDLE"] = args.ca
-    if args.gold:
-        # "nothing here" pages are training data, there's nothing to find on them
-        gold = [g for g in (json.loads(line) for line in args.gold.read_text().splitlines()
-                            if line) if not g.get("empty")]
-    elif args.export and args.pdf:
-        gold, args.docs = gold_from_export(args.export, args.pdf, args.lang), args.pdf.parent
-    else:
-        raise SystemExit("give --gold, or --export with --pdf")
+    # "nothing here" pages are training data, there's nothing to find on them
+    gold = [g for g in (json.loads(line) for line in args.gold.read_text().splitlines()
+                        if line) if not g.get("empty")]
 
     client = model_client(args.base_url, Path(args.key_file).read_text().strip())
     docs = {}
