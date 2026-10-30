@@ -1,13 +1,10 @@
 "use client";
 
-// shared tanstack query hooks + openapi-react-query client
+// shared tanstack query hooks
 
 import {useCallback} from "react";
-import createQueryClient from "openapi-react-query";
 import {useQueries, useQuery, useQueryClient} from "@tanstack/react-query";
-import {api, client, type Job} from "./api";
-
-export const $api = createQueryClient(client);
+import {api, type Job} from "./api";
 
 export const keys = {
     meta: ["meta"] as const,
@@ -63,7 +60,7 @@ export function useInvalidateDomain() {
         qc.invalidateQueries({
             predicate: (q) =>
                 // "jobs" so a finished batch leaves the in-flight list
-                ["candidates", "commitments", "links", "link", "trail", "documents", "jobs", "get"].includes(
+                ["candidates", "commitments", "links", "link", "trail", "documents", "jobs"].includes(
                     q.queryKey[0] as string,
                 ),
         }), [qc]);

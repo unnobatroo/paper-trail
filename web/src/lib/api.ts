@@ -124,7 +124,8 @@ export const client = createClient<paths>({
                 method: request.method,
                 headers,
                 ...(body ? {body} : {}),
-                signal: AbortSignal.timeout(90_000),
+                // react-query cancels through request.signal, the timeout caps slow answers
+                signal: AbortSignal.any([request.signal, AbortSignal.timeout(90_000)]),
             });
         } catch (e) {
             if (e instanceof DOMException && e.name === "TimeoutError") {

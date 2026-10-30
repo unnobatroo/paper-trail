@@ -6,7 +6,8 @@ import {useMutation} from "@tanstack/react-query";
 import {parseAsString, useQueryState} from "nuqs";
 import {useHotkeys} from "react-hotkeys-hook";
 import {Check, CircleCheck, ListChecks, Loader2, MousePointerClick, Search, X} from "lucide-react";
-import {Chip, EmptyState} from "@/components/chip";
+import {Chip} from "@/components/chip";
+import {Empty, EmptyDescription, EmptyHeader, EmptyTitle} from "@/components/ui/empty";
 import {type Columns, DataTable, useRowKeys} from "@/components/data-table";
 import {DetailSheet} from "@/components/detail-sheet";
 import {Bi} from "@/components/en";
@@ -24,7 +25,7 @@ import {api, type CandidateType, errorMessage} from "@/lib/api";
 import {useCommitments, useDocuments, useInvalidateDomain} from "@/lib/hooks";
 import {displayTitle, KIND_LABEL} from "@/lib/labels";
 import {KIND_ICON, KIND_TONE} from "@/lib/tones";
-import {useMediaQuery} from "@/lib/use-media-query";
+import {useMediaQuery} from "usehooks-ts";
 import {useSearchJobs} from "@/lib/use-search-jobs";
 import {cn} from "@/lib/utils";
 import {type Stage, STAGE_ORDER, STAGES, useWorkspace, type WorkRow} from "@/lib/workspace";
@@ -128,7 +129,7 @@ function WorkspacePage() {
     const {data: documents} = useDocuments();
     const invalidate = useInvalidateDomain();
     const search = useSearchJobs();
-    const docked = useMediaQuery("(min-width: 1280px)");
+    const docked = useMediaQuery("(min-width: 1280px)", {initializeWithValue: false});
     const searchRef = useRef<HTMLInputElement>(null);
 
     const [query, setQuery] = useQueryState("q", parseAsString.withDefault(""));
@@ -236,9 +237,14 @@ function WorkspacePage() {
         return (
             <>
                 <PageTitle title="Workspace" hint={hint} guide={["commitments", "evidence", "trail"]}/>
-                <EmptyState className="mt-6">
-                    Nothing extracted yet. Use <strong>Ingest</strong> in the top bar to read the strategy PDF.
-                </EmptyState>
+                <Empty className="mt-6 border">
+                    <EmptyHeader>
+                        <EmptyTitle>Nothing extracted yet</EmptyTitle>
+                        <EmptyDescription>
+                            Use <strong>Ingest</strong> in the top bar to read the strategy PDF.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
             </>
         );
 
@@ -283,7 +289,9 @@ function WorkspacePage() {
             colClass={COL_CLASS}
         />
     ) : (
-        <EmptyState>Nothing matches these filters.</EmptyState>
+        <Empty className="border">
+            <EmptyHeader><EmptyDescription>Nothing matches these filters.</EmptyDescription></EmptyHeader>
+        </Empty>
     );
 
     return (
