@@ -332,6 +332,7 @@
  "min_amount": 10000,
  "procurement_id_re": "\\bEKR\\d{9,12}\\b|\\b(?:VEKOP|KEHOP|GINOP|EFOP|TOP|TOP_PLUSZ|KEHOP_PLUSZ|VP)(?:-[\\dA-Z.]+){3,6}\\b",
  "parcel_re": "(?:\\bhrsz\\.?\\s*:?\\s*(\\d{3,6}(?:/\\d{1,4}){0,2}))|(?:\\b(\\d{3,6}(?:/\\d{1,4}){0,2})\\s*(?:hrsz\\b|helyrajzi\\s+sz))",
+ "form_labels": ["időtáv", "idősáv", "határidő", "felelős", "célcsoport", "lehetséges forrás", "forrás", "finanszírozási igény", "finanszírozás", "státusz", "célkitűzés kódja", "kapcsolódás a", "az intézkedés becsült költsége", "mitigációs célkitűzés", "adaptációs célkitűzés", "alkalmazkodási célkitűzés", "szemléletformálási célkitűzés"],
  "glossary": {
   "M": "mitigation: cutting greenhouse gas emissions",
   "A": "adaptation: coping with heat, drought and floods that are coming anyway",

@@ -57,6 +57,10 @@ class LanguageProfile:
     procurement_id_re: str = ""  # EKR\d{9,12}|…
     parcel_re: str = ""  # group 1 or 2 = the number
 
+    # field labels of measure fact sheets ("időtáv", "felelős"). a quote that's mostly these
+    # is a form row, not a commitment, the extractor drops it
+    form_labels: tuple[str, ...] = ()
+
     # term as it shows up in documents -> plain-english meaning, for the ui
     glossary: dict[str, str] = field(default_factory=dict)
 
