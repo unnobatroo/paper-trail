@@ -13,6 +13,7 @@ import sys
 import requests
 
 from paper_trail.infrastructure.settings import load
+from paper_trail.repositories.store import EvidenceRepository
 
 # public instances are often overloaded (502/504), try the next one
 OVERPASS = ("https://overpass-api.de/api/interpreter",
@@ -58,12 +59,7 @@ def places(area_name: str):
 
 def main(area_name: str) -> None:
     settings = load()
-    if settings.database_url:
-        from paper_trail.repositories.postgres.store import PostgresEvidenceRepository
-        repo = PostgresEvidenceRepository(settings.database_url)
-    else:
-        from paper_trail.repositories.sqlite.store import EvidenceRepository
-        repo = EvidenceRepository(settings.db_path)
+    repo = EvidenceRepository(settings.database_url or settings.db_path)
     seen = set()
     for kind, name, osm_id, geojson in places(area_name):
         # one row per name: a street drawn as 12 osm ways is still one street

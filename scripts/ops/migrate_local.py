@@ -10,7 +10,7 @@ from pathlib import Path
 
 from psycopg import sql
 
-from paper_trail.repositories.postgres.store import connect
+from paper_trail.repositories.postgres.db import connect
 
 TABLES = (
     "documents",

@@ -9,7 +9,7 @@ import uuid
 from datetime import timedelta
 
 from ...domain.jobs import Job, dedupe_key
-from .store import connect
+from .db import connect
 
 log = logging.getLogger(__name__)
 

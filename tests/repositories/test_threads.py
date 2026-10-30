@@ -6,7 +6,7 @@ import threading
 
 from paper_trail.domain.enums import CandidateType, ReviewStatus
 from paper_trail.domain.models import PolicyCandidate, SourceDocument
-from paper_trail.repositories.sqlite.store import EvidenceRepository, PolicyRepository
+from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 
 
 def _seed(policy: PolicyRepository) -> int:

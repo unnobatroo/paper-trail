@@ -3,10 +3,12 @@
 import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import date
 
 import psycopg
 from psycopg.conninfo import make_conninfo
+from sqlalchemy.exc import DBAPIError
 
 from paper_trail.domain.enums import BudgetKind, CandidateType, ReviewStatus
 from paper_trail.domain.models import (
@@ -17,14 +19,23 @@ from paper_trail.domain.models import (
     PolicyCandidate,
     SourceDocument,
 )
+from paper_trail.repositories.postgres.db import connect
 from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from paper_trail.repositories.postgres.jobs import PostgresJobRunner, PostgresWorker
-from paper_trail.repositories.postgres.store import (
-    PostgresEvidenceRepository,
-    PostgresPolicyRepository,
-    connect,
-)
+from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.sources.fetch import FetchedPage
+
+
+@contextmanager
+def refused(what):
+    # store errors come wrapped by sqlalchemy, the db one sits in .orig
+    try:
+        yield
+    except DBAPIError as e:
+        if not isinstance(e.orig, psycopg.errors.InsufficientPrivilege):
+            raise
+    else:
+        raise AssertionError(what)
 
 
 def main():
@@ -49,8 +60,8 @@ def main():
     )
     api = make_conninfo(url, user="paper_trail_api")
     worker_url = make_conninfo(url, user="paper_trail_worker")
-    policy, evidence = PostgresPolicyRepository(api), PostgresEvidenceRepository(api)
-    ingest = PostgresPolicyRepository(worker_url)
+    policy, evidence = PolicyRepository(api), EvidenceRepository(api)
+    ingest = PolicyRepository(worker_url)
     doc = SourceDocument(title="integration", publisher="municipality")
     assert (doc_id := ingest.add_document(doc)) == ingest.add_document(doc)
     candidate = PolicyCandidate(
@@ -65,23 +76,15 @@ def main():
         ids = list(pool.map(lambda _: ingest.add_candidate(candidate), range(8)))
     assert len(set(ids)) == 1
     cid = ids[0]
-    try:
+    with refused("worker accepted a candidate"):
         ingest.set_candidate_status(cid, ReviewStatus.ACCEPTED)
-    except psycopg.errors.InsufficientPrivilege:
-        pass
-    else:
-        raise AssertionError("worker accepted a candidate")
     commitment = Commitment(candidate_id=cid, kind=CandidateType.MEASURE, title="verified receipt")
-    try:
+    with refused("worker created a commitment"):
         ingest.add_commitment(commitment)
-    except psycopg.errors.InsufficientPrivilege:
-        pass
-    else:
-        raise AssertionError("worker created a commitment")
     policy.set_candidate_status(cid, ReviewStatus.ACCEPTED)
     com_id = policy.add_commitment(commitment)
     assert com_id == policy.add_commitment(commitment)
-    worker_evidence = PostgresEvidenceRepository(worker_url)
+    worker_evidence = EvidenceRepository(worker_url)
     ev = EvidenceItem(
         commitment_id=com_id,
         url="https://jozsefvaros.hu/test",
@@ -95,12 +98,8 @@ def main():
     link_id = worker_evidence.add_link(link)
     b = BudgetRecord(evidence_id=ev_id, kind=BudgetKind.ESTIMATED_COST, amount_raw="100 Ft")
     assert worker_evidence.add_budget(b) == worker_evidence.add_budget(b)
-    try:
+    with refused("worker accepted an evidence link"):
         worker_evidence.decide_link(link_id, ReviewStatus.ACCEPTED)
-    except psycopg.errors.InsufficientPrivilege:
-        pass
-    else:
-        raise AssertionError("worker accepted an evidence link")
     evidence.decide_link(link_id, ReviewStatus.ACCEPTED)
     assert worker_evidence.add_link(link) == link_id
     worker_evidence.add_evidence(ev.model_copy(update={"snippet": "changed"}))
@@ -141,13 +140,9 @@ def main():
             conn.rollback()
         else:
             raise AssertionError("worker confirmed a gazetteer entry")
-    try:
-        PostgresPolicyRepository(worker_url).set_commitment_jurisdiction(
+    with refused("worker changed a commitment's jurisdiction"):
+        PolicyRepository(worker_url).set_commitment_jurisdiction(
             com_id, Jurisdiction.PUBLIC_UTILITY_WATER)
-    except psycopg.errors.InsufficientPrivilege:
-        pass
-    else:
-        raise AssertionError("worker changed a commitment's jurisdiction")
     policy.set_commitment_jurisdiction(com_id, Jurisdiction.PUBLIC_UTILITY_WATER)
     assert policy.commitment(com_id).asset_owner_jurisdiction == Jurisdiction.PUBLIC_UTILITY_WATER
     page = FetchedPage(url=ev.url, title="test", text="climate trees budget")

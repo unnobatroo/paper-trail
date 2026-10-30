@@ -4,8 +4,8 @@ import logging
 import signal
 
 from .api.deps import _handlers, get_state
+from .repositories.postgres.db import connect
 from .repositories.postgres.jobs import PostgresWorker
-from .repositories.postgres.store import connect
 
 
 def main():
