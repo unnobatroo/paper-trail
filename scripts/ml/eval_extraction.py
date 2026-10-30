@@ -118,7 +118,9 @@ def main() -> None:
     if args.ca:
         os.environ["PAPER_TRAIL_MODEL_CA_BUNDLE"] = args.ca
     if args.gold:
-        gold = [json.loads(line) for line in args.gold.read_text().splitlines() if line]
+        # "nothing here" pages are training data, there's nothing to find on them
+        gold = [g for g in (json.loads(line) for line in args.gold.read_text().splitlines()
+                            if line) if not g.get("empty")]
     elif args.export and args.pdf:
         gold, args.docs = gold_from_export(args.export, args.pdf, args.lang), args.pdf.parent
     else:

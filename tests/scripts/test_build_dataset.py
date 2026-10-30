@@ -35,3 +35,20 @@ def test_only_human_decisions_become_labels(tmp_path, monkeypatch):
     # accepted -> an item, rejects-only -> empty, unreviewed page -> not a label at all
     assert [i["normalized_title"] for i in answers[1]] == ["Fák ültetése"]
     assert answers[2] == [] and 3 not in answers
+
+
+def test_gold_only_trains_on_train_split(tmp_path, monkeypatch):
+    pages = [DocumentPage(page_number=n, text=f"page {n}") for n in (1, 2)]
+    monkeypatch.setattr(build_dataset, "read_pages", lambda _: pages)
+    profiles = Path(__file__).resolve().parents[1] / "fixtures" / "profiles"
+    rows = [
+        {"doc": "a", "pdf": "a.pdf", "lang": "hu", "split": "train", "page": 1,
+         "kind": "measure", "title": "Fák", "quote": "fák ültetése"},
+        {"doc": "a", "pdf": "a.pdf", "lang": "hu", "split": "train", "page": 2, "empty": True},
+        {"doc": "b", "pdf": "b.pdf", "lang": "hu", "split": "holdout", "page": 1,
+         "kind": "measure", "title": "x", "quote": "x"},
+    ]
+    out = build_dataset.gold_examples(rows, tmp_path, profiles)
+    answers = {(r["doc"], r["page"]): json.loads(r["messages"][1]["content"])["items"] for r in out}
+    assert answers == {("a", 1): [{"type": "measure", "normalized_title": "Fák", "text": "Fák",
+                                   "page": 1, "excerpt": "fák ültetése"}], ("a", 2): []}

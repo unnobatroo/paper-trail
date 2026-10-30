@@ -6,6 +6,7 @@ in the same json the extractor parses. a person decided every label:
   page with only rejects -> {"items": []}, teaches the model to keep its mouth shut
   page nobody reviewed -> skipped, unknown isn't empty
 documents in --holdout never get in, those are the eval's.
+--gold adds checked answer keys (check_gold.py output) of other cities, train split only
 
   PAPER_TRAIL_DATABASE_URL=... uv run python scripts/ml/finetune/build_dataset.py \\
     --doc 2=data/source_documents/jozsefvaros_klimastrategia_2021.pdf --out train.jsonl
@@ -52,14 +53,39 @@ def examples(repo, profile, doc_id: int, pdf: Path) -> list[dict]:
     return out
 
 
+def gold_examples(rows: list[dict], docs: Path, profiles: Path) -> list[dict]:
+    """train-split answer keys -> the same examples, one per page they cover"""
+    from paper_trail.ml.lang import LanguageProfile
+    by_page: dict[tuple, list[dict]] = {}
+    for r in rows:
+        if r.get("split") == "train":
+            by_page.setdefault((r["doc"], r["pdf"], r["lang"], r["page"]), []).append(r)
+    out, cache = [], {}
+    for (doc, pdf, lang, number), golds in sorted(by_page.items()):
+        if pdf not in cache:
+            cache[pdf] = {p.page_number: p for p in read_pages(docs / pdf)}
+        profile = LanguageProfile.from_dict(json.loads((profiles / f"{lang}.json").read_text()))
+        items = [{"type": g["kind"], "normalized_title": g["title"], "text": g["title"],
+                  "page": number, "excerpt": g["quote"]} for g in golds if not g.get("empty")]
+        out.append({"doc": doc, "page": number, "messages": [
+            {"role": "user", "content": extraction_prompt(profile, [cache[pdf][number]])},
+            {"role": "assistant", "content": json.dumps({"items": items}, ensure_ascii=False)},
+        ]})
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--doc", action="append", required=True, metavar="ID=PDF",
+    ap.add_argument("--doc", action="append", default=[], metavar="ID=PDF",
                     help="document id in the db and its pdf, repeatable")
     ap.add_argument("--holdout", action="append", type=int, default=[], metavar="ID")
     ap.add_argument("--language", default="hu")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--gold", type=Path, help="checked answer keys, train rows get used")
+    ap.add_argument("--gold-docs", type=Path, default=Path("data/eval"))
+    ap.add_argument("--profiles", type=Path,
+                    default=Path(__file__).resolve().parents[3] / "tests/fixtures/profiles")
     args = ap.parse_args()
     from paper_trail.infrastructure.settings import load
     settings = load()
@@ -71,6 +97,9 @@ def main() -> None:
         if int(doc_id) in args.holdout:
             continue  # eval docs never leak into training
         rows += examples(repo, profile, int(doc_id), Path(pdf))
+    if args.gold:
+        gold = [json.loads(line) for line in args.gold.read_text().splitlines() if line.strip()]
+        rows += gold_examples(gold, args.gold_docs, args.profiles)
     with args.out.open("w") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
