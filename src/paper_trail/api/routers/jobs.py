@@ -1,6 +1,4 @@
-"""Job polling — GET /api/jobs/{id} while a long task runs, and
-GET /api/jobs?kind= for what's in flight, so a reload or another tab can
-pick running work back up."""
+"""job polling. ?kind= lets a reload or another tab find work in flight"""
 
 from __future__ import annotations
 

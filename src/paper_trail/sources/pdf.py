@@ -1,4 +1,4 @@
-"""Deterministic PDF text extraction — one DocumentPage per PDF page."""
+"""plain pdf text, one DocumentPage per page"""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ from ..domain.models import DocumentPage
 
 
 def read_pages(source: str | Path | bytes | io.BytesIO) -> list[DocumentPage]:
-    """`source` is a filesystem path or the document bytes themselves —
-    the latter lets ingestion read straight from object storage."""
+    """source is a path or the raw bytes"""
     if isinstance(source, bytes):
         source = io.BytesIO(source)
     reader = PdfReader(source if isinstance(source, io.BytesIO) else str(source))

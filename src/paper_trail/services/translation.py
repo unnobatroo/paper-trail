@@ -1,13 +1,10 @@
 """source language -> english machine translation
 
-sources stay verbatim, the ui shows this underneath labelled as automatic translation.
-backend: helsinki-nlp opus-mt-<lang>-en on the hf inference api (needs HF_TOKEN, no token = no
-translation), override with PAPER_TRAIL_MT_MODEL
+sources stay verbatim, the ui shows this underneath, labelled as machine translated.
+opus-mt-<lang>-en on the hf inference api, no HF_TOKEN = no translation
 """
 
 from __future__ import annotations
-
-import os
 
 from ..ml.lang import LanguageProfile
 
@@ -18,20 +15,19 @@ MT_DISCLAIMER = (
 
 
 class Translator:
-    def __init__(self, profile: LanguageProfile, api_key: str | None = None,
-                 model: str | None = None):
+    def __init__(self, profile: LanguageProfile, api_key: str, model: str | None = None):
         from huggingface_hub import InferenceClient
 
         self.model = (model
                       or f"Helsinki-NLP/opus-mt-{profile.code}-en")
         self.disclaimer = MT_DISCLAIMER.format(model=self.model)
         self._client = InferenceClient(
-            api_key=api_key or os.environ.get("HF_TOKEN", ""),
+            api_key=api_key,
             timeout=60,
         )
 
     def translate(self, text: str) -> str | None:
-        """english text, or None if the service is down (caller shows the source)"""
+        """english, or None if the service is down (ui shows the source)"""
         if not text.strip():
             return None
         try:
@@ -42,9 +38,9 @@ class Translator:
             return None
 
 
-def get_translator(profile: LanguageProfile,
-                   model: str | None = None) -> Translator | None:
-    """translator if HF_TOKEN is set, else None"""
-    if not os.environ.get("HF_TOKEN"):
+def get_translator(profile: LanguageProfile, token: str | None, model: str | None = None,
+                   *, enabled: bool = True) -> Translator | None:
+    """translator if there's an HF_TOKEN, else None"""
+    if not enabled or not token:
         return None
-    return Translator(profile, model=model)
+    return Translator(profile, token, model)

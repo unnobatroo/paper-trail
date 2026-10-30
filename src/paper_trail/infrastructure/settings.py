@@ -1,60 +1,12 @@
-"""Runtime configuration — everything has an offline-friendly default.
-
-Backed by pydantic-settings: env vars win, then a gitignored `.env` at the
-repo root (see .env.example). Unknown keys are ignored.
-
-Environment overrides:
-  PAPER_TRAIL_DB            SQLite path (default data/processed/paper_trail.db)
-  PAPER_TRAIL_EMBED_MODEL   fastembed model name
-                            (default paraphrase-multilingual-MiniLM-L12-v2;
-                            "hashing" for fully offline runs)
-  PAPER_TRAIL_RERANKER      "auto" (default — hosted Jina when JINA_API_KEY
-                            is set, else none), "none", "jina", or a local
-                            cross-encoder model name
-  PAPER_TRAIL_RERANK_K      candidates sent to the reranker (default 20)
-  PAPER_TRAIL_MAX_DOC_CHARS emergency document bound (default 4_000_000;
-                            hitting it truncates and warns, never silently)
-  PAPER_TRAIL_SEARCH        "ddgs" | "fixture"  (default ddgs, falls back)
-  PAPER_TRAIL_LLM_BASE_URL  OpenAI-compatible endpoint (e.g. Ollama, HF, vLLM)
-  PAPER_TRAIL_LLM_API_KEY   API key for that endpoint
-  PAPER_TRAIL_LLM_MODEL     model name for structured extraction
-  SUPABASE_URL + SUPABASE_KEY
-                          when both are set, the app stores state in
-                          Supabase/Postgres instead of the local SQLite file
-  JINA_API_KEY              enables the hosted Jina reranker under the
-                            default "auto" mode; set
-                            PAPER_TRAIL_EMBED_MODEL=jina to also use
-                            Jina for embeddings
-  HF_TOKEN                  enables machine translation in the UI
-                            (Helsinki-NLP opus-mt-{lang}-en)
-  PAPER_TRAIL_LANGUAGE      language profile for the deterministic parsers
-                            — money/date/status cues, stemming, extraction
-                            labels (default "hu"; profiles in ml/lang.py)
-  PAPER_TRAIL_ALLOWED_DOMAINS
-                            comma-separated extra evidence domains, on top
-                            of the official_sources registry hosts
-  PAPER_TRAIL_MT_MODEL      translation model (default derived from the
-                            language profile)
-  PAPER_TRAIL_BASELINE_YEAR the year the tracked strategy was adopted —
-                            evidence published earlier is forced to
-                            background (default: derived from the document
-                            URL's /YYYY/MM/ segment, else off)
-  PAPER_TRAIL_STORAGE_BUCKET
-                            Supabase Storage bucket for source PDFs
-                            (default "source-documents")
-  PAPER_TRAIL_API_ORIGINS   comma-separated CORS origins for the API
-                            (default http://localhost:3000)
-  PAPER_TRAIL_REVIEW_KEY    when set, mutating endpoints require the
-                            X-Review-Key header — a shared secret for
-                            deployments where strangers shouldn't click
-                            Confirm (unset = open review)
-"""
+"""settings: env vars win, then a gitignored .env. every var is on the wiki (Reference)"""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import AliasChoices, Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..ml.embeddings import DEFAULT_EMBED_MODEL
@@ -69,21 +21,51 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    environment: Literal["development", "test", "production"] = Field(
+        default="development", validation_alias="PAPER_TRAIL_ENV")
+    database_url: str | None = Field(default=None, validation_alias="PAPER_TRAIL_DATABASE_URL")
+    process_role: Literal["api", "worker"] = Field(
+        default="api", validation_alias="PAPER_TRAIL_PROCESS_ROLE")
+    job_mode: Literal["internal", "external"] = Field(
+        default="internal", validation_alias="PAPER_TRAIL_JOB_MODE")
+    parser: Literal["pypdf", "docling"] = Field(
+        default="pypdf", validation_alias="PAPER_TRAIL_PARSER")
+    parser_device: Literal["cpu", "cuda"] = Field(
+        default="cpu", validation_alias="PAPER_TRAIL_PARSER_DEVICE")
+    nlp: Literal["rules", "huspacy"] = Field(
+        default="rules", validation_alias="PAPER_TRAIL_NLP")
+    searxng_url: str | None = Field(default=None, validation_alias="PAPER_TRAIL_SEARXNG_URL")
+    rerank_base_url: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_RERANK_BASE_URL")
+    rerank_api_key: str | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_RERANK_API_KEY")
+    model_ca_bundle: Path | None = Field(
+        default=None, validation_alias="PAPER_TRAIL_MODEL_CA_BUNDLE")
+    max_fetch_workers: int = Field(default=2, ge=1, le=8,
+                                   validation_alias="PAPER_TRAIL_FETCH_WORKERS")
+    enable_sitemaps: bool = Field(default=False, validation_alias="PAPER_TRAIL_SITEMAPS")
+    document_dir: Path | None = Field(default=None, validation_alias="PAPER_TRAIL_DOCUMENT_DIR")
+
     db_path: Path = Field(
         default=PROJECT_ROOT / "data" / "processed" / "paper_trail.db",
         validation_alias="PAPER_TRAIL_DB")
     embed_model: str = Field(
         default=DEFAULT_EMBED_MODEL, validation_alias="PAPER_TRAIL_EMBED_MODEL")
-    # endpoint for PAPER_TRAIL_EMBED_MODEL=openai:<model> / bge-m3
+    # endpoint for openai:<model> embeddings
     embed_base_url: str | None = Field(
         default=None, validation_alias="PAPER_TRAIL_EMBED_BASE_URL")
     embed_api_key: str | None = Field(
         default=None, validation_alias="PAPER_TRAIL_EMBED_API_KEY")
-    # "auto" = jina if JINA_API_KEY is set, else embedding-only
+    # "none" or anything else = the /rerank server at PAPER_TRAIL_RERANK_BASE_URL
     reranker_model: str = Field(
-        default="auto", validation_alias="PAPER_TRAIL_RERANKER")
+        default="none", validation_alias="PAPER_TRAIL_RERANKER")
+    # model id the rerank server knows the cross-encoder by
+    rerank_model: str = Field(
+        default="BAAI/bge-reranker-v2-m3", validation_alias="PAPER_TRAIL_RERANK_MODEL")
+    # ui machine translation, dev only
+    hf_token: str | None = Field(default=None, validation_alias="HF_TOKEN")
     rerank_candidates: int = Field(
-        default=20, validation_alias="PAPER_TRAIL_RERANK_K")
+        default=20, ge=1, le=20, validation_alias="PAPER_TRAIL_RERANK_K")
     max_doc_chars: int = Field(
         default=4_000_000, validation_alias="PAPER_TRAIL_MAX_DOC_CHARS")
     search_provider: str = Field(
@@ -94,23 +76,21 @@ class Settings(BaseSettings):
         default=None, validation_alias="PAPER_TRAIL_LLM_API_KEY")
     llm_model: str = Field(
         default="", validation_alias="PAPER_TRAIL_LLM_MODEL")
-    # pages per llm call, small models/servers want 1
+    # pages per llm call, small models want 1
     llm_window_pages: int = Field(
-        default=4, validation_alias="PAPER_TRAIL_LLM_WINDOW")
+        default=4, ge=1, le=16, validation_alias="PAPER_TRAIL_LLM_WINDOW")
+    # calls in flight, match the model server's max-conc
+    llm_concurrency: int = Field(
+        default=1, ge=1, le=8, validation_alias="PAPER_TRAIL_LLM_CONCURRENCY")
+    # passages per /rerank call, a gpu box eats the whole top-k at once
+    rerank_batch: int = Field(
+        default=2, ge=1, le=20, validation_alias="PAPER_TRAIL_RERANK_BATCH")
     fixture_dir: Path = PROJECT_ROOT / "data" / "fixtures"
     seed_dir: Path = PROJECT_ROOT / "data" / "source_documents"
-    # fastembed defaults to $TMPDIR, macos cleans it and breaks models
+    # fastembed defaults to $TMPDIR, macos wipes it and the model breaks
     model_cache: Path = Field(
         default=PROJECT_ROOT / "data" / "models",
         validation_alias="PAPER_TRAIL_MODEL_CACHE")
-    supabase_url: str | None = Field(
-        default=None, validation_alias="SUPABASE_URL")
-    supabase_key: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("SUPABASE_KEY", "SUPABASE_SERVICE_KEY"))
-    storage_bucket: str = Field(
-        default="source-documents",
-        validation_alias="PAPER_TRAIL_STORAGE_BUCKET")
     api_origins_raw: str = Field(
         default="http://localhost:3000",
         validation_alias="PAPER_TRAIL_API_ORIGINS")
@@ -127,6 +107,30 @@ class Settings(BaseSettings):
     review_key: str = Field(
         default="", validation_alias="PAPER_TRAIL_REVIEW_KEY")
 
+    @model_validator(mode="after")
+    def validate_runtime(self):
+        for name in ("embed_base_url", "llm_base_url", "searxng_url", "rerank_base_url"):
+            value = getattr(self, name)
+            if value and (urlsplit(value).scheme not in ("http", "https")
+                          or not urlsplit(value).hostname):
+                raise ValueError(f"{name} must be an HTTP(S) endpoint")
+        if self.database_url and not self.database_url.startswith(("postgresql://", "postgres://")):
+            raise ValueError("database_url must use PostgreSQL")
+        if self.search_provider == "searxng" and not self.searxng_url:
+            raise ValueError("searxng requires PAPER_TRAIL_SEARXNG_URL")
+        if self.reranker_model not in ("", "none", "off") and not self.rerank_base_url:
+            raise ValueError("a reranker needs PAPER_TRAIL_RERANK_BASE_URL")
+        if self.environment == "production":
+            if not self.database_url:
+                raise ValueError("production requires direct PostgreSQL storage")
+            if self.job_mode != "external":
+                raise ValueError("production requires external job workers")
+            if self.process_role == "api" and len(self.review_key.strip()) < 32:
+                raise ValueError("production requires a review key of at least 32 characters")
+            if not self.embed_base_url or not self.embed_model.startswith("openai:"):
+                raise ValueError("production requires a configured local embedding endpoint")
+        return self
+
     @property
     def allowed_domains(self) -> tuple[str, ...]:
         return tuple(d.strip().lower() for d in
@@ -135,10 +139,6 @@ class Settings(BaseSettings):
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm_base_url and self.llm_model)
-
-    @property
-    def supabase_configured(self) -> bool:
-        return bool(self.supabase_url and self.supabase_key)
 
     @property
     def api_origins(self) -> list[str]:

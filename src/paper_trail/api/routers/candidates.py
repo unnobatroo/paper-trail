@@ -1,14 +1,14 @@
-"""Step 1 — review extraction candidates: accept becomes a commitment."""
+"""confirm queue: accept turns a candidate into a commitment"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..deps import get_state, require_review_key
-from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
 from ...domain.models import PolicyCandidate
+from ..deps import get_state, require_review_key
+from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 
@@ -30,7 +30,8 @@ def accept(candidate_id: int, req: AcceptCandidateRequest | None = None,
             candidate_id, kind=req.kind, title=req.title,
             parent_id=req.parent_id)
     except ValueError as exc:
-        raise HTTPException(404, str(exc)) from exc
+        raise HTTPException(
+            404 if state.policy.candidate(candidate_id) is None else 422, str(exc)) from exc
     return {"commitment_id": cid}
 
 
@@ -47,7 +48,10 @@ def reject(candidate_id: int,
 @router.post("/bulk", dependencies=[Depends(require_review_key)])
 def bulk(req: BulkCandidatesRequest,
          state: AppState = Depends(get_state)) -> dict:
-    accepted = state.review.confirm_candidates(req.accept)
+    try:
+        accepted = state.review.confirm_candidates(req.accept)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     rejected = state.review.reject_candidates(req.reject)
     if req.reject_rest:
         rejected += state.review.reject_all_pending()

@@ -1,25 +1,37 @@
-"""domain model, small on purpose
-
-candidates/evidence come out of the pipeline and always carry provenance,
-commitments only exist once a human accepts a candidate
+"""domain model, small on purpose. candidates/evidence always carry receipts,
+commitments only exist once a person accepts one
 """
 
 from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import (
+    ArtifactStatus,
     BudgetKind,
     CandidateType,
+    EvidenceFlag,
+    EvidencePolarity,
+    Jurisdiction,
     RelationshipType,
     ReviewStatus,
     Status,
 )
 
 
-class SourceDocument(BaseModel):
+class DomainModel(BaseModel):
+    """base for everything the api returns
+
+    defaulted fields are always sent, so mark them required in the schema,
+    otherwise the generated ts types (web/src/lib/api-schema.ts) lie
+    """
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
+class SourceDocument(DomainModel):
     """an ingested official document"""
 
     id: int | None = None
@@ -28,26 +40,25 @@ class SourceDocument(BaseModel):
     url: str = ""
 
 
-class OfficialSource(BaseModel):
-    """known official page the evidence search always checks (`official_sources` table)"""
+class OfficialSource(DomainModel):
+    """official page the search always checks (official_sources table)"""
 
     id: int | None = None
     url: str
     title: str = ""
     publisher: str = ""
     sort_order: int = 0
+    # whose asset this source covers, None = searched for everything
+    jurisdiction: Jurisdiction | None = None
 
 
-class DocumentPage(BaseModel):
+class DocumentPage(DomainModel):
     page_number: int  # 1-based
     text: str
 
 
-class PolicyCandidate(BaseModel):
-    """possible commitment pulled from the pdf
-
-    invariant: always has a page number + verbatim excerpt
-    """
+class PolicyCandidate(DomainModel):
+    """maybe-commitment from the pdf. always has a page + verbatim excerpt"""
 
     id: int | None = None
     document_id: int
@@ -58,7 +69,7 @@ class PolicyCandidate(BaseModel):
     source_excerpt: str = Field(min_length=1)
     code: str | None = None  # e.g. "A1.1.1"
     excerpt_on_page: bool | None = None
-    # extracted metadata, rules only
+    # metadata, rules only
     responsible_org: str | None = None
     timeframe: str | None = None
     deadline_year: int | None = None
@@ -67,8 +78,8 @@ class PolicyCandidate(BaseModel):
     review_status: ReviewStatus = ReviewStatus.UNREVIEWED
 
 
-class Commitment(BaseModel):
-    """accepted objective/measure/target, `parent_id` is the only hierarchy"""
+class Commitment(DomainModel):
+    """accepted objective/measure/target, parent_id is the whole hierarchy"""
 
     id: int | None = None
     candidate_id: int | None = None
@@ -83,10 +94,12 @@ class Commitment(BaseModel):
     unit: str | None = None
     target_value: float | None = None
     source_page: int | None = None
+    # guessed from the wording on accept, reviewer can change it
+    asset_owner_jurisdiction: Jurisdiction = Jurisdiction.DISTRICT_MUNICIPALITY
 
 
-class EvidenceItem(BaseModel):
-    """passage from an allow-listed official source"""
+class EvidenceItem(DomainModel):
+    """passage from an allowlisted official source"""
 
     id: int | None = None
     commitment_id: int
@@ -95,15 +108,33 @@ class EvidenceItem(BaseModel):
     publisher: str = ""
     published_on: date | None = None
     snippet: str = ""  # passage used for ranking
-    # rule-based extraction over the source text
+    # rule-based, from the passage
     organisations: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
     dates_mentioned: list[str] = Field(default_factory=list)
     status_hint: Status = Status.UNKNOWN
     status_excerpt: str | None = None
+    # all from the matched passage only
+    polarity: EvidencePolarity = EvidencePolarity.AFFIRMATIVE
+    flags: list[EvidenceFlag] = Field(default_factory=list)
+    procurement_ids: list[str] = Field(default_factory=list)  # EKR / EU project codes
+    parcels: list[str] = Field(default_factory=list)  # hrsz numbers as written
 
 
-class MatchFeatures(BaseModel):
+class ImplementationArtifact(DomainModel):
+    """contract/lot/funded project, keyed by its official id
+
+    one umbrella contract for 45 streets = one node every commitment's evidence
+    can point at, so a later cancellation hits all of them
+    """
+
+    id: int | None = None
+    procurement_id: str
+    status: ArtifactStatus = ArtifactStatus.ACTIVE
+    status_evidence_id: int | None = None  # the passage that amended/terminated it
+
+
+class MatchFeatures(DomainModel):
     """what went into a suggested link"""
 
     semantic_similarity: float = 0.0
@@ -112,8 +143,8 @@ class MatchFeatures(BaseModel):
     shared_dates: list[str] = Field(default_factory=list)
 
 
-class EvidenceLink(BaseModel):
-    """proposed commitment <-> evidence link, pending review"""
+class EvidenceLink(DomainModel):
+    """suggested commitment <-> evidence link, waiting for a person"""
 
     id: int | None = None
     commitment_id: int
@@ -126,13 +157,15 @@ class EvidenceLink(BaseModel):
     review_status: ReviewStatus = ReviewStatus.UNREVIEWED
 
 
-class BudgetRecord(BaseModel):
-    """money figure found verbatim in a source, raw wording kept, kind never guessed"""
+class BudgetRecord(DomainModel):
+    """money quoted verbatim, raw wording kept, kind never guessed"""
 
     id: int | None = None
     evidence_id: int
     kind: BudgetKind
     amount_huf: int | None = None
+    currency: str = "HUF"
+    amount_native: str | None = None
     amount_raw: str = ""
     fiscal_year: int | None = None
     description: str = ""
