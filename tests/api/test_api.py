@@ -1,4 +1,4 @@
-"""api smoke tests, offline: sqlite, hashing embeddings, fixture search, stub fetcher"""
+"""api smoke tests, offline: throwaway postgres, hashing embeddings, fixture search, stub fetcher"""
 
 import json
 import time
@@ -17,22 +17,22 @@ EVIDENCE_TEXT = (
 
 
 @pytest.fixture
-def state(tmp_path, monkeypatch):
-    """AppState on a throwaway sqlite db, same object the api serves (get_state is cached)"""
+def state(dsn, monkeypatch):
+    """AppState on a throwaway database, same object the api serves (get_state is cached)"""
     # empty strings defeat .env loading (setdefault) and mark the
     # services unconfigured → fully offline
     # empty strings beat whatever a local .env says, tests never call a real model
-    for var in ("HF_TOKEN", "PAPER_TRAIL_LLM_BASE_URL", "PAPER_TRAIL_LLM_MODEL",
-                "PAPER_TRAIL_EMBED_BASE_URL", "PAPER_TRAIL_DATABASE_URL"):
+    for var in ("HF_TOKEN", "LLM_BASE_URL", "LLM_MODEL",
+                "EMBED_BASE_URL"):
         monkeypatch.setenv(var, "")
-    monkeypatch.setenv("PAPER_TRAIL_DB", str(tmp_path / "t.db"))
+    monkeypatch.setenv("DATABASE_URL", dsn)
     # the profile lives in the db now, load the fixture before the app boots
     from paper_trail.repositories.store import PolicyRepository
     from tests.profiles import HU
-    PolicyRepository(tmp_path / "t.db").put_language_profile("hu", HU.to_dict())
-    monkeypatch.setenv("PAPER_TRAIL_EMBED_MODEL", "hashing")
-    monkeypatch.setenv("PAPER_TRAIL_RERANKER", "none")
-    monkeypatch.setenv("PAPER_TRAIL_SEARCH", "fixture")
+    PolicyRepository(dsn).put_language_profile("hu", HU.to_dict())
+    monkeypatch.setenv("EMBED_MODEL", "hashing")
+    monkeypatch.setenv("RERANKER", "none")
+    monkeypatch.setenv("SEARCH_PROVIDER", "fixture")
     from paper_trail.api.deps import get_state
     get_state.cache_clear()
     s = get_state()
@@ -51,7 +51,7 @@ def client(state):
 def test_health_and_meta(client):
     assert client.get("/healthz").json() == {"ok": True}
     meta = client.get("/api/meta").json()
-    assert meta["storage"] == "sqlite"
+    assert meta["storage"] == "postgres"
     assert meta["embed_model"] == "hashing"
 
 

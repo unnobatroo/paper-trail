@@ -5,8 +5,10 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import date
+from urllib.parse import urlsplit
 
 import psycopg
+from psycopg import sql
 from psycopg.conninfo import make_conninfo
 from sqlalchemy.exc import DBAPIError
 
@@ -39,7 +41,7 @@ def refused(what):
 
 
 def main():
-    url = os.environ["PAPER_TRAIL_TEST_DATABASE_URL"]
+    url = os.environ["TEST_DATABASE_URL"]
     with connect(url) as conn:
         if conn.execute("SELECT to_regclass('public.documents') present").fetchone()["present"]:
             raise RuntimeError("integration checks require an empty disposable database")
@@ -51,12 +53,15 @@ def main():
                 CREATE ROLE paper_trail_worker LOGIN;
             END IF;
         END $$""")
-        conn.execute("ALTER ROLE paper_trail_api PASSWORD 'papertrail-integration-only'")
-        conn.execute("ALTER ROLE paper_trail_worker PASSWORD 'papertrail-integration-only'")
+        # same throwaway password as the owner url, so the role urls below just swap the user
+        password = urlsplit(url).password or ""
+        for role in ("paper_trail_api", "paper_trail_worker"):
+            conn.execute(sql.SQL("ALTER ROLE {} PASSWORD {}").format(
+                sql.Identifier(role), sql.Literal(password)))
     subprocess.run(
         ["alembic", "-c", "db/alembic.ini", "upgrade", "head"],
         check=True,
-        env={**os.environ, "PAPER_TRAIL_DATABASE_URL": url},
+        env={**os.environ, "DATABASE_URL": url},
     )
     api = make_conninfo(url, user="paper_trail_api")
     worker_url = make_conninfo(url, user="paper_trail_worker")

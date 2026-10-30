@@ -116,7 +116,7 @@ def main() -> None:
                     help="an earlier --out report: exit 1 unless holdout recall goes up")
     args = ap.parse_args()
     if args.ca:
-        os.environ["PAPER_TRAIL_MODEL_CA_BUNDLE"] = args.ca
+        os.environ["MODEL_CA_BUNDLE"] = args.ca
     if args.gold:
         # "nothing here" pages are training data, there's nothing to find on them
         gold = [g for g in (json.loads(line) for line in args.gold.read_text().splitlines()

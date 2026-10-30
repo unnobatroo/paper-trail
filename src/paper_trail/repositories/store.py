@@ -1,16 +1,11 @@
-"""one sql store for postgres and sqlite, on sqlalchemy core
-
-same queries for both, postgres just gets advisory locks + row locks on top. rows map
-to domain models in mapping.py. sqlite is for offline dev/tests, prod is postgres
-"""
+"""the sql store: postgres via sqlalchemy core, rows map to domain models in mapping.py"""
 
 from __future__ import annotations
 
 import json
 from functools import lru_cache
-from pathlib import Path
 
-from sqlalchemy import bindparam, create_engine, event, text
+from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import Connection, Engine
 
 from ..domain.enums import (
@@ -46,20 +41,11 @@ from .mapping import (
 
 
 @lru_cache(maxsize=8)
-def engine(target: str) -> Engine:
-    """"sqlite:///path" -> local file, anything else is postgres (url or libpq conninfo)"""
-    if target.startswith("sqlite:///"):
-        from .sqlite.schema import init_db
-        init_db(target.removeprefix("sqlite:///"))
-        eng = create_engine(target, connect_args={"check_same_thread": False})
-
-        @event.listens_for(eng, "connect")
-        def _fk(dbapi_conn, _):
-            dbapi_conn.execute("PRAGMA foreign_keys = ON")
-        return eng
+def engine(dsn: str) -> Engine:
+    """postgres, url or libpq conninfo ("host=.. user=..") alike"""
     import psycopg
-    # creator takes urls and "host=.. user=.." alike, sqlalchemy's url parser only does urls
-    return create_engine("postgresql+psycopg://", creator=lambda: psycopg.connect(target),
+    # creator takes both forms, sqlalchemy's own url parser only does urls
+    return create_engine("postgresql+psycopg://", creator=lambda: psycopg.connect(dsn),
                          pool_pre_ping=True, pool_size=5, max_overflow=5)
 
 
@@ -68,15 +54,13 @@ def _json(value) -> str:
 
 
 class _Repo:
-    def __init__(self, target: str | Path):
-        # a Path is the sqlite file, a string is a postgres dsn
-        self._engine = engine(f"sqlite:///{target}" if isinstance(target, Path) else target)
-        self._pg = self._engine.dialect.name == "postgresql"
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+        self._engine = engine(dsn)
 
     def _lock(self, conn: Connection, key: str) -> None:
-        # postgres serializes racing writers per key, sqlite has one writer anyway
-        if self._pg:
-            conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"), {"k": key})
+        # racing writers of the same row wait for each other
+        conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"), {"k": key})
 
     def _one(self, sql: str, **params):
         with self._engine.begin() as conn:
@@ -353,7 +337,7 @@ class EvidenceRepository(_Repo):
     def link_artifact(self, procurement_id: str, evidence_id: int,
                       polarity: EvidencePolarity) -> ImplementationArtifact:
         status = POLARITY_STATUS[polarity]
-        lock = " FOR UPDATE" if self._pg else ""
+        lock = " FOR UPDATE"
         with self._engine.begin() as conn:
             conn.execute(text("INSERT INTO implementation_artifacts(procurement_id) VALUES (:p)"
                               " ON CONFLICT(procurement_id) DO NOTHING"), {"p": procurement_id})

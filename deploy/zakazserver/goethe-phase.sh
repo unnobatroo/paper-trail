@@ -3,9 +3,9 @@
 # goethe won't fit all three, so ingest wants "extraction", evidence search "retrieval"
 set -eu
 PATH="$HOME/.local/bin:$PATH"
-EMBED=${PAPER_TRAIL_EMBED_ID:-Qwen/Qwen3-Embedding-0.6B}
-RERANK=${PAPER_TRAIL_RERANK_ID:-paper-trail/bge-reranker-v2-m3-bf16}
-LLM=${PAPER_TRAIL_LLM_ID:-unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq}
+EMBED=${EMBED_ID:-Qwen/Qwen3-Embedding-0.6B}
+RERANK=${RERANK_ID:-paper-trail/bge-reranker-v2-m3-bf16}
+LLM=${LLM_ID:-unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq}
 case "${1:-}" in
   retrieval)
     goethe unload --all
@@ -17,7 +17,7 @@ case "${1:-}" in
   extraction)
     goethe unload --all
     # goethe sizes the kv cache off --ctx only: 4096 gave 1965 tokens and chopped answers,
-    # 12288 gives ~6100, enough for 3-4 pages in flight (PAPER_TRAIL_LLM_CONCURRENCY=4)
+    # 12288 gives ~6100, enough for 3-4 pages in flight (LLM_CONCURRENCY=4)
     goethe load --model "$LLM" --ctx 12288 --max-conc 4 --yes
     ;;
   status) goethe ps ;;

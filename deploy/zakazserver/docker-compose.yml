@@ -17,38 +17,38 @@ x-application: &application
     dockerfile: deploy/docker/api.Dockerfile
     target: api
   environment: &app-env
-    PAPER_TRAIL_ENV: production
-    PAPER_TRAIL_DATABASE_URL: postgresql://paper_trail_api:${API_DB_PASSWORD:?required}@db:5432/paper_trail
-    PAPER_TRAIL_JOB_MODE: external
-    PAPER_TRAIL_PROCESS_ROLE: api
-    PAPER_TRAIL_REVIEW_KEY: ${REVIEW_KEY:?required}
+    APP_ENV: production
+    DATABASE_URL: postgresql://paper_trail_api:${API_DB_PASSWORD:?required}@db:5432/paper_trail
+    JOB_MODE: external
+    PROCESS_ROLE: api
+    REVIEW_KEY: ${REVIEW_KEY:?required}
     # every model runs on the host's goethe gateway, see goethe-phase.sh
-    PAPER_TRAIL_EMBED_MODEL: openai:Qwen/Qwen3-Embedding-0.6B
-    PAPER_TRAIL_EMBED_BASE_URL: https://goethe:8443/v1
-    PAPER_TRAIL_EMBED_API_KEY: ${GOETHE_API_KEY:?required}
-    PAPER_TRAIL_RERANKER: goethe
-    PAPER_TRAIL_RERANK_BASE_URL: https://goethe:8443/v1
-    PAPER_TRAIL_RERANK_API_KEY: ${GOETHE_API_KEY:?required}
-    PAPER_TRAIL_RERANK_MODEL: paper-trail/bge-reranker-v2-m3-bf16
-    PAPER_TRAIL_MODEL_CA_BUNDLE: /run/goethe/server.crt
-    PAPER_TRAIL_SEARCH: searxng
-    PAPER_TRAIL_SEARXNG_URL: http://searxng:8080
-    PAPER_TRAIL_LLM_BASE_URL: https://goethe:8443/v1
-    PAPER_TRAIL_LLM_API_KEY: ${GOETHE_API_KEY:?required}
-    PAPER_TRAIL_LLM_MODEL: unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq
-    PAPER_TRAIL_LLM_WINDOW: "1"
-    PAPER_TRAIL_LLM_CONCURRENCY: "4"
-    PAPER_TRAIL_RERANK_BATCH: "20"
-    PAPER_TRAIL_PARSER: docling
-    PAPER_TRAIL_PARSER_DEVICE: cpu
-    PAPER_TRAIL_NLP: huspacy
+    EMBED_MODEL: openai:Qwen/Qwen3-Embedding-0.6B
+    EMBED_BASE_URL: https://goethe:8443/v1
+    EMBED_API_KEY: ${GOETHE_API_KEY:?required}
+    RERANKER: goethe
+    RERANK_BASE_URL: https://goethe:8443/v1
+    RERANK_API_KEY: ${GOETHE_API_KEY:?required}
+    RERANK_MODEL: paper-trail/bge-reranker-v2-m3-bf16
+    MODEL_CA_BUNDLE: /run/goethe/server.crt
+    SEARCH_PROVIDER: searxng
+    SEARXNG_URL: http://searxng:8080
+    LLM_BASE_URL: https://goethe:8443/v1
+    LLM_API_KEY: ${GOETHE_API_KEY:?required}
+    LLM_MODEL: unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq
+    LLM_WINDOW: "1"
+    LLM_CONCURRENCY: "4"
+    RERANK_BATCH: "20"
+    PARSER: docling
+    PARSER_DEVICE: cpu
+    NLP: huspacy
     # extra evidence domains, normally empty, sources live in official_sources
-    PAPER_TRAIL_ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
-    PAPER_TRAIL_API_ORIGINS: https://${DOMAIN:?required}
-    PAPER_TRAIL_MODEL_CACHE: /app/model-cache
+    ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
+    API_ORIGINS: https://${DOMAIN:?required}
+    MODEL_CACHE: /app/model-cache
     HF_HOME: /app/model-cache/huggingface
     XDG_CACHE_HOME: /app/model-cache
-    PAPER_TRAIL_DB: /app/data/paper_trail.db
+    DB: /app/data/paper_trail.db
     OMP_NUM_THREADS: "2"
     TOKENIZERS_PARALLELISM: "false"
   volumes:
@@ -90,7 +90,7 @@ services:
       context: ../../web
       dockerfile: ../deploy/docker/web.Dockerfile
     environment:
-      PAPER_TRAIL_API_URL: http://api:8000
+      API_URL: http://api:8000
     healthcheck:
       test: [CMD, node, -e, "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -125,9 +125,9 @@ services:
         HUSPACY_MODEL_URL: ${HUSPACY_MODEL_URL:?copy .env.example for pinned HuSpaCy model}
     environment:
       <<: *app-env
-      PAPER_TRAIL_DATABASE_URL: postgresql://paper_trail_worker:${WORKER_DB_PASSWORD:?required}@db:5432/paper_trail
-      PAPER_TRAIL_PROCESS_ROLE: worker
-      PAPER_TRAIL_REVIEW_KEY: ""
+      DATABASE_URL: postgresql://paper_trail_worker:${WORKER_DB_PASSWORD:?required}@db:5432/paper_trail
+      PROCESS_ROLE: worker
+      REVIEW_KEY: ""
     command: [python, -m, paper_trail.worker]
     depends_on:
       db:
@@ -141,7 +141,7 @@ services:
     restart: "no"
     environment:
       <<: *app-env
-      PAPER_TRAIL_DATABASE_URL: postgresql://paper_trail:${DB_PASSWORD:?required}@db:5432/paper_trail
+      DATABASE_URL: postgresql://paper_trail:${DB_PASSWORD:?required}@db:5432/paper_trail
     command: [alembic, -c, db/alembic.ini, upgrade, head]
     depends_on:
       db:

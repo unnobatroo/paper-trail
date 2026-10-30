@@ -79,7 +79,7 @@ def source_rows(args):
             rows = (json.loads(line) for line in lines if line)
             data[table] = sorted(rows, key=lambda r: r["id"])
     else:
-        with connect(os.environ["PAPER_TRAIL_SOURCE_DATABASE_URL"]) as conn:
+        with connect(os.environ["SOURCE_DATABASE_URL"]) as conn:
             conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             for table in TABLES:
                 exists = conn.execute(
@@ -218,7 +218,7 @@ def migrate(args):
         manifest["receipts"]["quarantined"] = len(unverified)
         manifest["receipts"]["quarantine_path"] = str(quarantine)
         manifest["receipts"]["quarantine_sha256"] = hashlib.sha256(payload).hexdigest()
-    with connect(os.environ["PAPER_TRAIL_TARGET_DATABASE_URL"]) as conn:
+    with connect(os.environ["TARGET_DATABASE_URL"]) as conn:
         for table in TABLES:
             columns = conn.execute(
                 """SELECT column_name, data_type FROM information_schema.columns
@@ -329,7 +329,7 @@ def main():
     source.add_argument(
         "--source-postgres",
         action="store_true",
-        help="read staging DB from PAPER_TRAIL_SOURCE_DATABASE_URL",
+        help="read staging DB from SOURCE_DATABASE_URL",
     )
     parser.add_argument("--objects", help="inventory source PDFs and provenance artifacts")
     parser.add_argument(

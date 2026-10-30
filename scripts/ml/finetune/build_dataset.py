@@ -8,7 +8,7 @@ in the same json the extractor parses. a person decided every label:
 documents in --holdout never get in, those are the eval's.
 --gold adds checked answer keys (check_gold.py output) of other cities, train split only
 
-  PAPER_TRAIL_DATABASE_URL=... uv run python scripts/ml/finetune/build_dataset.py \\
+  DATABASE_URL=... uv run python scripts/ml/finetune/build_dataset.py \\
     --doc 2=data/source_documents/jozsefvaros_klimastrategia_2021.pdf --out train.jsonl
 """
 

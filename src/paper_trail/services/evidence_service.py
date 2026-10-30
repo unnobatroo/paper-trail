@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 from urllib.parse import urlsplit
 
 from ..domain.enums import EvidenceFlag, EvidencePolarity, Status
@@ -32,7 +31,7 @@ from ..ml.ner import RuleNer
 from ..ml.nlp import TextAnalyzer
 from ..ml.rerank import Reranker
 from ..repositories.ports import EvidenceStore, PageStore, VectorIndex
-from ..repositories.sqlite.files import FilePageStore, FileVectorIndex
+from ..repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from ..sources import fetch as fetching
 from ..sources.chunking import structure_chunks
 from ..sources.fetch import FetchedPage
@@ -71,7 +70,6 @@ class EvidenceService:
             repo: EvidenceStore,
             search: SearchProvider,
             embedder: EmbeddingProvider,
-            cache_dir: Path | str | None = None,
             fetcher=None,
             reranker: Reranker | None = None,
             candidates: int = 20,
@@ -107,15 +105,10 @@ class EvidenceService:
         # gliner in prod, the profile's regex offline (ml/ner.py)
         self._ner = ner or RuleNer(self._profile)
         self._extra_domains = {d.lower() for d in allowed_domains}
-        # explicit stores (postgres/pgvector) win, else files under cache_dir
-        if page_store is None or vector_index is None:
-            if cache_dir is None:
-                raise ValueError(
-                    "EvidenceService needs cache_dir or explicit stores")
-            page_store = page_store or FilePageStore(Path(cache_dir))
-            vector_index = vector_index or FileVectorIndex(Path(cache_dir))
-        self._pages = page_store
-        self._index = vector_index
+        # page text + chunk vectors live next to the evidence, same database
+        self._pages = page_store or PostgresPageStore(repo.dsn)
+        self._index = vector_index or PostgresVectorIndex(
+            repo.dsn, ts_config=self._profile.ts_config)
         self.warnings: list[str] = []  # outside a run (tests, one-off calls)
 
     def _say(self, msg: str) -> None:
@@ -150,7 +143,7 @@ class EvidenceService:
         if not domains:
             self._warn("No evidence sources configured — the "
                        "official_sources registry is empty and "
-                       "PAPER_TRAIL_ALLOWED_DOMAINS is unset.")
+                       "ALLOWED_DOMAINS is unset.")
         if self._crawler is not None:
             try:
                 for source in self._crawler.discover(domains):
@@ -372,6 +365,7 @@ class EvidenceService:
         chunks = structure_chunks(page.text[:self._max_doc_chars], _CHUNK,
                                   _CHUNK - _CHUNK_STRIDE, self._warn)
         if chunks:
+            self._pages.put(page)  # vectors hang off the stored page
             vectors = self._embed.embed(chunks)
             self._index.put(page, model, _CHUNK, list(zip(chunks, vectors, strict=True)))
 

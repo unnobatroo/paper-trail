@@ -1,13 +1,9 @@
-"""PageStore / VectorIndex contract, file backend, offline. postgres gets the same
-checks in scripts/ops/check_postgres.py
-"""
-
-import json
+"""PageStore / VectorIndex contract on postgres + pgvector"""
 
 import pytest
 
 from paper_trail.repositories.indexing import content_key, fit_vector, pad_vector, url_key
-from paper_trail.repositories.sqlite.files import FilePageStore, FileVectorIndex
+from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from paper_trail.sources.fetch import FetchedPage
 
 PAGE = FetchedPage(url="https://rev8.hu/utcafasitas/", title="Utcafásítás",
@@ -15,8 +11,8 @@ PAGE = FetchedPage(url="https://rev8.hu/utcafasitas/", title="Utcafásítás",
 VECTORS = [("chunk a", [1.0, 0.0]), ("chunk b", [0.0, 1.0])]
 
 
-def test_page_store_roundtrip(tmp_path):
-    store = FilePageStore(tmp_path / "fetched")
+def test_page_store_roundtrip(dsn):
+    store = PostgresPageStore(dsn)
     assert store.get(PAGE.url) is None
     store.put(PAGE)
     got = store.get(PAGE.url)
@@ -24,12 +20,14 @@ def test_page_store_roundtrip(tmp_path):
     assert (got.url, got.title, got.text) == (PAGE.url, PAGE.title, PAGE.text)
 
 
-def test_vector_index_roundtrip_and_match(tmp_path):
-    index = FileVectorIndex(tmp_path / "fetched")
+def test_vector_index_roundtrip_and_match(dsn):
+    PostgresPageStore(dsn).put(PAGE)
+    index = PostgresVectorIndex(dsn)
     assert index.get(PAGE, "hashing", 2400) is None
     assert not index.has(PAGE, "hashing", 2400)
     index.put(PAGE, "hashing", 2400, VECTORS)
-    assert index.get(PAGE, "hashing", 2400) == VECTORS
+    # pgvector pads to the column width, the real dims come back first
+    assert [(c, v[:2]) for c, v in index.get(PAGE, "hashing", 2400)] == VECTORS
     assert index.has(PAGE, "hashing", 2400)
     # a different model or a changed document must miss the cache
     assert index.get(PAGE, "other-model", 2400) is None
@@ -60,16 +58,6 @@ def test_pad_vector_is_cosine_neutral():
 def test_content_and_url_keys_stable():
     assert url_key(PAGE.url) == url_key(PAGE.url)
     assert content_key("m", 2400, "t") != content_key("m", 2400, "t2")
-
-
-def test_file_layout_compatible_with_legacy_cache(tmp_path):
-    """pages written through the store still read in the old layout"""
-    cache = tmp_path / "fetched"
-    FilePageStore(cache).put(PAGE)
-    key = url_key(PAGE.url)
-    assert (cache / f"{key}.txt").read_text() == PAGE.text
-    meta = json.loads((cache / f"{key}.json").read_text())
-    assert meta["title"] == PAGE.title
 
 
 def _commitment(policy) -> int:

@@ -2,8 +2,8 @@
 
   python -m paper_trail.maintenance --help        every command, with its options
 
-reset/rerun/source need the owner dsn in PAPER_TRAIL_DATABASE_URL (api/worker roles
-can't delete). profile and notes also work on the local sqlite file when that's unset
+reset/rerun/source need the owner dsn in DATABASE_URL (api/worker roles
+can't delete)
 """
 
 import json
@@ -30,16 +30,16 @@ app.add_typer(notes_app, name="notes")
 
 
 def _owner_dsn() -> str:
-    url = os.environ.get("PAPER_TRAIL_DATABASE_URL")
+    url = os.environ.get("DATABASE_URL")
     if not url:
-        raise typer.BadParameter("PAPER_TRAIL_DATABASE_URL is not set")
+        raise typer.BadParameter("DATABASE_URL is not set")
     return url
 
 
 def _local_repo():
     from .infrastructure.settings import load
     settings = load()
-    return settings, PolicyRepository(settings.database_url or settings.db_path)
+    return settings, PolicyRepository(settings.database_url)
 
 
 def _gone(evidence_id: str) -> str:
@@ -193,7 +193,7 @@ def notes_generate(links: Annotated[bool, typer.Option(help="evidence links too"
     """our llm writes notes for unreviewed items (goethe in the extraction phase)"""
     settings, repo = _local_repo()
     rows = _generate_notes(settings, repo,
-                           EvidenceRepository(settings.database_url or settings.db_path),
+                           EvidenceRepository(settings.database_url),
                            links, redo, limit)
     for note in rows:
         repo.put_note(note)
@@ -207,7 +207,7 @@ def _generate_notes(settings, repo, evidence, links: bool, redo: bool, limit: in
     from .ml.client import model_client
     from .ml.notes import NoteWriter, candidate_item, link_item
     if not settings.llm_configured:
-        raise SystemExit("PAPER_TRAIL_LLM_BASE_URL / _MODEL not set, nothing to write notes with")
+        raise SystemExit("LLM_BASE_URL / _MODEL not set, nothing to write notes with")
     profile = load_profile(repo, settings.language)
     items = []
     cands = repo.candidates(ReviewStatus.UNREVIEWED)

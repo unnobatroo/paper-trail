@@ -9,7 +9,7 @@ export const API_URL =
     (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 
 // ---- review key ----
-// sent as X-Review-Key on mutations when PAPER_TRAIL_REVIEW_KEY is set
+// sent as X-Review-Key on mutations when REVIEW_KEY is set
 
 const LS_REVIEW_KEY = "pt-review-key";
 

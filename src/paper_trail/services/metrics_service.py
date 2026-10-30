@@ -21,13 +21,8 @@ def with_effective_flags(store: EvidenceStore, ev_map: dict[int, EvidenceItem]) 
 
 def _dedupe(budgets) -> list[BudgetRecord]:
     """same figure gets quoted all over a report, keep one per (wording, kind, source)"""
-    seen, out = set(), []
-    for b in budgets:
-        key = (b.amount_raw, b.currency, b.kind, b.source_url)
-        if key not in seen:
-            seen.add(key)
-            out.append(b)
-    return out
+    return list({(b.amount_raw, b.currency, b.kind, b.source_url): b
+                 for b in reversed(list(budgets))}.values())[::-1]
 
 
 # lifecycle only, budget/background evidence never bumps status
@@ -135,10 +130,11 @@ class MetricsService:
 
     @staticmethod
     def _best_status(items: list[EvidenceItem]) -> tuple[Status, str | None]:
-        best, excerpt = Status.UNKNOWN, None
-        for e in items:
-            if e.status_hint not in _STATUS_ORDER:
-                continue
-            if _STATUS_ORDER.index(e.status_hint) > _STATUS_ORDER.index(best):
-                best, excerpt = e.status_hint, e.status_excerpt
-        return best, excerpt
+        ranked = [e for e in items if e.status_hint in _STATUS_ORDER]
+        if not ranked:
+            return Status.UNKNOWN, None
+        # first item wins a tie, like reading the evidence in order
+        best = max(ranked, key=lambda e: (_STATUS_ORDER.index(e.status_hint), -items.index(e)))
+        if best.status_hint == Status.UNKNOWN:
+            return Status.UNKNOWN, None
+        return best.status_hint, best.status_excerpt

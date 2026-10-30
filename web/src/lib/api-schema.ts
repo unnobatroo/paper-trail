@@ -725,9 +725,9 @@ export interface components {
             search_provider: string;
             /**
              * Storage
-             * @enum {string}
+             * @constant
              */
-            storage: "postgres" | "sqlite";
+            storage: "postgres";
             /** Translation */
             translation: boolean;
         };

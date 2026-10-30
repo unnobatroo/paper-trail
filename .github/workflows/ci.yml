@@ -20,11 +20,24 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    # throwaway pgvector, every test clones its own database from a migrated template
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: paper_trail
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: paper_trail
+        ports: [ "5432:5432" ]
+        options: >-
+          --health-cmd "pg_isready -U paper_trail" --health-interval 2s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://paper_trail:test-only@localhost:5432/paper_trail
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
-      # the whole suite is offline by design, no secrets needed
+      # offline apart from that database, no secrets needed
       - run: uv run pytest -q
 
   frontend:

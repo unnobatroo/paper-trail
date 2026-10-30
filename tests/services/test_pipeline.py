@@ -2,7 +2,6 @@
 ingest -> review -> evidence -> trail
 """
 
-import hashlib
 import json
 
 from paper_trail.domain.enums import (
@@ -13,10 +12,12 @@ from paper_trail.domain.enums import (
 )
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
 from paper_trail.ml.embeddings import HashingProvider
+from paper_trail.repositories.postgres.index import PostgresPageStore
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.metrics_service import MetricsService
 from paper_trail.services.review_service import ReviewService
+from paper_trail.sources.fetch import FetchedPage
 from paper_trail.sources.web_search import FixtureSearch
 from tests.profiles import HU
 
@@ -36,14 +37,6 @@ class _FakeExtractor:
             source_page=1, source_excerpt=pages[0].text,
             code="A1.1.1", responsible_org="RÉV8 Zrt.",
         )]
-
-
-def _seed_fetch_cache(cache_dir, url, text):
-    key = hashlib.sha256(url.encode()).hexdigest()[:16]
-    (cache_dir / f"{key}.txt").write_text(text, encoding="utf-8")
-    (cache_dir / f"{key}.json").write_text(
-        json.dumps({"title": "Utcafásítás", "date": None}), encoding="utf-8"
-    )
 
 
 def _fixture_search(tmp_path):
@@ -81,11 +74,9 @@ def test_full_pipeline(policy: PolicyRepository, evidence: EvidenceRepository,
     assert len(policy.commitments()) == 1
 
     # 3. evidence: bounded, allowlisted, offline fixtures
-    cache = tmp_path / "fetched"
-    cache.mkdir()
-    _seed_fetch_cache(cache, EVIDENCE_URL, EVIDENCE_TEXT)
+    PostgresPageStore(evidence.dsn).put(FetchedPage(EVIDENCE_URL, "Utcafásítás", EVIDENCE_TEXT))
     svc = EvidenceService(evidence, _fixture_search(tmp_path),
-                          HashingProvider(), cache_dir=cache,
+                          HashingProvider(),
                           fetcher=lambda url, d=None: None,
                           profile=HU, allowed_domains=("rev8.hu",))
     links = svc.find_evidence(com)

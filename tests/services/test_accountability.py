@@ -100,7 +100,7 @@ def test_appropriation_is_not_spending_until_final_accounts():
 
 def _service(evidence, tmp_path, pages):
     svc = EvidenceService(evidence, SimpleNamespace(search=lambda *a, **kw: []),
-                          HashingProvider(), cache_dir=tmp_path, profile=HU)
+                          HashingProvider(), profile=HU)
     svc._collect_urls = lambda *a: [p.url for p in pages]
     svc._fetch_page = lambda url, *a: next(p for p in pages if p.url == url)
     return svc
@@ -181,7 +181,7 @@ def test_routed_owner_domains_come_from_the_registry(evidence, tmp_path):
         jurisdiction=Jurisdiction.PUBLIC_UTILITY_HEATING))
     queries = []
     search = SimpleNamespace(search=lambda q, **kw: queries.append(q) or [])
-    svc = EvidenceService(evidence, search, HashingProvider(), cache_dir=tmp_path,
+    svc = EvidenceService(evidence, search, HashingProvider(),
                           profile=HU, allowed_domains=("jozsefvaros.hu",))
     svc._fetch_page = lambda *a: None
     com = Commitment(id=1, kind=CandidateType.MEASURE, title="Ivóvízhálózat",
