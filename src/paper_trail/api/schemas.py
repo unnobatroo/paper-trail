@@ -116,6 +116,7 @@ class MetaOut(DomainModel):
     translation: bool
     # false until `maintenance profile import`, the rules find nothing without one
     language_profile_loaded: bool
+    language_name: str = ""  # "Hungarian", labels the original-language toggle
     # source-language words and codes explained in plain english, from the profile
     glossary: list[GlossaryTerm] = Field(default_factory=list)
 

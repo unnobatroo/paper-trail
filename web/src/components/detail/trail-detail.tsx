@@ -2,7 +2,7 @@
 
 import {Fragment, type ReactNode} from "react";
 import {ExternalLink} from "lucide-react";
-import {En} from "@/components/en";
+import {Bi, En} from "@/components/en";
 import {Chip} from "@/components/chip";
 import {EvidenceWarnings} from "@/components/evidence-warnings";
 import {JurisdictionSelect} from "@/components/jurisdiction-select";
@@ -58,10 +58,8 @@ export function TrailDetail({
         <div className="space-y-4">
             {!hideHeader && (
                 <div>
-                    <h2 className="text-lg font-semibold leading-snug">
-                        {displayTitle(com.title)}
-                    </h2>
-                    <En text={displayTitle(com.title)}/>
+                    <Bi as="h2" text={displayTitle(com.title)}
+                        className="text-lg font-semibold leading-snug"/>
                 </div>
             )}
 

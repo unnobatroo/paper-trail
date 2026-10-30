@@ -12,7 +12,7 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command";
-import {useTranslate} from "./en";
+import {useLang} from "./en";
 
 const NAV = [
     {href: "/", label: "Workspace: everything", icon: LayoutDashboard},
@@ -26,7 +26,7 @@ export function CommandMenu() {
     const [open, setOpen] = useState(false);
     const router = useRouter();
     const {resolvedTheme, setTheme} = useTheme();
-    const {on: translateOn, setOn: setTranslateOn} = useTranslate();
+    const {lang, setLang} = useLang();
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -73,12 +73,12 @@ export function CommandMenu() {
                     </CommandItem>
                     <CommandItem
                         onSelect={() => {
-                            setTranslateOn(!translateOn);
+                            setLang(lang === "en" ? "orig" : "en");
                             setOpen(false);
                         }}
                     >
                         <Languages className="size-4"/>
-                        {translateOn ? "Hide" : "Show"} English translation
+                        Show {lang === "en" ? "original language" : "English"}
                     </CommandItem>
                 </CommandGroup>
             </CommandList>
