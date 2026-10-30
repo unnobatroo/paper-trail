@@ -77,3 +77,18 @@ def test_classify_status():
     status, _ = entities.classify_status(
         "A beruházás becsült költsége 120 millió Ft.", HU, has_money=True)
     assert status == Status.BUDGET
+
+
+def test_gliner_ner_buckets_and_dedupes(monkeypatch):
+    from paper_trail.ml.ner import GlinerNer
+    ner = GlinerNer()
+    fake = [{"label": "organization", "text": "RÉV8 Zrt."},
+            {"label": "organization", "text": "rév8 zrt."},
+            {"label": "street, square or park", "text": "Losonci téren"},
+            {"label": "date", "text": "2024. március 15-én"}]
+    # stub the model, the real one is a 1 gb download
+    model = type("M", (), {"predict_entities": lambda *a, **k: fake})()
+    monkeypatch.setattr(GlinerNer, "_model", model)
+    found = ner.find("x")
+    assert (found.orgs, found.places, found.dates) == (
+        ["RÉV8 Zrt."], ["Losonci téren"], ["2024. március 15-én"])

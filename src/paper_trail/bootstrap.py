@@ -16,6 +16,7 @@ from .infrastructure.settings import Settings, load
 from .ml.embeddings import get_provider
 from .ml.extraction import get_extractor
 from .ml.lang import LanguageProfile
+from .ml.ner import get_ner
 from .ml.rerank import get_reranker
 from .repositories.ports import EvidenceStore, PolicyStore
 from .repositories.sqlite.files import FilePageStore, FileVectorIndex
@@ -135,6 +136,7 @@ def build_state(settings: Settings | None = None) -> AppState:
             baseline_year=_baseline_year(settings, policy),
             profile=profile,
             allowed_domains=settings.allowed_domains,
+            ner=get_ner(settings.ner, profile, str(settings.model_cache)),
         ),
         metrics=MetricsService(policy, evidence, profile),
         docs=docs,

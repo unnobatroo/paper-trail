@@ -27,6 +27,7 @@ from ..ml import entities, matching
 from ..ml.accountability import PassageAuditor
 from ..ml.embeddings import EmbeddingProvider
 from ..ml.lang import LanguageProfile
+from ..ml.ner import RuleNer
 from ..ml.nlp import TextAnalyzer
 from ..ml.rerank import Reranker
 from ..repositories.ports import EvidenceStore, PageStore, VectorIndex
@@ -81,6 +82,7 @@ class EvidenceService:
             parser=None,
             auditor: PassageAuditor | None = None,
             places: PlaceResolver | None = None,
+            ner=None,
     ):
         self._analyzer = analyzer
         self._crawler = crawler
@@ -97,6 +99,8 @@ class EvidenceService:
         self._profile = profile or LanguageProfile.empty()
         self._auditor = auditor or PassageAuditor(self._profile)
         self._places = places or PlaceResolver(repo, self._auditor)
+        # gliner in prod, the profile's regex offline (ml/ner.py)
+        self._ner = ner or RuleNer(self._profile)
         self._extra_domains = {d.lower() for d in allowed_domains}
         # explicit stores (postgres/pgvector) win, else files under cache_dir
         if page_store is None or vector_index is None:
@@ -199,7 +203,7 @@ class EvidenceService:
                 description=mention.sentence,
                 source_url=page.url,
             ))
-        features = matching.compute_features(commitment, ev, sim, self._profile)
+        features = matching.compute_features(commitment, ev, sim, self._profile, self._ner)
         has_budget = bool(self._repo.budgets_for_evidence(ev.id))
         rel, reasons = matching.suggest_relationship(features, has_budget)
         rel, reasons = self._audited_hint(ev, artifacts, rel, reasons)
@@ -222,7 +226,8 @@ class EvidenceService:
                   registry: list[OfficialSource]) -> EvidenceItem:
         """entities, places and audit cues, passage only"""
         analysis = self._analyzer.analyze(snippet) if self._analyzer else None
-        streets = entities.extract_locations(snippet, self._profile)
+        found = self._ner.find(snippet)
+        streets = found.places
         audit = self._auditor.audit(snippet)
         return EvidenceItem(
             commitment_id=commitment.id,
@@ -232,14 +237,12 @@ class EvidenceService:
             published_on=page.published_on,
             snippet=snippet,
             organisations=list(dict.fromkeys(
-                entities.extract_organisations(snippet, self._profile)
-                + (analysis.organisations if analysis else []))),
+                found.orgs + (analysis.organisations if analysis else []))),
             locations=list(dict.fromkeys(
                 streets + (analysis.locations if analysis else [])
                 + self._places.resolve(snippet, page.url, streets))),
             dates_mentioned=list(dict.fromkeys(
-                entities.extract_dates(snippet, self._profile)
-                + (analysis.dates if analysis else []))),
+                found.dates + (analysis.dates if analysis else []))),
             polarity=audit.polarity,
             flags=audit.flags,
             procurement_ids=audit.procurement_ids,
