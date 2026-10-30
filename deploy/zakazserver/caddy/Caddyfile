@@ -38,6 +38,7 @@
 		reverse_proxy api:8000
 	}
 	handle {
-		reverse_proxy frontend:3000
+		# the nicegui ui, websocket included
+		reverse_proxy api:8000
 	}
 }

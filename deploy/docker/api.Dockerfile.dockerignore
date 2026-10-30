@@ -24,8 +24,6 @@ experiments/checkpoints/
 tests/
 docs/
 .github/
-web/node_modules/
-web/.next/
 
 **/._*
 **/.env

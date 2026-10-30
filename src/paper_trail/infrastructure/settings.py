@@ -91,8 +91,9 @@ class Settings(BaseSettings):
     model_cache: Path = Field(
         default=PROJECT_ROOT / "data" / "models",
         validation_alias="MODEL_CACHE")
+    # cors for other clients, the ui is same-origin
     api_origins_raw: str = Field(
-        default="http://localhost:3000",
+        default="",
         validation_alias="API_ORIGINS")
     baseline_year: int | None = Field(
         default=None, validation_alias="BASELINE_YEAR")

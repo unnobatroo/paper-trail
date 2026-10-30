@@ -44,7 +44,6 @@ x-application: &application
     NLP: huspacy
     # extra evidence domains, normally empty, sources live in official_sources
     ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
-    API_ORIGINS: https://${DOMAIN:?required}
     MODEL_CACHE: /app/model-cache
     HF_HOME: /app/model-cache/huggingface
     XDG_CACHE_HOME: /app/model-cache
@@ -80,26 +79,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      frontend:
-        condition: service_healthy
     mem_limit: 192m
-
-  frontend:
-    <<: *runtime
-    build:
-      context: ../../web
-      dockerfile: ../deploy/docker/web.Dockerfile
-    environment:
-      API_URL: http://api:8000
-    healthcheck:
-      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    mem_limit: 512m
-    security_opt:
-      - no-new-privileges:true
-    cap_drop: [ALL]
 
   api:
     <<: *application

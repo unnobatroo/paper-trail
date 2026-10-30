@@ -1,11 +1,11 @@
 # Claude Code notes
 
-Project rules live in `AGENTS.md`; under `web/` also read `web/AGENTS.md`. They are not repeated here.
+Project rules live in `AGENTS.md`. They are not repeated here.
 
 ## Commands
 
-- tests: `make test` (`uv run pytest -q` + `cd web && npm test`)
-- full check, same as CI: `make check` (tests, `uvx pre-commit run --all-files`, `npm run lint`, `npm run build`)
+- tests: `make test` (`uv run pytest -q`)
+- full check, same as CI: `make check` (tests + `uvx pre-commit run --all-files`)
 - format: `make fmt`
 
 ## Rules

@@ -9,7 +9,7 @@ The software only suggests: nothing reaches the public record until
 someone clicks Confirm, and a commitment with no evidence shows up as a gap.
 
 ```sh
-make setup && make dev     # api on :8000, ui on :3000, fully offline by default
+make setup && make dev     # api + review ui on :8000, fully offline by default
 make check                 # what ci runs
 ```
 

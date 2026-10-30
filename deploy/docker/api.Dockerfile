@@ -12,7 +12,8 @@ COPY README.md LICENSE ./
 RUN uv sync --frozen --no-dev && mkdir -p /app/data /app/model-cache && chown -R papertrail:papertrail /app/data /app/model-cache
 USER papertrail
 EXPOSE 8000
-CMD ["uvicorn", "paper_trail.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--proxy-headers", "--forwarded-allow-ips=*"]
+# one worker: the ui keeps page state in-process, slow work runs in the job worker
+CMD ["uvicorn", "paper_trail.ui.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips=*"]
 
 FROM base AS api
 COPY db ./db
