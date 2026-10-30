@@ -25,7 +25,7 @@ body:
         - REST API
         - Extraction (PDF → candidates)
         - Evidence ranking
-        - Storage / Supabase
+        - Storage / database
         - Other
     validations:
       required: true
@@ -33,7 +33,7 @@ body:
     id: env
     attributes:
       label: Environment
-      description: "local / container / hosted; backend: sqlite or supabase; embed model + reranker settings"
+      description: "local / zakazserver; backend: sqlite or postgres; embed model + reranker settings"
   - type: checkboxes
     id: honesty
     attributes:
