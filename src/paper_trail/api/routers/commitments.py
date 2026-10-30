@@ -1,8 +1,4 @@
-"""Step 2 — commitments and evidence discovery.
-
-`find_evidence` is a minutes-long pipeline (search → fetch → embed →
-rerank), so it runs as a background job; poll GET /api/jobs/{id}.
-"""
+"""commitments + kicking off evidence search (minutes long, so it's a job)"""
 
 from __future__ import annotations
 
@@ -12,7 +8,7 @@ from ...bootstrap import AppState
 from ...domain.models import Commitment
 from ..deps import get_jobs, get_state, require_review_key
 from ..jobs import JobRunner
-from ..schemas import JobOut
+from ..schemas import JobOut, JurisdictionRequest
 
 router = APIRouter(prefix="/api/commitments", tags=["commitments"])
 
@@ -32,3 +28,14 @@ def find_evidence(commitment_id: int,
 
     job = jobs.submit("find_evidence", {"commitment_id": commitment_id})
     return JobOut(**job.__dict__)
+
+
+@router.post("/{commitment_id}/jurisdiction", dependencies=[Depends(require_review_key)])
+def set_jurisdiction(commitment_id: int, req: JurisdictionRequest,
+                     state: AppState = Depends(get_state)) -> Commitment:
+    """reviewer picks the asset owner, next search follows it"""
+    try:
+        state.review.set_jurisdiction(commitment_id, req.jurisdiction)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return state.policy.commitment(commitment_id)

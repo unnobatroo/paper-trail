@@ -1,4 +1,4 @@
-"""Step 3 — the paper trail: commitments plus their verified evidence."""
+"""the trail: commitments + accepted evidence + gaps"""
 
 from __future__ import annotations
 

@@ -1,14 +1,11 @@
-"""Simple, inspectable matching between a commitment and an evidence passage.
+"""commitment <-> passage matching, plain weighted math, nothing learned or hidden
 
-A weighted score — nothing learned, nothing hidden:
+    score = 0.60 * similarity
+          + 0.15 * shared orgs (cap 2)
+          + 0.15 * shared places (cap 2)
+          + 0.10 * shared years (cap 2)
 
-    score = 0.60 * semantic_similarity
-          + 0.15 * (shared organisations, capped at 2)
-          + 0.15 * (shared locations, capped at 2)
-          + 0.10 * (shared dates/years, capped at 2)
-
-The relationship suggestion is a transparent rule set over those components.
-A human still decides.
+the relationship hint is a small rule set over that. a person still decides
 """
 
 from __future__ import annotations
@@ -27,7 +24,7 @@ W_ORG = 0.15
 W_LOCATION = 0.15
 W_DATE = 0.10
 
-# calibrated on the default fastembed model: real evidence ~0.4-0.6, noise ~0.33, bigger models
+# tuned on the default fastembed: real evidence ~0.4-0.6, noise ~0.33. bigger models
 # spread wider and still pass
 DIRECT_SIMILARITY = 0.58
 SUPPORTING_SIMILARITY = 0.48
@@ -39,7 +36,7 @@ def _norm(names: list[str]) -> set[str]:
 
 
 def _shared(a: set[str], b: set[str]) -> set[str]:
-    """Exact or containing match — 'RÉV8' should match 'RÉV8 Zrt.'."""
+    """exact or containing match, 'RÉV8' should hit 'RÉV8 Zrt.'"""
     out = set()
     for x in a:
         for y in b:
@@ -50,7 +47,7 @@ def _shared(a: set[str], b: set[str]) -> set[str]:
 
 def commitment_entities(commitment: Commitment,
                         profile: LanguageProfile) -> dict[str, set[str]]:
-    """Entities visible in the commitment text itself."""
+    """entities right there in the commitment text"""
     text = " ".join([commitment.title, commitment.summary])
     orgs = _norm(extract_organisations(text, profile))
     if commitment.responsible_org:

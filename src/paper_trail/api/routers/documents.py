@@ -1,8 +1,4 @@
-"""Documents: what has been ingested, and starting a new ingest.
-
-Ingestion parses a whole PDF and can take a while with an LLM extractor,
-so it runs as a background job — the client polls GET /api/jobs/{id}.
-"""
+"""documents + starting an ingest (slow with an llm, so it's a job)"""
 
 from __future__ import annotations
 
@@ -24,8 +20,7 @@ def documents(state: AppState = Depends(get_state)) -> list[SourceDocument]:
 
 @router.get("/available")
 def available(state: AppState = Depends(get_state)) -> list[str]:
-    """Filenames in the document store (bucket/local dir) — what
-    POST /ingest can be called with."""
+    """files you can ingest"""
     return state.docs.list()
 
 
@@ -34,7 +29,7 @@ def available(state: AppState = Depends(get_state)) -> list[str]:
 def ingest(req: IngestRequest,
            state: AppState = Depends(get_state),
            jobs: JobRunner = Depends(get_jobs)) -> JobOut:
-    # fail fast if the pdf is missing, the job re-reads it by name so the payload stays plain data
+    # fail fast on a missing file, the job re-reads it by name so the payload stays plain
     if state.docs.read(req.name) is None:
         raise HTTPException(
             404, f"{req.name} is not in the document store")

@@ -1,15 +1,16 @@
-"""request/response shapes, domain models already serialize so this is just bodies + joined views"""
+"""request/response shapes. domain models serialize themselves, this is bodies + joined views"""
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from ..domain.enums import CandidateType, RelationshipType
+from ..domain.enums import BudgetKind, CandidateType, Jurisdiction, RelationshipType, Status
 from ..domain.models import (
     BudgetRecord,
     Commitment,
+    DomainModel,
     EvidenceItem,
     EvidenceLink,
 )
@@ -35,6 +36,10 @@ class BulkCandidatesRequest(BaseModel):
     reject_rest: bool = False
 
 
+class JurisdictionRequest(BaseModel):
+    jurisdiction: Jurisdiction
+
+
 class LinkDecisionRequest(BaseModel):
     decision: str = Field(pattern="^(accept|reject)$")
     relationship: RelationshipType | None = None
@@ -46,21 +51,24 @@ class BulkLinksRequest(BaseModel):
     reject: list[int] = Field(default_factory=list)
 
 
-class LinkView(BaseModel):
-    """link + everything needed to review it"""
+class LinkView(DomainModel):
+    """link + everything you need to review it"""
     link: EvidenceLink
     evidence: EvidenceItem | None = None
     budgets: list[BudgetRecord] = Field(default_factory=list)
 
 
-class TrailRowView(BaseModel):
+class TrailRowView(DomainModel):
     commitment: Commitment
     evidence: list[EvidenceItem]
     relationships: list[RelationshipType]
     budgets: list[BudgetRecord]
-    status: str
+    status: Status
     status_excerpt: str | None
     gaps: list[str]
+    financial_states: list[BudgetKind]
+    financially_executed: bool
+    findings: list[str]
 
     @classmethod
     def from_row(cls, row: TrailRow) -> TrailRowView:
@@ -69,18 +77,35 @@ class TrailRowView(BaseModel):
             evidence=row.evidence,
             relationships=row.relationships,
             budgets=row.budgets,
-            status=row.status.value,
+            status=row.status,
             status_excerpt=row.status_excerpt,
             gaps=row.gaps,
+            financial_states=row.financial_states,
+            financially_executed=row.financially_executed,
+            findings=row.findings,
         )
 
 
 class TranslateRequest(BaseModel):
-    # endpoint is public so it's bounded: one page of ui strings, not a free translator
+    # public endpoint, so bounded: a page of ui strings, not a free translator
     texts: list[Annotated[str, StringConstraints(max_length=4000)]] = Field(max_length=50)
 
 
-class JobOut(BaseModel):
+class MetaOut(DomainModel):
+    """what this deployment runs"""
+    deployment: str
+    storage: Literal["postgres", "sqlite"]
+    embed_model: str
+    reranker: str
+    search_provider: str
+    llm_extraction: bool
+    review_required: bool  # mutations need X-Review-Key
+    translation: bool
+    # false until `maintenance profile import`, the rules find nothing without one
+    language_profile_loaded: bool
+
+
+class JobOut(DomainModel):
     id: str
     kind: str
     status: str

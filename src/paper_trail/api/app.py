@@ -1,12 +1,12 @@
-"""rest api, run with `make dev-api`
-
-services come from `bootstrap.build_state`, slow work runs as jobs (poll /api/jobs/{id}),
-docs at /docs
-"""
+"""rest api. `make dev-api`, docs at /docs, slow stuff runs as jobs"""
 
 from __future__ import annotations
 
+import json
+import logging
+import time
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,8 +27,9 @@ from .routers import (
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     from .deps import get_jobs
-    # build the runner at boot so jobs orphaned by a restart get claimed (cheap, embedder is lazy)
-    jobs = get_jobs() if load().supabase_configured else None
+    # build the runner at boot so jobs a restart orphaned get picked up
+    settings = load()
+    jobs = get_jobs() if (settings.database_url) else None
     yield
     if jobs is not None:
         jobs.shutdown()
@@ -39,10 +40,25 @@ def create_app() -> FastAPI:
         title="Paper Trail",
         version="0.2.0",
         description="From policy text to implementation evidence — "
-                    "Józsefváros climate commitments under human review.",
+                    "climate commitments under human review.",
         lifespan=_lifespan,
     )
-    # load() only, building AppState here would pull the embedder at import time
+
+    @app.middleware("http")
+    async def request_log(request, call_next):
+        request_id = uuid4().hex
+        started = time.monotonic()
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        logging.getLogger("uvicorn.error").info(json.dumps({
+            "event": "http_request", "request_id": request_id,
+            "method": request.method, "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": round((time.monotonic() - started) * 1000),
+        }))
+        return response
+
+    # load() only, building AppState here would drag the embedder in at import
     app.add_middleware(
         CORSMiddleware,
         allow_origins=load().api_origins,

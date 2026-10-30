@@ -6,11 +6,8 @@ repos:
     hooks:
       - id: ruff-check
         args: [ --fix ]
-  # uv.lock matches pyproject, and requirements.txt (what azure's zip deploy
-  # installs) matches uv.lock
+  # uv.lock matches pyproject
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.13.4
     hooks:
       - id: uv-lock
-      - id: uv-export
-        args: [ --format, requirements-txt, --no-hashes, --no-dev, --no-group, ml, --frozen, -o, requirements.txt ]

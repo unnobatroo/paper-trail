@@ -1,4 +1,4 @@
-"""Step 2 (cont.) — review proposed commitment↔evidence links."""
+"""review the suggested commitment <-> evidence links"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
+from ...services.metrics_service import with_effective_flags
 from ..deps import get_state, require_review_key
 from ..schemas import BulkLinksRequest, LinkDecisionRequest, LinkView
 
@@ -14,10 +15,10 @@ router = APIRouter(prefix="/api/links", tags=["links"])
 
 def _views(state: AppState, links: list,
            lite: bool = False) -> list[LinkView]:
-    """Batch the evidence + budget lookups — a per-link `.evidence()`
-    call turns a 500-link list into 1000 round-trips."""
+    """batch lookups, per-link calls turn 500 links into 1000 round trips"""
     ids = sorted({l.evidence_id for l in links})
     ev_map = state.evidence.evidence_many(ids)
+    with_effective_flags(state.evidence, ev_map)
     if lite:
         for ev in ev_map.values():
             ev.snippet = ""
