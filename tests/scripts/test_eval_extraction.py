@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 
 from paper_trail.domain.models import DocumentPage
-from paper_trail.ml.extraction import LLMExtractor, _LLMItem, _LLMResponse
+from paper_trail.ml.extraction import LLMExtractor, _Item, _Reply
 from tests.profiles import HU
 
 _spec = importlib.util.spec_from_file_location(
@@ -17,7 +17,7 @@ def test_score_doc_counts_hits_and_misses_per_page(monkeypatch):
     monkeypatch.setattr(eval_extraction, "read_pages", lambda _: [page])
     extractor = LLMExtractor(None, "fake", HU, window=1)
     # stub the model: one right answer, nothing for the second gold row
-    extractor._ask = lambda window: _LLMResponse(items=[_LLMItem(
+    extractor._ask = lambda window: _Reply(items=[_Item(
         type="measure", normalized_title="M1.1.2 Távhőszolgáltatás fejlesztése",
         text="Távhőszolgáltatás fejlesztése", page=3, excerpt="Távhőszolgáltatás fejlesztése")])
     golds = [{"page": 3, "title": "Távhőszolgáltatás fejlesztése", "code": "M1.1.2"},

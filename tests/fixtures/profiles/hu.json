@@ -334,21 +334,6 @@
   "és",
   "–"
  ],
- "code_pattern": "[AMS][a-z]?\\d+(?:\\.\\d+)*",
- "goal_labels": [
-  "Stratégiai cél"
- ],
- "pillar_labels": [
-  "Tematikus cél"
- ],
- "card_label": "Intézkedés kódja",
- "responsible_label": "Felelős",
- "timeframe_label": "Időtáv",
- "indicator_label": "Indikátor",
- "noise_words": [
-  "KEHOP",
-  "Klímastratégiája"
- ],
  "intent_re": "cél|irányoz|irányít|tervez|növel|csökkent|elér|megvalós|felszámol|kialakít|fejleszt|javít|bevezet|biztosít|fenntart|ültet|korszerűsít|támogat",
  "units_re": "m2|m²|%|db|fő/év|fő|mm|°C|kWh|Ft|m-en",
  "currency": "HUF",

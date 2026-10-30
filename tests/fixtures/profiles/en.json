@@ -214,24 +214,6 @@
   "to",
   "–"
  ],
- "code_pattern": "[A-Z]{1,3}[a-z]?\\d+(?:\\.\\d+)*",
- "goal_labels": [
-  "Strategic goal",
-  "Strategic objective"
- ],
- "pillar_labels": [
-  "Thematic objective",
-  "Pillar"
- ],
- "card_label": "Measure code",
- "responsible_label": "Responsible",
- "timeframe_label": "Timeframe",
- "indicator_label": "Indicator",
- "noise_words": [
-  "INTERREG",
-  "LIFE-",
-  "ERDF"
- ],
  "intent_re": "aim|target|goal|increase|decrease|reduce|achieve|implement|establish|develop|improve|introduce|ensure|maintain|plant|upgrade|support|create|deliver",
  "units_re": "m2|m²|%|km|km2|ha|mm|°C|kWh|MWh|tCO2|EUR|USD|GBP|€|\\$|£",
  "currency": "GBP",

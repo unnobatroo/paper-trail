@@ -39,9 +39,8 @@ def _handlers():
         if n == 0:
             # zero candidates looks like a bug, so say why
             result["warnings"] = [
-                "no commitments were extracted — the layout may not "
-                "match the rule parser; try an LLM extractor "
-                "(PAPER_TRAIL_LLM_*) or extend the language profile",
+                "no commitments were extracted. is an llm configured (PAPER_TRAIL_LLM_*) "
+                "and is goethe in the extraction phase?",
             ]
         return result
 

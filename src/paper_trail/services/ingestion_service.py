@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..domain.models import SourceDocument
-from ..ml.extraction import Extractor
+from ..ml.extraction import LLMExtractor, NoExtractor
 from ..repositories.ports import PolicyStore
 from ..sources.pdf import read_pages
 
 
 class IngestionService:
-    def __init__(self, repo: PolicyStore, extractor: Extractor, parser=None):
+    def __init__(self, repo: PolicyStore, extractor: LLMExtractor | NoExtractor, parser=None):
         self._repo = repo
         self._extractor = extractor
         self._parser = parser
