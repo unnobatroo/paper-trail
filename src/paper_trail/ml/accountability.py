@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from ..domain.enums import (
     ArtifactStatus,
@@ -159,9 +160,11 @@ class FinancialAuditor:
     @staticmethod
     def _unspent(budgets: list[BudgetRecord]) -> list[str]:
         """latest appropriation vs final accounts, same year + currency only"""
-        by_key: dict[tuple, dict[BudgetKind, int]] = {}
+        by_key: dict[tuple, dict[BudgetKind, Decimal]] = {}
         for b in budgets:
-            value = int(float(b.amount_native)) if b.amount_native else b.amount_huf
+            # decimal, float rounds big forint sums and drops euro cents
+            value = (Decimal(b.amount_native) if b.amount_native
+                     else None if b.amount_huf is None else Decimal(b.amount_huf))
             if value is None or b.fiscal_year is None:
                 continue
             slot = by_key.setdefault((b.fiscal_year, b.currency), {})
