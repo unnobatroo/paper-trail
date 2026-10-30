@@ -11,6 +11,7 @@
   profile import FILE      load a language profile (json) into the db
   profile export CODE      print one as json
   notes import FILE.jsonl  plain-english notes + ai suggestions, one json Note per line
+  notes generate [--links] [--redo] [--limit N]   our llm writes them (goethe extraction phase)
 
 run as python -m paper_trail.maintenance <command>
 
@@ -130,14 +131,46 @@ def notes(args) -> int:
     from .domain.models import Note
     from .infrastructure.settings import load
     settings = load()
-    repo = PolicyRepository(settings.database_url or settings.db_path)
-    # validate everything first, a bad line halfway shouldn't leave half an import
-    rows = [Note.model_validate_json(line)
-            for line in args.file.read_text().splitlines() if line.strip()]
+    url = settings.database_url or settings.db_path
+    repo = PolicyRepository(url)
+    if args.notes_cmd == "import":
+        # validate everything first, a bad line halfway shouldn't leave half an import
+        rows = [Note.model_validate_json(line)
+                for line in args.file.read_text().splitlines() if line.strip()]
+    else:
+        rows = _generate_notes(settings, repo, EvidenceRepository(url), args)
     for note in rows:
         repo.put_note(note)
-    print(f"imported {len(rows)} notes")
+    print(f"{args.notes_cmd}: {len(rows)} notes written")
     return 0
+
+
+def _generate_notes(settings, repo, evidence, args) -> list:
+    """our own llm writes them, needs goethe in the extraction phase"""
+    from .bootstrap import load_profile
+    from .domain.enums import ReviewStatus
+    from .ml.client import model_client
+    from .ml.notes import NoteWriter, candidate_item, link_item
+    if not settings.llm_configured:
+        raise SystemExit("PAPER_TRAIL_LLM_BASE_URL / _MODEL not set, nothing to write notes with")
+    profile = load_profile(repo, settings.language)
+    items = []
+    cands = repo.candidates(ReviewStatus.UNREVIEWED)
+    have = set() if args.redo else set(repo.notes("candidate", [c.id for c in cands]))
+    items += [("candidate", c.id, candidate_item(c)) for c in cands if c.id not in have]
+    if args.links:
+        links = evidence.links(ReviewStatus.UNREVIEWED)
+        have = set() if args.redo else set(repo.notes("link", [l.id for l in links]))
+        todo = [l for l in links if l.id not in have]
+        ev = evidence.evidence_many([l.evidence_id for l in todo])
+        coms = {c.id: c for c in repo.commitments()}
+        items += [("link", l.id, link_item(coms[l.commitment_id], ev[l.evidence_id]))
+                  for l in todo if l.evidence_id in ev and l.commitment_id in coms]
+    items = items[:args.limit] if args.limit else items
+    print(f"writing {len(items)} notes with {settings.llm_model}", file=sys.stderr)
+    writer = NoteWriter(model_client(settings.llm_base_url, settings.llm_api_key),
+                        settings.llm_model, profile, settings.llm_concurrency)
+    return writer.write(items)
 
 
 def main(argv=None) -> int:
@@ -171,8 +204,12 @@ def main(argv=None) -> int:
     pr_sub.add_parser("import", help="load a profile json").add_argument("file", type=Path)
     pr_sub.add_parser("export", help="print a profile as json").add_argument("code")
     nt = sub.add_parser("notes", help="plain-english notes and ai suggestions")
-    nt.add_subparsers(dest="notes_cmd", required=True).add_parser(
-        "import", help="load a jsonl of notes").add_argument("file", type=Path)
+    nt_sub = nt.add_subparsers(dest="notes_cmd", required=True)
+    nt_sub.add_parser("import", help="load a jsonl of notes").add_argument("file", type=Path)
+    gen = nt_sub.add_parser("generate", help="our llm writes notes for unreviewed items")
+    gen.add_argument("--links", action="store_true", help="evidence links too")
+    gen.add_argument("--redo", action="store_true", help="rewrite existing notes")
+    gen.add_argument("--limit", type=int, default=0)
     args = parser.parse_args(argv)
     if args.cmd == "profile":
         return profile(args)
