@@ -107,3 +107,20 @@ def test_fit_vector_rejects_vectors_wider_than_the_column():
     assert len(fit_vector([1.0])) == 1024
     with pytest.raises(ValueError):
         fit_vector([0.1] * 1025)
+
+
+def test_lexical_side_uses_stored_lemmas_with_an_analyzer(dsn):
+    from types import SimpleNamespace
+
+    # fake lemmatizer: "ültetése" and "ültetés" both become "ültet"
+    def analyze(text):
+        return SimpleNamespace(lemmas=[w[:5] for w in text.lower().split()])
+
+    analyzer = SimpleNamespace(analyze=analyze, _model="fake")
+    PostgresPageStore(dsn).put(PAGE)
+    index = PostgresVectorIndex(dsn, analyzer=analyzer)
+    index.put(PAGE, "lem", 2400, [("fák szakasz", [1.0, 0.0]),
+                                  ("ültetése szakasz", [0.9, 0.1]),
+                                  ("más szakasz", [0.0, 1.0])])
+    top = index.match([1.0, 0.0], "ültetés", "lem", 2400, [PAGE], k=2)
+    assert [t for _, t, _ in top] == ["ültetése szakasz", "fák szakasz"]
