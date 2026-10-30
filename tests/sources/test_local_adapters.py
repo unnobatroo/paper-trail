@@ -113,29 +113,31 @@ def test_sitemap_registers_only_allowlisted_pdf_links(monkeypatch):
     assert [row.url for row in rows] == ["https://rev8.hu/strategy.pdf"]
 
 
-def test_evidence_entities_see_only_matched_passage(policy, evidence, tmp_path, monkeypatch):
+def test_evidence_entities_see_only_matched_passage(policy, evidence, tmp_path):
     from paper_trail.domain.enums import CandidateType
     from paper_trail.domain.models import Commitment
     from paper_trail.ml.embeddings import HashingProvider
+    from paper_trail.ml.ner import Found
     from paper_trail.services.evidence_service import EvidenceService
     from paper_trail.sources.fetch import FetchedPage
     url = "https://rev8.hu/report"
     page = FetchedPage(url, "Report", "Outside entity 1999.\nMatched trees 2024.")
+    seen = []
+
+    class SpyNer:
+        def find(self, text):
+            seen.append(text)
+            return Found()
     svc = EvidenceService(evidence, SimpleNamespace(search=lambda *a, **kw: []),
-                          HashingProvider(), cache_dir=tmp_path)
+                          HashingProvider(), cache_dir=tmp_path, ner=SpyNer())
     svc._collect_urls = lambda *a: [url]
     svc._fetch_page = lambda *a: page
     svc._rank = lambda *a: [(page, "Matched trees 2024.", 0.8)]
-    seen = []
-    def extract(text, profile):
-        seen.append(text)
-        return []
-    for name in ["extract_organisations", "extract_locations", "extract_dates"]:
-        monkeypatch.setattr("paper_trail.services.evidence_service.entities." + name, extract)
     commitment = Commitment(kind=CandidateType.MEASURE, title="Trees")
     commitment.id = policy.add_commitment(commitment)
     svc.find_evidence(commitment)
-    assert seen == ["Matched trees 2024."] * 3
+    # the commitment title gets looked at for matching, the page only through its passage
+    assert "Matched trees 2024." in seen and not any("Outside" in t for t in seen)
 
 
 def test_eur_receipts_preserve_cents_without_huf_conversion():

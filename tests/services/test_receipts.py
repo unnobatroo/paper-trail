@@ -1,12 +1,11 @@
 import pytest
 
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
-from paper_trail.ml.extraction import Extractor
 from paper_trail.services.ingestion_service import IngestionService
 from paper_trail.services.review_service import ReviewService
 
 
-class ForgedExtractor(Extractor):
+class ForgedExtractor:
     def extract(self, pages):
         return [PolicyCandidate(document_id=0, text="promise", normalized_title="promise",
                                 source_page=page, source_excerpt=excerpt, excerpt_on_page=True)

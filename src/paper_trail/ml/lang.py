@@ -61,17 +61,10 @@ class LanguageProfile:
     status_rules: tuple[tuple[Status, tuple[str, ...]], ...] = ()
     title_stopwords: frozenset[str] = frozenset()
 
-    # document-layout extraction (fixed-layout policy PDFs)
-    code_pattern: str = r""  # e.g. [AMS][a-z]?\d+(\.\d+)*
-    goal_labels: tuple[str, ...] = ()  # "Stratégiai cél"
-    pillar_labels: tuple[str, ...] = ()  # "Tematikus cél"
-    card_label: str = ""  # "Intézkedés kódja"
-    responsible_label: str = ""  # "Felelős"
-    timeframe_label: str = ""  # "Időtáv"
-    indicator_label: str = ""  # "Indikátor"
-    noise_words: tuple[str, ...] = ()  # grant codes / furniture
-    procurement_id_re: str = ""  # tender / eu project ids, EKR\d{9,12}|…
-    parcel_re: str = ""  # land-registry numbers, group 1 or 2 = the number
+    # tender / eu project ids and land-registry numbers, both per country
+    procurement_id_re: str = ""  # EKR\d{9,12}|…
+    parcel_re: str = ""  # group 1 or 2 = the number
+
     intent_re: str = ""  # target-sentence verbs
     units_re: str = ""  # m2|%|db|fő|mm|°C|kWh|Ft
 

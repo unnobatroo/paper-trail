@@ -13,7 +13,6 @@ from paper_trail.domain.enums import (
 )
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
 from paper_trail.ml.embeddings import HashingProvider
-from paper_trail.ml.extraction import Extractor
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.metrics_service import MetricsService
@@ -29,7 +28,7 @@ EVIDENCE_TEXT = (
 )
 
 
-class _FakeExtractor(Extractor):
+class _FakeExtractor:
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
         return [PolicyCandidate(
             document_id=0, suggested_type=CandidateType.MEASURE,

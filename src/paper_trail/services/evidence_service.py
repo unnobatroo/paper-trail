@@ -11,6 +11,7 @@ import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -27,6 +28,7 @@ from ..ml import entities, matching
 from ..ml.accountability import PassageAuditor
 from ..ml.embeddings import EmbeddingProvider
 from ..ml.lang import LanguageProfile
+from ..ml.ner import RuleNer
 from ..ml.nlp import TextAnalyzer
 from ..ml.rerank import Reranker
 from ..repositories.ports import EvidenceStore, PageStore, VectorIndex
@@ -43,11 +45,15 @@ _CHUNK_STRIDE = _CHUNK - 400  # overlap so edge evidence doesn't get cut
 # panic bound for corrupt input only, truncates + warns, real docs go in full
 _DEFAULT_MAX_DOC_CHARS = 4_000_000
 
-# per-run state so parallel jobs don't stomp each other's progress/warnings
-_run_warnings: ContextVar[list[str] | None] = ContextVar(
-    "pt_warnings", default=None)
-_run_progress: ContextVar[Callable[[str], None] | None] = ContextVar(
-    "pt_progress", default=None)
+@dataclass
+class _Run:
+    """one find_evidence call: where progress goes, where warnings land"""
+    say: Callable[[str], None]
+    warnings: list[str]
+
+
+# per-run, so parallel jobs don't stomp each other's progress/warnings
+_run: ContextVar[_Run | None] = ContextVar("pt_run", default=None)
 
 
 def _key(commitment: Commitment) -> str:
@@ -81,6 +87,7 @@ class EvidenceService:
             parser=None,
             auditor: PassageAuditor | None = None,
             places: PlaceResolver | None = None,
+            ner=None,
     ):
         self._analyzer = analyzer
         self._crawler = crawler
@@ -97,6 +104,8 @@ class EvidenceService:
         self._profile = profile or LanguageProfile.empty()
         self._auditor = auditor or PassageAuditor(self._profile)
         self._places = places or PlaceResolver(repo, self._auditor)
+        # gliner in prod, the profile's regex offline (ml/ner.py)
+        self._ner = ner or RuleNer(self._profile)
         self._extra_domains = {d.lower() for d in allowed_domains}
         # explicit stores (postgres/pgvector) win, else files under cache_dir
         if page_store is None or vector_index is None:
@@ -107,16 +116,14 @@ class EvidenceService:
             vector_index = vector_index or FileVectorIndex(Path(cache_dir))
         self._pages = page_store
         self._index = vector_index
-        self.warnings: list[str] = []
-        self._progress = lambda msg: None
+        self.warnings: list[str] = []  # outside a run (tests, one-off calls)
 
     def _say(self, msg: str) -> None:
-        progress = _run_progress.get()
-        (progress if progress is not None else self._progress)(msg)
+        if run := _run.get():
+            run.say(msg)
 
     def _warn(self, msg: str) -> None:
-        warnings = _run_warnings.get()
-        (warnings if warnings is not None else self.warnings).append(msg)
+        (run.warnings if (run := _run.get()) else self.warnings).append(msg)
 
     def find_evidence(
             self,
@@ -131,13 +138,11 @@ class EvidenceService:
         """
         if warnings is None:
             self.warnings = warnings = []
-        w_tok = _run_warnings.set(warnings)
-        p_tok = _run_progress.set(progress or (lambda msg: None))
+        token = _run.set(_Run(progress or (lambda msg: None), warnings))
         try:
             return self._discover(commitment)
         finally:
-            _run_warnings.reset(w_tok)
-            _run_progress.reset(p_tok)
+            _run.reset(token)
 
     def _discover(self, commitment: Commitment) -> list[EvidenceLink]:
         self._say("Finding official sources…")
@@ -199,7 +204,7 @@ class EvidenceService:
                 description=mention.sentence,
                 source_url=page.url,
             ))
-        features = matching.compute_features(commitment, ev, sim, self._profile)
+        features = matching.compute_features(commitment, ev, sim, self._profile, self._ner)
         has_budget = bool(self._repo.budgets_for_evidence(ev.id))
         rel, reasons = matching.suggest_relationship(features, has_budget)
         rel, reasons = self._audited_hint(ev, artifacts, rel, reasons)
@@ -222,7 +227,8 @@ class EvidenceService:
                   registry: list[OfficialSource]) -> EvidenceItem:
         """entities, places and audit cues, passage only"""
         analysis = self._analyzer.analyze(snippet) if self._analyzer else None
-        streets = entities.extract_locations(snippet, self._profile)
+        found = self._ner.find(snippet)
+        streets = found.places
         audit = self._auditor.audit(snippet)
         return EvidenceItem(
             commitment_id=commitment.id,
@@ -232,14 +238,12 @@ class EvidenceService:
             published_on=page.published_on,
             snippet=snippet,
             organisations=list(dict.fromkeys(
-                entities.extract_organisations(snippet, self._profile)
-                + (analysis.organisations if analysis else []))),
+                found.orgs + (analysis.organisations if analysis else []))),
             locations=list(dict.fromkeys(
                 streets + (analysis.locations if analysis else [])
                 + self._places.resolve(snippet, page.url, streets))),
             dates_mentioned=list(dict.fromkeys(
-                entities.extract_dates(snippet, self._profile)
-                + (analysis.dates if analysis else []))),
+                found.dates + (analysis.dates if analysis else []))),
             polarity=audit.polarity,
             flags=audit.flags,
             procurement_ids=audit.procurement_ids,
@@ -302,13 +306,7 @@ class EvidenceService:
             urls.extend(h.url for h in hits)
         urls.extend(d.url for d in registry)
         # dedupe, keep order, allowlist only
-        seen, out = set(), []
-        for u in urls:
-            u = u.split("#")[0]
-            if u not in seen and allowed(u, domains):
-                seen.add(u)
-                out.append(u)
-        return out
+        return [u for u in dict.fromkeys(u.split("#")[0] for u in urls) if allowed(u, domains)]
 
     def _fetch_page(self, url: str, registry: list[OfficialSource],
                     domains: set[str]) -> FetchedPage | None:
@@ -353,57 +351,29 @@ class EvidenceService:
 
     def _relevant_money(self, snippet: str) -> list:
         """money from the matched excerpt: explicit currency, sane amount, deduped"""
-        out, seen = [], set()
+        found = {}
         for m in entities.extract_money(snippet, self._profile):
             if m.kind is None or m.amount_native is None:
                 continue
             if (m.currency == self._profile.currency
                     and Decimal(m.amount_native) < self._profile.min_amount):
                 continue
-            key = (m.currency, m.amount_native, m.kind)
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(m)
-        return out
+            found.setdefault((m.currency, m.amount_native, m.kind), m)
+        return list(found.values())
 
-    def _doc_chunks(self, page: FetchedPage) -> list[str]:
-        """chunk the whole doc, only the panic bound cuts it and it always warns"""
-        text = page.text
-        if len(text) > self._max_doc_chars:
-            text = text[: self._max_doc_chars]
-        return structure_chunks(text, _CHUNK, _CHUNK - _CHUNK_STRIDE, self._warn)
-
-    def _warn_if_oversized(self, page: FetchedPage) -> None:
-        """truncation has to be visible"""
+    def _index_page(self, page: FetchedPage) -> None:
+        """chunk + embed once per (page, model), re-runs never re-embed. truncation warns"""
         if len(page.text) > self._max_doc_chars:
-            self._warn(
-                f"{page.title or page.url} is larger than the safety "
-                f"limit ({self._max_doc_chars:,} chars) — only the first "
-                "part was searched.")
-
-    def _embed_and_store(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
-        chunks = self._doc_chunks(page)
-        if not chunks:
-            return []
-        vectors = self._embed.embed(chunks)
-        pairs = list(zip(chunks, vectors, strict=True))
-        self._index.put(page, self._embed.model_name, _CHUNK, pairs)
-        return pairs
-
-    def _ensure_indexed(self, page: FetchedPage) -> None:
-        """fill the index without pulling vectors back, remote just needs has()"""
-        self._warn_if_oversized(page)
-        if not self._index.has(page, self._embed.model_name, _CHUNK):
-            self._embed_and_store(page)
-
-    def _doc_vectors(self, page: FetchedPage) -> list[tuple[str, list[float]]]:
-        """chunks + vectors, cached so re-runs never re-embed"""
-        self._warn_if_oversized(page)
-        cached = self._index.get(page, self._embed.model_name, _CHUNK)
-        if cached is not None:
-            return cached
-        return self._embed_and_store(page)
+            self._warn(f"{page.title or page.url} is larger than the safety limit "
+                       f"({self._max_doc_chars:,} chars), only the first part was searched.")
+        model = self._embed.model_name
+        if self._index.has(page, model, _CHUNK):
+            return
+        chunks = structure_chunks(page.text[:self._max_doc_chars], _CHUNK,
+                                  _CHUNK - _CHUNK_STRIDE, self._warn)
+        if chunks:
+            vectors = self._embed.embed(chunks)
+            self._index.put(page, model, _CHUNK, list(zip(chunks, vectors, strict=True)))
 
     def _rank(self, commitment: Commitment, pages: list[FetchedPage],
               ) -> list[tuple[FetchedPage, str, float]]:
@@ -416,7 +386,7 @@ class EvidenceService:
         for i, page in enumerate(pages):
             self._say(
                 f"Indexing page {i + 1}/{len(pages)} — {page.title[:60]}")
-            self._ensure_indexed(page)
+            self._index_page(page)
         top = self._index.match(
             q, query_text, self._embed.model_name, _CHUNK, pages,
             self._candidates)

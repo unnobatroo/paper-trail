@@ -34,6 +34,8 @@ class Settings(BaseSettings):
         default="cpu", validation_alias="PAPER_TRAIL_PARSER_DEVICE")
     nlp: Literal["rules", "huspacy"] = Field(
         default="rules", validation_alias="PAPER_TRAIL_NLP")
+    # who/where/when in passages: gliner on cpu in prod, the profile's regex offline
+    ner: Literal["rules", "gliner"] = Field(default="rules", validation_alias="PAPER_TRAIL_NER")
     searxng_url: str | None = Field(default=None, validation_alias="PAPER_TRAIL_SEARXNG_URL")
     rerank_base_url: str | None = Field(
         default=None, validation_alias="PAPER_TRAIL_RERANK_BASE_URL")
