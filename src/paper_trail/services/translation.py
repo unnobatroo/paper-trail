@@ -36,11 +36,3 @@ class Translator:
             return out.translation_text if out else None
         except Exception:
             return None
-
-
-def get_translator(profile: LanguageProfile, token: str | None, model: str | None = None,
-                   *, enabled: bool = True) -> Translator | None:
-    """translator if there's an HF_TOKEN, else None"""
-    if not enabled or not token:
-        return None
-    return Translator(profile, token, model)

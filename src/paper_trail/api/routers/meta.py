@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
-from ...services.translation import get_translator
 from ..deps import get_state
 from ..schemas import MetaOut
 
@@ -43,8 +42,7 @@ def meta(state: AppState = Depends(get_state)) -> MetaOut:
         "search_provider": s.search_provider,
         "llm_extraction": s.llm_configured,
         "review_required": bool(s.review_key),
-        "translation": get_translator(
-            state.profile, s.hf_token, enabled=s.environment != "production") is not None,
+        "translation": s.translation,
         "language_profile_loaded": bool(state.profile.status_rules),
         "language_name": state.profile.name if state.profile.status_rules else "",
         "glossary": [{"term": t, "meaning": m} for t, m in state.profile.glossary.items()],

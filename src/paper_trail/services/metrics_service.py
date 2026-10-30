@@ -133,8 +133,8 @@ class MetricsService:
         ranked = [e for e in items if e.status_hint in _STATUS_ORDER]
         if not ranked:
             return Status.UNKNOWN, None
-        # first item wins a tie, like reading the evidence in order
-        best = max(ranked, key=lambda e: (_STATUS_ORDER.index(e.status_hint), -items.index(e)))
+        # max keeps the first of equals, so a tie goes to the earlier evidence
+        best = max(ranked, key=lambda e: _STATUS_ORDER.index(e.status_hint))
         if best.status_hint == Status.UNKNOWN:
             return Status.UNKNOWN, None
         return best.status_hint, best.status_excerpt

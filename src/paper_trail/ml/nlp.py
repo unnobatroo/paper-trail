@@ -1,5 +1,4 @@
 """passage-level language analysis, heavy models only load when picked"""
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from threading import Lock
 
@@ -12,12 +11,7 @@ class Analysis:
     dates: list[str] = field(default_factory=list)
 
 
-class TextAnalyzer(ABC):
-    @abstractmethod
-    def analyze(self, passage: str) -> Analysis: ...
-
-
-class HuSpacyAnalyzer(TextAnalyzer):
+class HuSpacyAnalyzer:
     def __init__(self, model: str = "hu_core_news_lg"):
         self._model = model
         self._nlp = None

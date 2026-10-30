@@ -10,7 +10,6 @@ from datetime import date
 from paper_trail.domain.enums import CandidateType, ReviewStatus, Status
 from paper_trail.domain.models import Commitment, OfficialSource
 from paper_trail.ml.embeddings import HashingProvider
-from paper_trail.ml.rerank import Reranker
 from paper_trail.repositories.postgres.index import PostgresPageStore
 from paper_trail.repositories.store import EvidenceRepository
 from paper_trail.services.evidence_service import (
@@ -35,7 +34,7 @@ class _CountingEmbedder(HashingProvider):
         return super().embed(texts)
 
 
-class _RecordingReranker(Reranker):
+class _RecordingReranker:
     name = "stub"
 
     def __init__(self):
@@ -138,7 +137,7 @@ def test_reranker_sees_bounded_candidates(policy, evidence, tmp_path):
     assert reranker.seen and max(reranker.seen) <= 20
 
 
-class _DownReranker(Reranker):
+class _DownReranker:
     name = "down"
 
     def score(self, query, passages):

@@ -136,6 +136,11 @@ class Settings(BaseSettings):
                      self.allowed_domains_raw.split(",") if d.strip())
 
     @property
+    def translation(self) -> bool:
+        # ui reading aid only, never in production where a reviewer needs the source
+        return bool(self.hf_token) and self.environment != "production"
+
+    @property
     def llm_configured(self) -> bool:
         return bool(self.llm_base_url and self.llm_model)
 

@@ -11,8 +11,6 @@ from .repositories.postgres.jobs import PostgresWorker
 def main():
     logging.basicConfig(level=logging.INFO)
     state = get_state()
-    if not state.settings.database_url:
-        raise RuntimeError("the production worker requires DATABASE_URL")
     with connect(state.settings.database_url) as conn:
         role = conn.execute("""SELECT current_user AS name,
             has_column_privilege(current_user,'candidates','review_status','UPDATE')

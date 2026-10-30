@@ -28,11 +28,9 @@ from .routers import (
 async def _lifespan(_app: FastAPI):
     from .deps import get_jobs
     # build the runner at boot so jobs a restart orphaned get picked up
-    settings = load()
-    jobs = get_jobs() if (settings.database_url) else None
+    jobs = get_jobs()
     yield
-    if jobs is not None:
-        jobs.shutdown()
+    jobs.shutdown()
 
 
 def create_app() -> FastAPI:

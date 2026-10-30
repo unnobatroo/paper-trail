@@ -27,7 +27,7 @@ from ..ml.accountability import PassageAuditor
 from ..ml.embeddings import EmbeddingProvider
 from ..ml.lang import LanguageProfile
 from ..ml.ner import NoNer
-from ..ml.nlp import Analysis, TextAnalyzer
+from ..ml.nlp import Analysis, HuSpacyAnalyzer
 from ..ml.rerank import Reranker
 from ..repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from ..repositories.store import EvidenceRepository
@@ -71,7 +71,7 @@ class EvidenceService:
             baseline_year: int | None = None,
             profile: LanguageProfile | None = None,
             allowed_domains: tuple[str, ...] = (),
-            analyzer: TextAnalyzer | None = None,
+            analyzer: HuSpacyAnalyzer | None = None,
             crawler=None,
             max_fetch_workers: int = 2,
             parser=None,

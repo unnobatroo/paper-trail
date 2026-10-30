@@ -1,6 +1,5 @@
 """bounded sitemap/feed discovery, no search engine needed"""
 import xml.etree.ElementTree as ET
-from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Collection
 from urllib.parse import urljoin, urlsplit
@@ -10,12 +9,7 @@ from .fetch import _read_capped, safe_get
 from .web_search import allowed
 
 
-class SourceDiscovery(ABC):
-    @abstractmethod
-    def discover(self, domains: Collection[str]) -> list[OfficialSource]: ...
-
-
-class SitemapCrawler(SourceDiscovery):
+class SitemapCrawler:
     def __init__(self, max_maps: int = 20, max_urls: int = 200):
         self.max_maps, self.max_urls = max_maps, max_urls
 
