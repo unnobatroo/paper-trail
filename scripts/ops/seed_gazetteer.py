@@ -1,12 +1,15 @@
 """seed the gazetteer with a district's named streets, squares and parks from openstreetmap
 
-  uv run python scripts/ops/seed_gazetteer.py "VIII. kerület"            # sqlite
+  uv run python scripts/ops/seed_gazetteer.py "VIII. kerület" --admin-level 9   # sqlite
   PAPER_TRAIL_DATABASE_URL=... uv run python scripts/ops/seed_gazetteer.py "..."   # postgres
+
+--admin-level narrows same-named areas: 9 = budapest district, 8 = most towns
 
 data © OpenStreetMap contributors, ODbL 1.0. geometry is kept as geojson for later spatial
 use; parcel numbers (hrsz) are not in osm, the evidence pipeline records those as it reads
 """
 
+import argparse
 import json
 import sys
 
@@ -23,9 +26,10 @@ OVERPASS = ("https://overpass-api.de/api/interpreter",
 _KINDS = {"square": "square", "park": "park", "garden": "park"}
 
 
-def query(area_name: str) -> str:
+def query(area_name: str, admin_level: int | None = None) -> str:
+    level = f'["admin_level"="{admin_level}"]' if admin_level else ""
     return f"""[out:json][timeout:120];
-area["name"="{area_name}"]["boundary"="administrative"]["admin_level"="9"]->.a;
+area["name"="{area_name}"]["boundary"="administrative"]{level}->.a;
 (
   way["highway"]["name"](area.a);
   way["place"="square"]["name"](area.a);
@@ -35,10 +39,24 @@ area["name"="{area_name}"]["boundary"="administrative"]["admin_level"="9"]->.a;
 out tags geom;"""
 
 
-def places(area_name: str):
+def _geojson(el: dict) -> str | None:
+    # relations carry their geometry on the members, closed ways are areas
+    if el["type"] == "relation":
+        lines = [[[p["lon"], p["lat"]] for p in m.get("geometry", [])]
+                 for m in el.get("members", []) if m.get("geometry")]
+        return json.dumps({"type": "MultiLineString", "coordinates": lines}) if lines else None
+    coords = [[p["lon"], p["lat"]] for p in el.get("geometry", [])]
+    if not coords:
+        return None
+    if len(coords) > 3 and coords[0] == coords[-1]:
+        return json.dumps({"type": "Polygon", "coordinates": [coords]})
+    return json.dumps({"type": "LineString", "coordinates": coords})
+
+
+def places(area_name: str, admin_level: int | None = None):
     for url in OVERPASS:
         try:
-            resp = requests.post(url, data={"data": query(area_name)}, timeout=180,
+            resp = requests.post(url, data={"data": query(area_name, admin_level)}, timeout=180,
                                  headers={"User-Agent": "paper-trail gazetteer seed"})
             resp.raise_for_status()
             break
@@ -52,16 +70,14 @@ def places(area_name: str):
         if not name:
             continue
         kind = _KINDS.get(tags.get("place") or tags.get("leisure"), "street")
-        coords = [[p["lon"], p["lat"]] for p in el.get("geometry", [])]
-        geojson = json.dumps({"type": "LineString", "coordinates": coords}) if coords else None
-        yield kind, name, f"{el['type']}/{el['id']}", geojson
+        yield kind, name, f"{el['type']}/{el['id']}", _geojson(el)
 
 
-def main(area_name: str) -> None:
+def main(area_name: str, admin_level: int | None = None) -> None:
     settings = load()
     repo = EvidenceRepository(settings.database_url or settings.db_path)
     seen = set()
-    for kind, name, osm_id, geojson in places(area_name):
+    for kind, name, osm_id, geojson in places(area_name, admin_level):
         # one row per name: a street drawn as 12 osm ways is still one street
         if (kind, name) in seen:
             continue
@@ -71,4 +87,9 @@ def main(area_name: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "VIII. kerület")
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("area", help="osm name of the administrative area")
+    ap.add_argument("--admin-level", type=int)
+    args = ap.parse_args()
+    main(args.area, args.admin_level)
