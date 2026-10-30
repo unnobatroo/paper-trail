@@ -4,6 +4,7 @@ the row model and wording live in workspace.py"""
 from __future__ import annotations
 
 import re
+from functools import partial
 from itertools import zip_longest
 
 from fastapi.responses import RedirectResponse
@@ -164,27 +165,32 @@ class Workspace:
     def picked_rows(self) -> list[Row]:
         return [r for r in self.snap.rows if r.id in self.selected]
 
-    def bulk(self, what: str) -> None:
-        rows = self.picked_rows()
-        if what in ("confirm", "reject"):
-            ids = [c.id for r in rows if r.stage == "confirm" for c in r.group
-                   if c.review_status == ReviewStatus.UNREVIEWED]
-            done = "confirmed" if what == "confirm" else "rejected"
-            out = self.run(actions.bulk_candidates, ids if what == "confirm" else [],
-                           ids if what == "reject" else [],
-                           ok=f"{len(ids)} source mentions {done}.")
-        elif what == "search":
-            out = self.search([m.id for r in rows if r.stage == "search" for m in r.commitments])
-        else:
-            ids = [lv.link.id for r in rows if r.stage == "review" for lv in r.pending]
-            n = len(ids)
-            word = "match" if n == 1 else "matches"
-            out = self.run(actions.bulk_links, ids if what == "links_ok" else [],
-                           ids if what == "links_no" else [],
-                           ok=f"{n} {word} {'confirmed' if what == 'links_ok' else 'rejected'}.")
-        if out is not None:
-            self.selected.clear()
-            self.view.refresh()
+    def bulk_mentions(self, confirm: bool) -> None:
+        ids = [c.id for r in self.picked_rows() if r.stage == "confirm" for c in r.group
+               if c.review_status == ReviewStatus.UNREVIEWED]
+        accept, reject = (ids, []) if confirm else ([], ids)
+        verb = "confirmed" if confirm else "rejected"
+        if self.run(actions.bulk_candidates, accept, reject,
+                    ok=f"{len(ids)} source mentions {verb}.") is not None:
+            self.clear_selection()
+
+    def bulk_matches(self, confirm: bool) -> None:
+        ids = [lv.link.id for r in self.picked_rows() if r.stage == "review" for lv in r.pending]
+        accept, reject = (ids, []) if confirm else ([], ids)
+        noun = "match" if len(ids) == 1 else "matches"
+        verb = "confirmed" if confirm else "rejected"
+        if self.run(actions.bulk_links, accept, reject,
+                    ok=f"{len(ids)} {noun} {verb}.") is not None:
+            self.clear_selection()
+
+    def bulk_search(self) -> None:
+        if self.search([m.id for r in self.picked_rows() if r.stage == "search"
+                        for m in r.commitments]):
+            self.clear_selection()
+
+    def clear_selection(self) -> None:
+        self.selected.clear()
+        self.view.refresh()
 
     def search(self, commitment_ids: list[int]) -> bool | None:
         # one after another, the first failure stops the rest
@@ -383,22 +389,21 @@ class Workspace:
         if self.selected:
             picked = self.picked_rows()
             stages = {r.stage for r in picked}
+            mentions, matches = self.bulk_mentions, self.bulk_matches
             with ui.row().classes("items-center gap-2 p-2 bg-grey-2 rounded"):
                 ui.label(f"{len(self.selected)} selected")
                 if "confirm" in stages:
                     n = sum(r.stage == "confirm" for r in picked)
-                    ui.button(f"Confirm {n}", on_click=lambda: self.bulk("confirm")).props("dense")
-                    ui.button("Reject", on_click=lambda: self.bulk("reject")).props("dense flat")
+                    ui.button(f"Confirm {n}", on_click=partial(mentions, True)).props("dense")
+                    ui.button("Reject", on_click=partial(mentions, False)).props("dense flat")
                 if "search" in stages:
                     n = sum(r.stage == "search" for r in picked)
-                    ui.button(f"Find evidence {n}", on_click=lambda: self.bulk("search")).props(
-                        "dense")
+                    ui.button(f"Find evidence {n}", on_click=self.bulk_search).props("dense")
                 if "review" in stages:
                     ui.button("Confirm matches",
-                              on_click=lambda: self.bulk("links_ok")).props("dense")
-                    ui.button("Reject", on_click=lambda: self.bulk("links_no")).props("dense flat")
-                ui.button("Clear", on_click=lambda: (self.selected.clear(),
-                                                     self.view.refresh())).props("dense flat")
+                              on_click=partial(matches, True)).props("dense")
+                    ui.button("Reject", on_click=partial(matches, False)).props("dense flat")
+                ui.button("Clear", on_click=self.clear_selection).props("dense flat")
         if self.search_jobs:
             n = len(self.search_jobs)
             with ui.row().classes("items-center gap-2 p-2 bg-blue-1 rounded"):
