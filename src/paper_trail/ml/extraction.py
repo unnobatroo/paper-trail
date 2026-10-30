@@ -124,10 +124,19 @@ def form_row(quote: str, labels: tuple[str, ...]) -> bool:
     return len(re.findall(r"[^\W\d_]{3,}", low)) < 4
 
 
+def squash(text: str) -> str:
+    return " ".join(text.split())
+
+
+def norm(text: str) -> str:
+    """casefolded words only, for comparing quotes and titles"""
+    return re.sub(r"\W+", " ", text.casefold()).strip()
+
+
 def same_passage(a: str, b: str) -> bool:
     """two quotes of the same text: a long shared run, not a stray "a város" or two.
     numbers decide: "200 fa" and "500 fa" are two commitments however alike the rest is"""
-    a, b = sorted((re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b)), key=len)
+    a, b = sorted((norm(a), norm(b)), key=len)
     if not a or not b or not set(re.findall(r"\d+", a)) <= set(re.findall(r"\d+", b)):
         return False
     run = SequenceMatcher(None, a, b, autojunk=False).find_longest_match().size

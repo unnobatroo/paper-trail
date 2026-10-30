@@ -30,15 +30,11 @@ from statistics import mean
 import openai
 
 from paper_trail.ml.client import model_client
-from paper_trail.ml.extraction import LLMExtractor, same_passage
+from paper_trail.ml.extraction import LLMExtractor, norm, same_passage
 from paper_trail.ml.lang import LanguageProfile
 from paper_trail.sources.pdf import read_pages
 
 PROFILES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "profiles"
-
-
-def norm(text: str) -> str:
-    return re.sub(r"\W+", " ", text.casefold()).strip()
 
 
 def matches(gold: dict, cand) -> bool:

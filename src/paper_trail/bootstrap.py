@@ -20,6 +20,8 @@ from .services.ingestion_service import IngestionService
 from .services.metrics_service import MetricsService
 from .services.review_service import ReviewService
 from .sources.document_store import DocumentStore
+from .sources.parsers import DoclingDocumentParser, FallbackDocumentParser, PypdfDocumentParser
+from .sources.sitemaps import SitemapCrawler
 from .sources.web_search import get_search_provider
 
 log = logging.getLogger(__name__)
@@ -77,21 +79,13 @@ def build_state(settings: Settings | None = None) -> AppState:
     vector_index = PostgresVectorIndex(settings.database_url, ts_config=profile.ts_config,
                                        analyzer=analyzer)
 
-    from .sources.parsers import (
-        DoclingDocumentParser,
-        FallbackDocumentParser,
-        PypdfDocumentParser,
-    )
     parser = PypdfDocumentParser()
     if settings.parser == "docling":
         artifact_dir = (settings.document_dir or settings.seed_dir) / "parsed"
         parser = FallbackDocumentParser(
             DoclingDocumentParser(device=settings.parser_device, artifact_dir=artifact_dir),
             parser)
-    crawler = None
-    if settings.enable_sitemaps:
-        from .sources.sitemaps import SitemapCrawler
-        crawler = SitemapCrawler()
+    crawler = SitemapCrawler() if settings.enable_sitemaps else None
 
     embedder = get_provider(settings.embed_model, settings.embed_base_url,
                             settings.embed_api_key, str(settings.model_cache))

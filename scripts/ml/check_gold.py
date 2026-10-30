@@ -11,14 +11,10 @@ for the human spot check
 import argparse
 import json
 import random
-import re
 from pathlib import Path
 
+from paper_trail.ml.extraction import squash
 from paper_trail.sources.pdf import read_pages
-
-
-def squash(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def main() -> None:
