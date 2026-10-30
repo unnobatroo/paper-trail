@@ -53,5 +53,6 @@ def meta(state: AppState = Depends(get_state)) -> MetaOut:
         "translation": get_translator(
             state.profile, s.hf_token, enabled=s.environment != "production") is not None,
         "language_profile_loaded": bool(state.profile.status_rules),
+        "language_name": state.profile.name if state.profile.status_rules else "",
         "glossary": [{"term": t, "meaning": m} for t, m in state.profile.glossary.items()],
     })

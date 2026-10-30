@@ -7,7 +7,7 @@ import {useForm, useWatch} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {z} from "zod";
 import {Check, CircleHelp, Clock, FileText, SquarePen, X} from "lucide-react";
-import {En} from "@/components/en";
+import {Bi, CodeHint, En, NoteCard} from "@/components/en";
 import {Chip, type RowChip} from "@/components/chip";
 import {Kbd} from "@/components/ui/kbd";
 import {Button} from "@/components/ui/button";
@@ -106,11 +106,11 @@ export function CandidateDetail({
     return (
         <div className="space-y-4">
             <div>
-                <h2 className="text-lg font-semibold leading-snug">
-                    {displayTitle(cand.normalized_title)}
-                </h2>
-                <En text={displayTitle(cand.normalized_title)}/>
+                <Bi as="h2" text={displayTitle(cand.normalized_title)} en={cand.note?.title_en}
+                    className="text-lg font-semibold leading-snug"/>
+                <CodeHint code={cand.code}/>
             </div>
+            <NoteCard note={cand.note}/>
 
             {group.length > 1 && (
                 <Select

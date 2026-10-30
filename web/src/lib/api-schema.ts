@@ -708,6 +708,11 @@ export interface components {
             embed_model: string;
             /** Glossary */
             glossary: components["schemas"]["GlossaryTerm"][];
+            /**
+             * Language Name
+             * @default
+             */
+            language_name: string;
             /** Language Profile Loaded */
             language_profile_loaded: boolean;
             /** Llm Extraction */

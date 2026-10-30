@@ -993,6 +993,11 @@
             "title": "Glossary",
             "type": "array"
           },
+          "language_name": {
+            "default": "",
+            "title": "Language Name",
+            "type": "string"
+          },
           "language_profile_loaded": {
             "title": "Language Profile Loaded",
             "type": "boolean"
@@ -1036,6 +1041,7 @@
           "review_required",
           "translation",
           "language_profile_loaded",
+          "language_name",
           "glossary"
         ],
         "title": "MetaOut",

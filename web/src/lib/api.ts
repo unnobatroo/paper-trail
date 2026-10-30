@@ -41,7 +41,9 @@ export type EvidenceFlag = Schemas["EvidenceFlag"];
 export type Jurisdiction = Schemas["Jurisdiction"];
 
 export type SourceDocument = Stored<Schemas["SourceDocument"]>;
-export type PolicyCandidate = Stored<Schemas["PolicyCandidate"]>;
+// the api sends candidates with their plain-english note attached
+export type PolicyCandidate = Stored<Schemas["CandidateView"]>;
+export type Note = Schemas["Note"];
 export type Commitment = Stored<Schemas["Commitment"]>;
 export type EvidenceItem = Stored<Schemas["EvidenceItem"]>;
 export type MatchFeatures = Schemas["MatchFeatures"];

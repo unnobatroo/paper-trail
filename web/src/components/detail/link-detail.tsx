@@ -1,7 +1,7 @@
 "use client";
 
 import {ExternalLink} from "lucide-react";
-import {En} from "@/components/en";
+import {Bi, En, NoteCard} from "@/components/en";
 import {Chip} from "@/components/chip";
 import {EvidenceWarnings} from "@/components/evidence-warnings";
 import {Button} from "@/components/ui/button";
@@ -37,11 +37,10 @@ export function LinkDetail({
                 Evidence inspector
             </p>
             <div>
-                <h2 className="text-lg font-semibold leading-snug">
-                    {displayTitle(ev.title)}
-                </h2>
-                <En text={displayTitle(ev.title)}/>
+                <Bi as="h2" text={displayTitle(ev.title)}
+                    className="text-lg font-semibold leading-snug"/>
             </div>
+            <NoteCard note={view.note}/>
             <p className="text-xs text-muted-foreground">
                 {[
                     ev.publisher ?? "Official source",

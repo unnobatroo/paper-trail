@@ -5,7 +5,7 @@ import {FileText, ListChecks, Loader2, Route, Search} from "lucide-react";
 import {Chip} from "@/components/chip";
 import {CandidateDetail} from "@/components/detail/candidate-detail";
 import {TrailDetail} from "@/components/detail/trail-detail";
-import {En} from "@/components/en";
+import {Bi, CodeHint} from "@/components/en";
 import {MatchCard} from "@/components/workspace/match-card";
 import {Section} from "@/components/workspace/section";
 import {Button} from "@/components/ui/button";
@@ -60,8 +60,9 @@ export function WorkDetail({
                     <Chip label={stage.label} tone={stage.tone} icon={stage.icon}/>
                     <span className="text-xs text-muted-foreground">Page {cand.source_page}</span>
                 </div>
-                <h2 className="text-lg leading-snug font-semibold">{displayTitle(row.title)}</h2>
-                <En text={displayTitle(row.title)}/>
+                <Bi as="h2" text={displayTitle(row.title)} en={cand.note?.title_en}
+                    className="text-lg leading-snug font-semibold"/>
+                <CodeHint code={cand.code}/>
                 {row.searchable && row.commitments.length > 0 && (
                     <Button
                         size="sm"

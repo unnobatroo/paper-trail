@@ -4,14 +4,14 @@ import {useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {toast} from "sonner";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
-import {Languages, Loader2, Search} from "lucide-react";
+import {Loader2, Search} from "lucide-react";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Kbd} from "@/components/ui/kbd";
 import {IngestDialog} from "@/components/ingest-dialog";
 import {ReviewKeyDialog} from "@/components/review-key-dialog";
 import {ThemeToggle} from "@/components/theme-toggle";
-import {useTranslate} from "@/components/en";
+import {GlossaryButton, LangToggle} from "@/components/en";
 import {keys, useDocuments, useJobs, useMeta,} from "@/lib/hooks";
 import {api} from "@/lib/api";
 
@@ -19,7 +19,6 @@ export function TopNav() {
     const qc = useQueryClient();
     const {data: meta, isError: metaError} = useMeta();
     const {data: documents} = useDocuments();
-    const {on: translateOn, setOn: setTranslateOn} = useTranslate();
     const [startedIds, setJobIds] = useState<string[]>([]);
     // the server knows what's running, so a reload keeps following an ingest
     const {data: inFlight} = useQuery({
@@ -80,17 +79,8 @@ export function TopNav() {
                     {documents !== undefined && !documents.length && (
                         <IngestDialog onJob={setJobIds}/>
                     )}
-                    <Button
-                        variant={translateOn ? "secondary" : "ghost"}
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={!meta?.translation}
-                        onClick={() => setTranslateOn(!translateOn)}
-                        title={meta && !meta.translation ? "Translation is unavailable" : undefined}
-                    >
-                        <Languages className="size-4"/>
-                        EN
-                    </Button>
+                    <GlossaryButton/>
+                    <LangToggle original={meta?.language_name || undefined}/>
                     {meta?.review_required && <ReviewKeyDialog/>}
                     <ThemeToggle/>
                     <Button

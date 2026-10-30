@@ -9,7 +9,7 @@ import {Check, CircleCheck, ListChecks, Loader2, MousePointerClick, Search, X} f
 import {Chip, EmptyState} from "@/components/chip";
 import {type Columns, DataTable, useRowKeys} from "@/components/data-table";
 import {DetailSheet} from "@/components/detail-sheet";
-import {En} from "@/components/en";
+import {Bi} from "@/components/en";
 import {QueryError} from "@/components/query-error";
 import {PageTitle} from "@/components/toolbar";
 import {Button} from "@/components/ui/button";
@@ -55,8 +55,8 @@ const columns: Columns<WorkRow> = [
             const r = row.original;
             return (
                 <div className="max-w-xl min-w-0">
-                    <p className="font-medium leading-snug">{displayTitle(r.title)}</p>
-                    <En text={displayTitle(r.title)}/>
+                    <Bi text={displayTitle(r.title)} en={r.group[0].note?.title_en}
+                        className="font-medium leading-snug"/>
                     <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{r.group[0].source_excerpt}</p>
                 </div>
             );
