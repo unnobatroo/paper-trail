@@ -7,8 +7,9 @@ gold = jsonl, one approved commitment per line:
 recall    gold commitments matched by a kept candidate on the same page
 precision kept candidates that match some gold row on their page (a floor, gold isn't
           guaranteed complete), f1 from the two. recall gains that tank this are junk
-kept      candidates whose receipt was verbatim on the page (ingestion keeps only these)
-returned  everything the model answered, kept or not
+kept      what ingestion would store: receipt found on the page, no fact-sheet rows, deduped
+returned  everything the model answered. kept_rate = kept / returned, so it moves with
+          receipts, form rows and dedupe together
 
 the number that matters is macro recall on holdout docs: a model that only learned
 one city's layout scores high on train and falls over there
@@ -90,12 +91,12 @@ def score_doc(extractor: LLMExtractor, pdf: Path, golds: list[dict]) -> dict:
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     returned = len(raw)
     # raw answers incl. the ones dropped for a bad receipt, for --dump error digging
-    answers = [{"page": i.page, "type": i.type, "title": i.normalized_title,
+    answers = [{"page": i.page, "type": i.type, "title": i.normalized_title, "text": i.text,
                 "excerpt": i.excerpt} for i in raw]
     return {"gold": len(golds), "found": found, "recall": round(recall, 3),
             "precision": round(precision, 3), "f1": round(f1, 3),
             "kept": len(cands), "returned": returned,
-            "receipt_rate": round(len(cands) / returned, 3) if returned else None,
+            "kept_rate": round(len(cands) / returned, 3) if returned else None,
             "seconds_per_page": round(seconds / len(numbers), 1), "missed": missed,
             "answers": answers}
 

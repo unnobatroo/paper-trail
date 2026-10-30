@@ -120,7 +120,13 @@ def test_dedupe_drops_the_same_passage_twice_on_a_page():
     again = _cand(1, "green roofs on four primary schools by 2027", title="other")
     elsewhere = _cand(2, "Install green roofs on four primary schools by 2027.")
     different = _cand(1, "Plant 500 street trees in the district.")
+    # same wording, other numbers: two commitments, both go to review
+    two = _cand(1, "Plant 200 street trees in the district by 2027.")
+    five = _cand(1, "Plant 500 street trees in the district by 2027.")
     assert dedupe([a, again, elsewhere, different]) == [a, elsewhere, different]
+    assert dedupe([two, five]) == [two, five]
+    # a shorter quote of the same passage still merges
+    assert dedupe([two, _cand(1, "Plant 200 street trees")]) == [two]
 
 
 def test_fact_sheet_rows_are_not_commitments():

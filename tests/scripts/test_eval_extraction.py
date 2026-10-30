@@ -28,6 +28,7 @@ def test_score_doc_counts_hits_and_misses_per_page(monkeypatch):
     assert out["missed"] == [{"page": 3, "title": "Napelemek az iskolákon"}]
     assert out["answers"] == [{"page": 3, "type": "measure",
                                "title": "M1.1.2 Távhőszolgáltatás fejlesztése",
+                               "text": "Távhőszolgáltatás fejlesztése",
                                "excerpt": "Távhőszolgáltatás fejlesztése"}]
 
 
@@ -53,6 +54,11 @@ def test_same_quote_matches_even_with_a_useless_title():
     cand = SimpleNamespace(text="x", normalized_title="M1.02", source_excerpt=(
         "Provide ‘carbon literacy’ training to key decision-makers in the council."))
     assert eval_extraction.matches(gold, cand)
+    # same sentence, conflicting target number: not the gold commitment
+    twenty = {**gold, "quote": "Provide training to 20 key decision-makers in the council."}
+    forty = SimpleNamespace(text="x", normalized_title="M1.02", source_excerpt=(
+        "Provide training to 40 key decision-makers in the council."))
+    assert not eval_extraction.matches(twenty, forty)
     # sharing a few common words isn't the same passage
     other = SimpleNamespace(text="x", normalized_title="M1.03",
                             source_excerpt="Establish a climate emergency board in the council.")

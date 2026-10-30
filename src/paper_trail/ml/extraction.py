@@ -130,12 +130,13 @@ def form_row(quote: str, labels: tuple[str, ...]) -> bool:
 
 
 def same_passage(a: str, b: str) -> bool:
-    """two quotes of the same text: a long shared run, not a stray "a város" or two"""
-    a, b = (re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b))
-    if not a or not b:
+    """two quotes of the same text: a long shared run, not a stray "a város" or two.
+    numbers decide: "200 fa" and "500 fa" are two commitments however alike the rest is"""
+    a, b = sorted((re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b)), key=len)
+    if not a or not b or not set(re.findall(r"\d+", a)) <= set(re.findall(r"\d+", b)):
         return False
     run = SequenceMatcher(None, a, b, autojunk=False).find_longest_match().size
-    return run >= 20 and run >= 0.5 * min(len(a), len(b))
+    return run >= 20 and run >= 0.5 * len(a)
 
 
 def dedupe(cands: list[PolicyCandidate]) -> list[PolicyCandidate]:
