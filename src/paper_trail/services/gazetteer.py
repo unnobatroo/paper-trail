@@ -6,6 +6,8 @@ lets matching connect them
 
 from __future__ import annotations
 
+import re
+
 from ..ml.accountability import PassageAuditor
 from ..repositories.ports import EvidenceStore
 
@@ -24,8 +26,10 @@ class PlaceResolver:
         """street names for the passage. unknown parcels get recorded unconfirmed with
         the first street in the same passage, a person confirms later
         """
-        low = passage.lower()
-        out = [name for name in self._known if name.lower() in low]
+        # anchor the start only: "Nagytompa utca" isn't "Tompa utca", but endings stay
+        # allowed, hungarian says "Kálvária téren" for "on Kálvária tér"
+        out = [name for name in self._known
+               if re.search(rf"(?<!\w){re.escape(name)}", passage, re.I)]
         for parcel in PassageAuditor.parcels(passage):
             street = self._store.resolve_parcel(parcel)
             if street is None and streets:

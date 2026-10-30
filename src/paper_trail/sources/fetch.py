@@ -40,10 +40,15 @@ def fetch(url: str, allowed_domains: Collection[str], parser=None) -> FetchedPag
         return None
     try:
         resp = safe_get(url, allowed_domains)
-        resp.raise_for_status()
-        content = _read_capped(resp)
     except requests.RequestException:
         return None
+    # streamed, so close it ourselves or a 404 leaks the socket
+    with resp:
+        try:
+            resp.raise_for_status()
+            content = _read_capped(resp)
+        except requests.RequestException:
+            return None
     if content is None:
         return None
     # redirects get followed, so recheck the allowlist on the final url
