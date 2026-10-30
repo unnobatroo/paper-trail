@@ -115,6 +115,20 @@ class _Reply(BaseModel):
     items: list[_Item]
 
 
+def form_row(quote: str, labels: tuple[str, ...]) -> bool:
+    """fact-sheet row ("Időtáv 2021-2030", "Felelős: Jegyző", "célkitűzés kódja Ms-1.3"):
+    starts with a label, or is labels + codes + numbers with barely any words left"""
+    low = " ".join(quote.casefold().split()).lstrip("•-–* :")
+    hits = [label for label in labels if label in low]
+    if not hits:
+        return False
+    if any(low.startswith(label) for label in hits):
+        return True
+    for label in sorted(hits, key=len, reverse=True):
+        low = low.replace(label, " ")
+    return len(re.findall(r"[^\W\d_]{3,}", low)) < 4
+
+
 def same_passage(a: str, b: str) -> bool:
     """two quotes of the same text: a long shared run, not a stray "a város" or two"""
     a, b = (re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b))
@@ -210,7 +224,8 @@ class LLMExtractor:
             for item in reply.items:
                 kind = CandidateType(item.type) if item.type in CandidateType else None
                 receipt = source_excerpt(text.get(item.page, ""), item.excerpt)
-                if kind in KINDS and receipt:
+                if kind in KINDS and receipt and not form_row(receipt,
+                                                              self._profile.form_labels):
                     title, code = grounded_title(item.normalized_title, item.text,
                                                  text[item.page])
                     out.append(PolicyCandidate(

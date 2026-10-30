@@ -121,3 +121,18 @@ def test_dedupe_drops_the_same_passage_twice_on_a_page():
     elsewhere = _cand(2, "Install green roofs on four primary schools by 2027.")
     different = _cand(1, "Plant 500 street trees in the district.")
     assert dedupe([a, again, elsewhere, different]) == [a, elsewhere, different]
+
+
+def test_fact_sheet_rows_are_not_commitments():
+    from paper_trail.ml.extraction import form_row
+    labels = HU.form_labels
+    assert labels, "hu profile should carry its fact-sheet labels"
+    for junk in ("Időtáv 2021-2030", "Felelős: Önkormányzat, helyi civil szervezetek",
+                 "Mitigációs célkitűzés kódja Adaptációs célkitűzés kódja Ms-1.3 As-1.2",
+                 "• Lehetséges forrás VMOP, ZIKOP, TOP Plusz"):
+        assert form_row(junk, labels), junk
+    for real in ("Zöldtető alkalmazására pilot projektet kell tervezni 2025-ig.",
+                 "Az önkormányzat felelős a fasorok gondozásáért és bővítéséért."):
+        assert not form_row(real, labels), real
+    # no labels in the profile = rule off
+    assert not form_row("Időtáv 2021-2030", ())
