@@ -7,8 +7,6 @@ import os
 import threading
 from abc import ABC, abstractmethod
 
-import numpy as np
-
 from .client import model_client
 
 # ~220mb onnx, fine on cpu
@@ -72,12 +70,6 @@ class HashingProvider(EmbeddingProvider):
                 vec[int(hashlib.md5(token.encode()).hexdigest(), 16) % self.DIM] += 1.0
             out.append(vec)
         return out
-
-
-def cosine(a: list[float], b: list[float]) -> float:
-    a_, b_ = np.asarray(a, dtype=np.float32), np.asarray(b, dtype=np.float32)
-    denom = np.linalg.norm(a_) * np.linalg.norm(b_)
-    return float(a_ @ b_ / denom) if denom else 0.0
 
 
 def get_provider(model: str, base_url: str | None = None, api_key: str | None = None,

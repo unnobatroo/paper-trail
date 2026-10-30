@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from paper_trail.ml.extraction import excerpt_found, source_excerpt
+from paper_trail.ml.extraction import source_excerpt
 from paper_trail.ml.rerank import HttpReranker
 from paper_trail.ml.retrieval import reciprocal_rank_fusion
 from paper_trail.sources.chunking import structure_chunks
@@ -14,9 +14,9 @@ from paper_trail.sources.web_search import SearxngSearchProvider, allowed
 def test_receipt_restores_source_bytes():
     raw = "A  fák\nültetése."
     receipt = source_excerpt(raw, "A fák ültetése.")
-    assert receipt == raw and excerpt_found(raw, receipt)
+    assert receipt == raw
     assert source_excerpt(raw, "") is None
-    assert not excerpt_found(raw, "A fák ültetése.")
+    assert "A fák ültetése." not in raw
 
 
 def test_table_rows_and_heading_boundaries():

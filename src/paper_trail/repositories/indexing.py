@@ -14,13 +14,6 @@ def fit_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
         raise ValueError(
             f"embedding has {len(vec)} dims, the pgvector column holds {dim}: "
             "use a model with <= 1024 dims or widen the column")
-    return pad_vector(vec, dim)
-
-
-def pad_vector(vec: list[float], dim: int = VECTOR_DIM) -> list[float]:
-    """zero-pad to `dim`, longer vectors untouched"""
-    if len(vec) >= dim:
-        return vec
     return vec + [0.0] * (dim - len(vec))
 
 

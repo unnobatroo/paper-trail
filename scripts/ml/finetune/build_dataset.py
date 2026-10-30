@@ -109,7 +109,7 @@ def main() -> None:
         ap.error("nothing to build from, pass --doc and/or --gold")
     from paper_trail.infrastructure.settings import load
     settings = load()
-    repo = PolicyRepository(settings.database_url or settings.db_path)
+    repo = PolicyRepository(settings.database_url)
     profile = load_profile(repo, args.language)
     rows = []
     for spec in args.doc:

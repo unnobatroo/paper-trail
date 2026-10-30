@@ -20,7 +20,5 @@ class DocumentStore:
         path = self._path(name)
         return path.read_bytes() if path.exists() else None
 
-    def list(self, prefix: str = "") -> list[str]:
-        if not self._root.exists():
-            return []
-        return sorted(p.name for p in self._root.glob(f"{prefix}*"))
+    def list(self) -> list[str]:
+        return sorted(p.name for p in self._root.glob("*")) if self._root.exists() else []

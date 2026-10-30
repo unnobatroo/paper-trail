@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from paper_trail.domain.models import DocumentPage, PolicyCandidate
-from paper_trail.ml.extraction import NoExtractor, excerpt_found
+from paper_trail.ml.extraction import NoExtractor
 from tests.profiles import HU
 
 
@@ -15,13 +15,6 @@ def test_candidate_requires_page_and_excerpt():
     with pytest.raises(ValidationError):
         PolicyCandidate(document_id=1, text="t", normalized_title="t",
                         source_page=3, source_excerpt="")
-
-
-def test_excerpt_found_requires_raw_verbatim_receipt():
-    assert excerpt_found("a  b\nc", "a  b\nc")
-    assert not excerpt_found("a  b\nc", "a b c")
-    assert not excerpt_found("a b c", "")
-    assert not excerpt_found("a b c", "a b d")
 
 
 @pytest.mark.parametrize("model,thinking_off", [("Qwen/Qwen3-4B-AWQ", True), ("gemma3", False)])

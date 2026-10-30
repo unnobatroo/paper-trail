@@ -50,11 +50,6 @@ PAGES:
 """
 
 
-def excerpt_found(page_text: str, excerpt: str) -> bool:
-    """non-empty verbatim substring of the raw page text"""
-    return bool(excerpt.strip()) and excerpt in page_text
-
-
 def source_excerpt(page_text: str, excerpt: str) -> str | None:
     """the excerpt as it really sits on the page, or None. whitespace doesn't count: pdf text
     has spaces mid-word ("bizonyít ékalapú", "létr e") and models quote the clean word"""
