@@ -11,9 +11,6 @@ from py_rust_stemmers import SnowballStemmer
 # pgvector column width, shorter vectors get zero-padded (cosine doesn't care)
 VECTOR_DIM = 1024
 
-# dense vs lexical weight, benchmarked in migration 006, same on both backends
-LEX_WEIGHT = 0.5
-
 
 def stemmer_for(language: str):
     """word -> stem callable for a snowball language"""

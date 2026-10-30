@@ -2,46 +2,37 @@
 
 import json
 
+from sqlalchemy import text
+
 from ...ml.retrieval import reciprocal_rank_fusion
 from ...sources.fetch import FetchedPage
 from ..indexing import content_key, fit_vector
 from ..ports import PageStore, VectorIndex
-from .db import connect
+from ..store import Repo
+
+_CHUNKS = "FROM chunks c JOIN pages p ON p.id=c.page_id"
 
 
 def _vector(values):
     return json.dumps(fit_vector(values))
 
 
-class PostgresPageStore(PageStore):
-    def __init__(self, database_url: str):
-        self.database_url = database_url
-
+class PostgresPageStore(Repo, PageStore):
     def get(self, url):
-        with connect(self.database_url) as conn:
-            row = conn.execute("SELECT * FROM pages WHERE url=%s", (url,)).fetchone()
-        if row:
-            return FetchedPage(
-                url=row["url"],
-                title=row["title"],
-                text=row["text"],
-                published_on=row["published_on"],
-            )
-        return None
+        row = self._one("SELECT url, title, text, published_on FROM pages WHERE url=:url", url=url)
+        return FetchedPage(**row) if row else None
 
     def put(self, page):
-        with connect(self.database_url) as conn:
-            conn.execute(
-                """INSERT INTO pages(url,title,text,published_on)
-                VALUES(%s,%s,%s,%s) ON CONFLICT(url) DO UPDATE SET title=excluded.title,
-                text=excluded.text,published_on=excluded.published_on""",
-                (page.url, page.title, page.text, page.published_on),
-            )
+        self._exec("INSERT INTO pages(url, title, text, published_on)"
+                   " VALUES (:url, :title, :text, :published_on) ON CONFLICT(url) DO UPDATE"
+                   " SET title=excluded.title, text=excluded.text,"
+                   " published_on=excluded.published_on",
+                   url=page.url, title=page.title, text=page.text, published_on=page.published_on)
 
 
-class PostgresVectorIndex(VectorIndex):
+class PostgresVectorIndex(Repo, VectorIndex):
     def __init__(self, database_url: str, ts_config: str = "simple", analyzer=None):
-        self.database_url = database_url
+        super().__init__(database_url)
         self.ts_config = ts_config
         self.analyzer = analyzer
 
@@ -49,103 +40,63 @@ class PostgresVectorIndex(VectorIndex):
         analyzer_model = getattr(self.analyzer, "_model", "snowball")
         return model + ":" + content_key(model + analyzer_model, chunk_size, page.text)
 
+    def _lemmas(self, text_):
+        return " ".join(self.analyzer.analyze(text_).lemmas) if self.analyzer else text_
+
     def has(self, page, model, chunk_size):
-        with connect(self.database_url) as conn:
-            return bool(
-                conn.execute(
-                    """SELECT 1 FROM chunks c JOIN pages p ON p.id=c.page_id
-                WHERE p.url=%s AND c.embed_model=%s AND c.chunk_index=0""",
-                    (page.url, self._key(page, model, chunk_size)),
-                ).fetchone()
-            )
+        return self._one(f"SELECT 1 {_CHUNKS} WHERE p.url=:url AND c.embed_model=:key"
+                         " AND c.chunk_index=0",
+                         url=page.url, key=self._key(page, model, chunk_size)) is not None
 
     def get(self, page, model, chunk_size):
-        with connect(self.database_url) as conn:
-            rows = conn.execute(
-                """SELECT c.text,c.embedding::text FROM chunks c
-                JOIN pages p ON p.id=c.page_id WHERE p.url=%s AND c.embed_model=%s
-                ORDER BY c.chunk_index""",
-                (page.url, self._key(page, model, chunk_size)),
-            ).fetchall()
+        rows = self._all(f"SELECT c.text, c.embedding::text AS embedding {_CHUNKS}"
+                         " WHERE p.url=:url AND c.embed_model=:key ORDER BY c.chunk_index",
+                         url=page.url, key=self._key(page, model, chunk_size))
         return [(r["text"], json.loads(r["embedding"])) for r in rows] or None
 
     def put(self, page, model, chunk_size, pairs):
         # do the model work before the transaction, no db lock waits on nlp
-        lemmas = [
-            " ".join(self.analyzer.analyze(text).lemmas) if self.analyzer else text
-            for text, _ in pairs
-        ]
-        with connect(self.database_url) as conn:
-            pid = conn.execute("SELECT id FROM pages WHERE url=%s", (page.url,)).fetchone()
-            if not pid:
+        lemmas = [self._lemmas(t) for t, _ in pairs]
+        key = self._key(page, model, chunk_size)
+        with self._engine.begin() as conn:
+            pid = conn.execute(text("SELECT id FROM pages WHERE url=:url"),
+                               {"url": page.url}).scalar()
+            if pid is None:
                 raise ValueError("cache the source page before its vectors")
-            key = self._key(page, model, chunk_size)
-            conn.execute("DELETE FROM chunks WHERE page_id=%s AND embed_model=%s", (pid["id"], key))
-            for i, ((text, vec), lemma) in enumerate(zip(pairs, lemmas, strict=True)):
-                conn.execute(
-                    """INSERT INTO chunks
-                    (page_id,embed_model,chunk_index,text,embedding,lemma_text)
-                    VALUES(%s,%s,%s,%s,%s::vector,%s)""",
-                    (pid["id"], key, i, text, _vector(vec), lemma),
-                )
+            conn.execute(text("DELETE FROM chunks WHERE page_id=:pid AND embed_model=:key"),
+                         {"pid": pid, "key": key})
+            if pairs:
+                conn.execute(text(
+                    "INSERT INTO chunks(page_id, embed_model, chunk_index, text, embedding,"
+                    " lemma_text) VALUES (:pid, :key, :i, :text, CAST(:vec AS vector), :lemma)"),
+                    [{"pid": pid, "key": key, "i": i, "text": t, "vec": _vector(v), "lemma": lem}
+                     for i, ((t, v), lem) in enumerate(zip(pairs, lemmas, strict=True))])
 
     def match(self, query, query_text, model, chunk_size, pages, k):
         if not pages or not any(query):
             return []
         by_url = {p.url: p for p in pages}
-        models = [self._key(p, model, chunk_size) for p in pages]
-        query_lemmas = (
-            " ".join(self.analyzer.analyze(query_text).lemmas) if self.analyzer else query_text
-        )
-        pool = max(k * 4, 20)
-        with connect(self.database_url) as conn:
-            # order by the bare cosine op or postgres won't use hnsw
-            dense = conn.execute(
-                """SELECT c.id,c.text,p.url,
-                    1-(c.embedding <=> %s::vector) similarity
-                FROM chunks c JOIN pages p ON p.id=c.page_id
-                WHERE p.url=ANY(%s) AND c.embed_model=ANY(%s)
-                ORDER BY c.embedding <=> %s::vector LIMIT %s""",
-                (_vector(query), list(by_url), models, _vector(query), pool),
-            ).fetchall()
-            if self.analyzer:
-                lexical = conn.execute(
-                    """SELECT c.id,c.text,p.url,
-                        1-(c.embedding <=> %s::vector) similarity
-                    FROM chunks c JOIN pages p ON p.id=c.page_id
-                    WHERE p.url=ANY(%s) AND c.embed_model=ANY(%s)
-                        AND c.lemma_search @@ websearch_to_tsquery('simple',%s)
-                    ORDER BY ts_rank_cd(c.lemma_search,websearch_to_tsquery('simple',%s)) DESC,c.id
-                    LIMIT %s""",
-                    (_vector(query), list(by_url), models, query_lemmas, query_lemmas, pool),
-                ).fetchall()
-            else:
-                lexical = conn.execute(
-                    """SELECT c.id,c.text,p.url,
-                        1-(c.embedding <=> %s::vector) similarity
-                    FROM chunks c JOIN pages p ON p.id=c.page_id
-                    WHERE p.url=ANY(%s) AND c.embed_model=ANY(%s)
-                        AND to_tsvector(%s::regconfig,c.text) @@
-                            websearch_to_tsquery(%s::regconfig,%s)
-                    ORDER BY ts_rank_cd(to_tsvector(%s::regconfig,c.text),
-                        websearch_to_tsquery(%s::regconfig,%s)) DESC,c.id LIMIT %s""",
-                    (
-                        _vector(query),
-                        list(by_url),
-                        models,
-                        self.ts_config,
-                        self.ts_config,
-                        query_text,
-                        self.ts_config,
-                        self.ts_config,
-                        query_text,
-                        pool,
-                    ),
-                ).fetchall()
+        if self.analyzer:
+            # lemmas are stored pre-analyzed, so the 'simple' config is enough
+            tsv, tsq = "c.lemma_search", "websearch_to_tsquery('simple', :terms)"
+        else:
+            tsv = "to_tsvector(CAST(:cfg AS regconfig), c.text)"
+            tsq = "websearch_to_tsquery(CAST(:cfg AS regconfig), :terms)"
+        params = {"q": _vector(query), "urls": list(by_url),
+                  "models": [self._key(p, model, chunk_size) for p in pages],
+                  "terms": self._lemmas(query_text), "cfg": self.ts_config,
+                  "pool": max(k * 4, 20)}
+        base = ("SELECT c.id, c.text, p.url,"
+                " 1 - (c.embedding <=> CAST(:q AS vector)) AS similarity"
+                f" {_CHUNKS} WHERE p.url IN :urls AND c.embed_model IN :models")
+        # order by the bare cosine op or postgres won't use hnsw
+        dense = self._all(base + " ORDER BY c.embedding <=> CAST(:q AS vector) LIMIT :pool",
+                          **params)
+        lexical = self._all(base + f" AND {tsv} @@ {tsq}"
+                                   f" ORDER BY ts_rank_cd({tsv}, {tsq}) DESC, c.id LIMIT :pool",
+                            **params)
         rows = {r["id"]: r for r in dense + lexical}
-        rankings = [[r["id"] for r in dense], [r["id"] for r in lexical]]
-        fused = reciprocal_rank_fusion(rankings)
+        fused = reciprocal_rank_fusion([[r["id"] for r in dense], [r["id"] for r in lexical]])
         order = sorted(fused, key=lambda i: (-fused[i], i))[:k]
-        return [
-            (by_url[rows[i]["url"]], rows[i]["text"], float(rows[i]["similarity"])) for i in order
-        ]
+        return [(by_url[rows[i]["url"]], rows[i]["text"], float(rows[i]["similarity"]))
+                for i in order]
