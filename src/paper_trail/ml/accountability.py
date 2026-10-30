@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import lru_cache
 
 from ..domain.enums import (
     ArtifactStatus,
@@ -21,14 +22,12 @@ from ..domain.enums import (
 from ..domain.models import BudgetRecord, EvidenceItem, ImplementationArtifact
 from .lang import LanguageProfile
 
-# EKR001234562021 = public procurement, VEKOP-6.2.1-15-2016-00001 = eu programme
-_PROCUREMENT_RE = re.compile(
-    r"\bEKR\d{9,12}\b|"
-    r"\b(?:VEKOP|KEHOP|GINOP|EFOP|TOP|TOP_PLUSZ|KEHOP_PLUSZ|VP)(?:-[\dA-Z.]+){3,6}\b")
-# "36542/1 hrsz.", "hrsz.: 36542/1", "36542/1 helyrajzi számú"
-_PARCEL_RE = re.compile(
-    r"(?:\bhrsz\.?\s*:?\s*(\d{3,6}(?:/\d{1,4}){0,2}))|"
-    r"(?:\b(\d{3,6}(?:/\d{1,4}){0,2})\s*(?:hrsz\b|helyrajzi\s+sz))", re.I)
+
+@lru_cache(maxsize=16)
+def _rx(pattern: str) -> re.Pattern | None:
+    # id formats are per country, so they live in the profile
+    return re.compile(pattern, re.I) if pattern else None
+
 
 # flagged passages never get an auto hint above INDIRECT
 _CAPPED = {RelationshipType.DIRECT_IMPLEMENTATION, RelationshipType.SUPPORTING,
@@ -89,13 +88,16 @@ class PassageAuditor:
                 return jurisdiction
         return Jurisdiction.DISTRICT_MUNICIPALITY
 
-    @staticmethod
-    def procurement_ids(text: str) -> list[str]:
-        return list(dict.fromkeys(m.group(0) for m in _PROCUREMENT_RE.finditer(text)))
+    def procurement_ids(self, text: str) -> list[str]:
+        rx = _rx(self._profile.procurement_id_re)
+        return list(dict.fromkeys(m.group(0) for m in rx.finditer(text))) if rx else []
 
-    @staticmethod
-    def parcels(text: str) -> list[str]:
-        return list(dict.fromkeys(m.group(1) or m.group(2) for m in _PARCEL_RE.finditer(text)))
+    def parcels(self, text: str) -> list[str]:
+        rx = _rx(self._profile.parcel_re)
+        if rx is None:
+            return []
+        return list(dict.fromkeys(
+            next((g for g in m.groups() if g), m.group(0)) for m in rx.finditer(text)))
 
     @staticmethod
     def effective_flags(evidence: EvidenceItem,
@@ -149,8 +151,7 @@ class FinancialAuditor:
         findings = []
         if (BudgetKind.REPORTED_EXPENDITURE in states
                 and BudgetKind.ACTUAL_EXPENDITURE not in states):
-            findings.append("Spending is only reported, not confirmed by the final accounts "
-                            "(zárszámadás).")
+            findings.append("Spending is only reported, not confirmed by the final accounts.")
         if any(k in states for k in _APPROPRIATIONS) and not executed:
             findings.append("Money was appropriated but no final accounts figure or "
                             "completion certificate confirms it was spent.")

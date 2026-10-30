@@ -35,9 +35,9 @@ MONEY = FinancialAuditor(HU)
 def test_ids_parcels_and_polarity_come_from_the_passage():
     text = ("A Kálvária tér (36542/1 hrsz.) felújítása az EKR001234562021 eljárásban. "
             "A VEKOP-6.2.1-15-2016-00001 projekt támogatási szerződése.")
-    assert PassageAuditor.procurement_ids(text) == ["EKR001234562021", "VEKOP-6.2.1-15-2016-00001"]
-    assert PassageAuditor.parcels(text) == ["36542/1"]
-    assert PassageAuditor.parcels("hrsz.: 35012/4 alatti ingatlan") == ["35012/4"]
+    assert AUDIT.procurement_ids(text) == ["EKR001234562021", "VEKOP-6.2.1-15-2016-00001"]
+    assert AUDIT.parcels(text) == ["36542/1"]
+    assert AUDIT.parcels("hrsz.: 35012/4 alatti ingatlan") == ["35012/4"]
     assert AUDIT.polarity("A szerződést a kivitelező felmondta.") == EvidencePolarity.TERMINATION
     assert AUDIT.polarity("Szerződésmódosítás: a határidő 2026.") == EvidencePolarity.AMENDMENT
     assert AUDIT.polarity("Átadták a felújított teret.") == EvidencePolarity.AFFIRMATIVE

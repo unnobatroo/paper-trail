@@ -3,17 +3,17 @@
  "name": "English",
  "stemmer": "english",
  "ts_config": "english",
- "currency_words": [
-  "EUR",
-  "USD",
-  "GBP",
-  "€",
-  "$",
-  "£",
-  "euros",
-  "dollars",
-  "pounds"
- ],
+ "currency_words": {
+  "GBP": "GBP",
+  "£": "GBP",
+  "pounds": "GBP",
+  "EUR": "EUR",
+  "€": "EUR",
+  "euros": "EUR",
+  "USD": "USD",
+  "$": "USD",
+  "dollars": "USD"
+ },
  "multiplier_words": {
   "billion": 1000000000,
   "bn": 1000000000,
@@ -233,5 +233,8 @@
   "ERDF"
  ],
  "intent_re": "aim|target|goal|increase|decrease|reduce|achieve|implement|establish|develop|improve|introduce|ensure|maintain|plant|upgrade|support|create|deliver",
- "units_re": "m2|m²|%|km|km2|ha|mm|°C|kWh|MWh|tCO2|EUR|USD|GBP|€|\\$|£"
+ "units_re": "m2|m²|%|km|km2|ha|mm|°C|kWh|MWh|tCO2|EUR|USD|GBP|€|\\$|£",
+ "currency": "GBP",
+ "min_amount": 100,
+ "procurement_id_re": "\\b(?:ocds-[a-z0-9]{6}-[\\w-]+|CF-\\d{4}-\\d{6,})\\b"
 }

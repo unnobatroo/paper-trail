@@ -1,4 +1,6 @@
+from paper_trail.ml.accountability import PassageAuditor
 from paper_trail.services.gazetteer import PlaceResolver
+from tests.profiles import HU
 
 
 class _Store:
@@ -13,7 +15,7 @@ class _Store:
 
 
 def test_place_names_match_whole_words_only():
-    r = PlaceResolver(_Store())
+    r = PlaceResolver(_Store(), PassageAuditor(HU))
     r.refresh()
     # endings are fine, a longer name that merely contains it isn't
     assert r.resolve("felújítás a Kálvária téren", "u", []) == ["Kálvária tér"]

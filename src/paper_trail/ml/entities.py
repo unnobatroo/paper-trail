@@ -15,18 +15,21 @@ from .lang import LanguageProfile
 
 # money
 
-_AMOUNT = r"(\d[\d\s.,]*)"
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 
 
 @lru_cache(maxsize=8)
 def _compiled(profile: LanguageProfile):
     """every regex a profile needs, compiled once"""
-    cur = "|".join(re.escape(c) for c in (*profile.currency_words, "EUR", "euró", "euro", "€"))
-    mult = ("|".join(re.escape(m) for m in profile.multiplier_words)
-            or r"(?!)")
+    # longest first, or "m" eats the start of "million"
+    cur = "|".join(re.escape(c) for c in sorted(profile.currency_words, key=len, reverse=True))
+    cur = cur or r"(?!)"
+    mult = ("|".join(re.escape(m) for m in sorted(profile.multiplier_words, key=len,
+                                                   reverse=True)) or r"(?!)")
+    # "2,5 millió Ft" or "£2.5 million"
     money = re.compile(
-        _AMOUNT + rf"\s*({mult})?\s*({cur})(?!\w)", re.IGNORECASE)
+        rf"(?P<pre>{cur})\s*(?P<a1>\d[\d\s.,]*\d|\d)\s*(?:(?P<m1>{mult})\b)?"
+        rf"|(?P<a2>\d[\d\s.,]*)\s*(?P<m2>{mult})?\s*(?P<post>{cur})(?!\w)", re.IGNORECASE)
 
     date = None
     if profile.months_re:
@@ -89,6 +92,12 @@ def _sentence_around(text: str, start: int, end: int) -> str:
     return " ".join(text[left:right].split())
 
 
+def _currency(profile: LanguageProfile, word: str) -> str:
+    low = word.lower()
+    return next((code for w, code in profile.currency_words.items() if w.lower() == low),
+                profile.currency)
+
+
 @dataclass
 class BudgetMention:
     amount_huf: int | None
@@ -96,7 +105,7 @@ class BudgetMention:
     kind: BudgetKind | None  # None = money stated, kind unclear
     sentence: str
     year: int | None
-    currency: str = "HUF"
+    currency: str = ""
     amount_native: str | None = None
 
 
@@ -112,18 +121,19 @@ def extract_money(text: str,
             None,
         )
         y = _YEAR_RE.search(sentence)
-        currency = "EUR" if m.group(3).lower() in {"eur", "euró", "euro", "€"} else "HUF"
-        number = re.sub(r"\s+", "", m.group(1))
+        amount, mult_word = m["a1"] or m["a2"], m["m1"] or m["m2"]
+        currency = _currency(profile, m["pre"] or m["post"])
+        number = re.sub(r"\s+", "", amount)
         number = (number.replace(".", "").replace(",", ".") if profile.decimal_comma
                   else number.replace(",", ""))
         try:
             native = format(Decimal(number) * Decimal(str(profile.multiplier_words.get(
-                (m.group(2) or "").lower(), 1))), "f")
+                (mult_word or "").lower(), 1))), "f")
         except InvalidOperation:
             native = None
         mentions.append(
             BudgetMention(
-                amount_huf=(_to_number(profile, m.group(1), m.group(2))
+                amount_huf=(_to_number(profile, amount, mult_word)
                             if currency == "HUF" else None),
                 currency=currency, amount_native=native,
                 amount_raw=" ".join(m.group(0).split()),
