@@ -112,8 +112,6 @@ def main() -> None:
     ap.add_argument("--ca")
     ap.add_argument("--out")
     ap.add_argument("--concurrency", type=int, default=1)
-    ap.add_argument("--chunk-chars", type=int, default=0, help="0 = whole pages")
-    ap.add_argument("--verify", action="store_true", help="critic pass per page")
     ap.add_argument("--dump", type=Path, help="jsonl of every raw model answer, per doc")
     ap.add_argument("--baseline", type=Path,
                     help="an earlier --out report: exit 1 unless holdout recall goes up")
@@ -134,8 +132,7 @@ def main() -> None:
         profile = LanguageProfile.from_dict(
             json.loads((args.profiles / f"{lang}.json").read_text()))
         extractor = LLMExtractor(client, args.model, profile, window=1,
-                                 concurrency=args.concurrency, chunk_chars=args.chunk_chars,
-                                 verify=args.verify)
+                                 concurrency=args.concurrency)
         try:
             per_doc[name] = score_doc(extractor, args.docs / golds[0]["pdf"], golds)
         except openai.APIError as exc:
@@ -156,8 +153,7 @@ def main() -> None:
                "recall_macro_train": macro("train"), "recall_macro_holdout": macro("holdout"),
                "precision_macro_holdout": macro("holdout", "precision"),
                "f1_macro_holdout": macro("holdout", "f1"),
-               "concurrency": args.concurrency, "chunk_chars": args.chunk_chars,
-               "verify": args.verify}
+               "concurrency": args.concurrency}
     print(json.dumps(summary, ensure_ascii=False))
     if args.out:
         Path(args.out).write_text(json.dumps({"summary": summary, "docs": per_doc},

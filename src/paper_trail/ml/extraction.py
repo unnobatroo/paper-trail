@@ -115,26 +115,6 @@ class _Reply(BaseModel):
     items: list[_Item]
 
 
-_VERIFY = """These items were pulled from one page of a municipal climate strategy
-written in {language}. For each numbered item answer true only if its quote is a
-commitment the document's own authors make (the council or municipality and its bodies):
-a goal, a concrete action, a numeric target or a progress indicator. Answer false for
-background facts, past data, plans or laws of other bodies, examples, bare headings,
-tables of contents. Return {{"keep": [...]}} with one true/false per item, in order.
-
-PAGE:
-{page}
-
-ITEMS:
-{items}
-"""
-
-
-class _Verdicts(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    keep: list[bool]
-
-
 def same_passage(a: str, b: str) -> bool:
     """two quotes of the same text: a long shared run, not a stray "a város" or two"""
     a, b = (re.sub(r"\W+", " ", x.casefold()).strip() for x in (a, b))
@@ -155,27 +135,11 @@ def dedupe(cands: list[PolicyCandidate]) -> list[PolicyCandidate]:
     return out
 
 
-def chunk_page(page: DocumentPage, size: int) -> list[DocumentPage]:
-    """page -> pieces of ~size chars on line breaks, same page number. receipts get checked
-    against the whole page later, so a quote can't fall into a crack"""
-    if size <= 0 or len(page.text) <= size:
-        return [page]
-    out, cur = [], []
-    for line in page.text.splitlines():
-        if cur and sum(len(x) + 1 for x in cur) + len(line) > size:
-            out.append(cur)
-            cur = []
-        cur.append(line)
-    out.append(cur)
-    return [page.model_copy(update={"text": "\n".join(c)}) for c in out]
-
-
 class LLMExtractor:
     """any openai-style /chat/completions endpoint, json-schema constrained"""
 
     def __init__(self, client, model: str, profile: LanguageProfile, window: int = 4,
-                 concurrency: int = 1, max_tokens: int = 2048, chunk_chars: int = 0,
-                 verify: bool = False):
+                 concurrency: int = 1, max_tokens: int = 2048):
         self._client = client
         self._model = model
         self._profile = profile
@@ -184,11 +148,6 @@ class LLMExtractor:
         self._concurrency = max(1, concurrency)
         # set it ourselves, a server default can chop the json mid-object
         self._max_tokens = max_tokens
-        # 0 = whole pages. small models miss stuff deep in long inputs, langextract-style
-        # chunks trade more calls for recall
-        self._chunk_chars = chunk_chars
-        # second "is this really a commitment" pass per page, trades calls for precision
-        self._verify = verify
 
     def _ask(self, pages: list[DocumentPage]) -> _Reply | None:
         """one call. None when the reply isn't valid json for the schema, http errors raise"""
@@ -237,8 +196,7 @@ class LLMExtractor:
         return _Reply(items=items) if any(halves) else None
 
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
-        parts = [c for p in pages for c in chunk_page(p, self._chunk_chars)]
-        windows = [parts[i:i + self._window] for i in range(0, len(parts), self._window)]
+        windows = [pages[i:i + self._window] for i in range(0, len(pages), self._window)]
         with ThreadPoolExecutor(self._concurrency) as pool:
             # map keeps page order and re-raises the first http error
             answers = list(chain.from_iterable(pool.map(self._ask_window, windows)))
@@ -259,35 +217,7 @@ class LLMExtractor:
                         document_id=0, suggested_type=kind, text=item.text,
                         normalized_title=title, source_page=item.page, code=code,
                         source_excerpt=receipt, excerpt_on_page=True))
-        out = dedupe(out)
-        if not self._verify or not out:
-            return out
-        by_page: dict[int, list[PolicyCandidate]] = {}
-        for c in out:
-            by_page.setdefault(c.source_page, []).append(c)
-        with ThreadPoolExecutor(self._concurrency) as pool:
-            kept = pool.map(lambda kv: self._check(text[kv[0]], kv[1]), by_page.items())
-        return list(chain.from_iterable(kept))
-
-    def _check(self, page_text: str, cands: list[PolicyCandidate]) -> list[PolicyCandidate]:
-        """critic pass. fails open: a broken verdict keeps everything, a human reviews anyway"""
-        items = "\n".join(f"{i}. [{c.suggested_type.value}] {c.normalized_title}: "
-                          f"\"{c.source_excerpt}\"" for i, c in enumerate(cands))
-        resp = self._client.chat.completions.create(
-            model=self._model, temperature=0, max_tokens=16 * len(cands) + 64,
-            messages=[{"role": "user", "content": _VERIFY.format(
-                language=self._profile.name, page=page_text[:PAGE_CHARS], items=items)}],
-            response_format={"type": "json_schema", "json_schema": {
-                "name": "verdicts", "strict": True, "schema": _Verdicts.model_json_schema()}},
-            extra_body=({"chat_template_kwargs": {"enable_thinking": False}}
-                        if "qwen3" in self._model.lower() else None))
-        try:
-            keep = _Verdicts.model_validate_json(resp.choices[0].message.content or "").keep
-        except ValidationError:
-            return cands
-        if len(keep) != len(cands):
-            return cands
-        return [c for c, k in zip(cands, keep, strict=True) if k]
+        return dedupe(out)
 
 
 class NoExtractor:

@@ -92,17 +92,6 @@ def test_receipt_survives_pdf_spaces_inside_words():
     assert source_excerpt(page, "napelemek") is None and source_excerpt(page, "  ") is None
 
 
-def test_chunks_split_on_lines_and_keep_the_page_number():
-    from paper_trail.domain.models import DocumentPage
-    from paper_trail.ml.extraction import chunk_page
-    page = DocumentPage(page_number=4, text="\n".join(f"sor {i:02}" for i in range(30)))
-    parts = chunk_page(page, 50)
-    assert len(parts) > 1 and {p.page_number for p in parts} == {4}
-    assert all(len(p.text) <= 50 for p in parts)
-    assert "\n".join(p.text for p in parts) == page.text
-    assert chunk_page(page, 0) == [page]
-
-
 def test_title_code_must_be_on_the_page():
     from paper_trail.ml.extraction import grounded_title
     page = "1.01 Carbon neutral roadmap for the city. Develop pathways."
@@ -132,21 +121,3 @@ def test_dedupe_drops_the_same_passage_twice_on_a_page():
     elsewhere = _cand(2, "Install green roofs on four primary schools by 2027.")
     different = _cand(1, "Plant 500 street trees in the district.")
     assert dedupe([a, again, elsewhere, different]) == [a, elsewhere, different]
-
-
-def test_critic_drops_what_it_rejects_and_fails_open_on_junk():
-    from types import SimpleNamespace
-
-    from paper_trail.ml.extraction import LLMExtractor
-    replies = iter(['{"keep": [true, false]}', '{"keep": [true]}', "not json"])
-
-    def create(**_):
-        msg = SimpleNamespace(content=next(replies))
-        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
-    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
-    ex = LLMExtractor(client, "fake", HU, verify=True)
-    keep, drop = _cand(1, "a cél 2030"), _cand(1, "a város 1990-ben")
-    assert ex._check("page", [keep, drop]) == [keep]
-    # wrong length or broken json: keep everything, a human reviews them anyway
-    assert ex._check("page", [keep, drop]) == [keep, drop]
-    assert ex._check("page", [keep, drop]) == [keep, drop]
