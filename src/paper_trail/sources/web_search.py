@@ -6,12 +6,13 @@ providers are dumb, the evidence service owns the ssrf allowlist
 from __future__ import annotations
 
 import json
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
+
+from tenacity import retry, stop_after_attempt, wait_incrementing
 
 
 @dataclass
@@ -40,25 +41,15 @@ class SearchProvider(ABC):
 class DdgSearch(SearchProvider):
     """ddgs, two retries with backoff, a total failure bubbles up so the caller skips the domain"""
 
+    @retry(stop=stop_after_attempt(3), wait=wait_incrementing(start=1.5, increment=1.5),
+           reraise=True)
     def search(self, query: str, max_results: int = 5) -> list[SearchHit]:
         from ddgs import DDGS
 
-        for attempt in range(3):
-            try:
-                hits: list[SearchHit] = []
-                with DDGS() as ddgs:
-                    for r in ddgs.text(query, max_results=max_results):
-                        hits.append(SearchHit(
-                            url=r.get("href", ""),
-                            title=r.get("title", ""),
-                            snippet=r.get("body", ""),
-                        ))
-                return hits
-            except Exception:
-                if attempt == 2:
-                    raise
-                time.sleep(1.5 * (attempt + 1))
-        return []  # unreachable, last attempt re-raises
+        with DDGS() as ddgs:
+            return [SearchHit(url=r.get("href", ""), title=r.get("title", ""),
+                              snippet=r.get("body", ""))
+                    for r in ddgs.text(query, max_results=max_results)]
 
 
 class FixtureSearch(SearchProvider):
