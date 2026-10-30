@@ -354,5 +354,19 @@
  "currency": "HUF",
  "min_amount": 10000,
  "procurement_id_re": "\\bEKR\\d{9,12}\\b|\\b(?:VEKOP|KEHOP|GINOP|EFOP|TOP|TOP_PLUSZ|KEHOP_PLUSZ|VP)(?:-[\\dA-Z.]+){3,6}\\b",
- "parcel_re": "(?:\\bhrsz\\.?\\s*:?\\s*(\\d{3,6}(?:/\\d{1,4}){0,2}))|(?:\\b(\\d{3,6}(?:/\\d{1,4}){0,2})\\s*(?:hrsz\\b|helyrajzi\\s+sz))"
+ "parcel_re": "(?:\\bhrsz\\.?\\s*:?\\s*(\\d{3,6}(?:/\\d{1,4}){0,2}))|(?:\\b(\\d{3,6}(?:/\\d{1,4}){0,2})\\s*(?:hrsz\\b|helyrajzi\\s+sz))",
+ "glossary": {
+  "M": "mitigation: cutting greenhouse gas emissions",
+  "A": "adaptation: coping with heat, drought and floods that are coming anyway",
+  "Sz": "szemléletformálás: awareness raising, changing how people think and act",
+  "Stratégiai cél": "strategic goal, the top level of the plan (e.g. M1)",
+  "Tematikus cél": "thematic goal, one theme inside a strategic goal (e.g. M1.2)",
+  "Intézkedés": "measure, a concrete action the district promises (e.g. M1.2.1)",
+  "Felelős": "who is responsible",
+  "Időtáv": "timeframe",
+  "Indikátor": "indicator, how progress is measured",
+  "hrsz": "helyrajzi szám, the land-registry parcel number of a plot",
+  "EKR": "the national e-procurement system, EKR numbers identify public tenders",
+  "Ft": "forint, the Hungarian currency (HUF)"
+ }
 }

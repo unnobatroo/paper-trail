@@ -75,6 +75,9 @@ class LanguageProfile:
     intent_re: str = ""  # target-sentence verbs
     units_re: str = ""  # m2|%|db|fő|mm|°C|kWh|Ft
 
+    # term as it shows up in documents -> plain-english meaning, for the ui
+    glossary: dict[str, str] = field(default_factory=dict)
+
     def __hash__(self) -> int:  # dict fields aren't hashable, key on code
         return hash(self.code)
 

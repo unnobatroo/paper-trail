@@ -27,6 +27,7 @@ from ..domain.models import (
     EvidenceItem,
     EvidenceLink,
     ImplementationArtifact,
+    Note,
     OfficialSource,
     PolicyCandidate,
     SourceDocument,
@@ -185,6 +186,23 @@ class PolicyRepository(_Repo):
                    " VALUES (:c, :p, CURRENT_TIMESTAMP) ON CONFLICT(code) DO UPDATE"
                    " SET profile=excluded.profile, updated_at=excluded.updated_at",
                    c=code, p=_json(profile))
+
+    def notes(self, kind: str, ids: list[int]) -> dict[int, Note]:
+        if not ids:
+            return {}
+        rows = self._all("SELECT * FROM notes WHERE subject_kind=:k AND subject_id IN :ids",
+                         k=kind, ids=ids)
+        return {r["subject_id"]: Note.model_validate(dict(r)) for r in rows}
+
+    def put_note(self, note: Note) -> None:
+        p = note.model_dump()
+        self._exec("INSERT INTO notes(subject_kind, subject_id, title_en, summary_en, suggestion,"
+                   " reason_en, author, updated_at) VALUES (:subject_kind, :subject_id,"
+                   " :title_en, :summary_en, :suggestion, :reason_en, :author, CURRENT_TIMESTAMP)"
+                   " ON CONFLICT(subject_kind, subject_id) DO UPDATE SET"
+                   " title_en=excluded.title_en, summary_en=excluded.summary_en,"
+                   " suggestion=excluded.suggestion, reason_en=excluded.reason_en,"
+                   " author=excluded.author, updated_at=excluded.updated_at", **p)
 
     def commitments(self, kind: CandidateType | None = None) -> list[Commitment]:
         if kind:

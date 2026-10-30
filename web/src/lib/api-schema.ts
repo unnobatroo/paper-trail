@@ -454,6 +454,43 @@ export interface components {
          */
         CandidateType: "objective" | "measure" | "target" | "indicator" | "background" | "unclear";
         /**
+         * CandidateView
+         * @description a candidate plus its plain-english note, if someone wrote one
+         */
+        CandidateView: {
+            /** Code */
+            code: string | null;
+            /** Deadline Year */
+            deadline_year: number | null;
+            /** Document Id */
+            document_id: number;
+            /** Excerpt On Page */
+            excerpt_on_page: boolean | null;
+            /** Id */
+            id: number | null;
+            /** Normalized Title */
+            normalized_title: string;
+            note: components["schemas"]["Note"] | null;
+            /** Responsible Org */
+            responsible_org: string | null;
+            /** @default unreviewed */
+            review_status: components["schemas"]["ReviewStatus"];
+            /** Source Excerpt */
+            source_excerpt: string;
+            /** Source Page */
+            source_page: number;
+            /** @default unclear */
+            suggested_type: components["schemas"]["CandidateType"];
+            /** Target Value */
+            target_value: number | null;
+            /** Text */
+            text: string;
+            /** Timeframe */
+            timeframe: string | null;
+            /** Unit */
+            unit: string | null;
+        };
+        /**
          * Commitment
          * @description accepted objective/measure/target, parent_id is the whole hierarchy
          */
@@ -570,6 +607,13 @@ export interface components {
          * @enum {string}
          */
         EvidencePolarity: "affirmative" | "amendment" | "termination";
+        /** GlossaryTerm */
+        GlossaryTerm: {
+            /** Meaning */
+            meaning: string;
+            /** Term */
+            term: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -634,6 +678,7 @@ export interface components {
             budgets: components["schemas"]["BudgetRecord"][];
             evidence: components["schemas"]["EvidenceItem"] | null;
             link: components["schemas"]["EvidenceLink"];
+            note: components["schemas"]["Note"] | null;
         };
         /**
          * MatchFeatures
@@ -661,6 +706,8 @@ export interface components {
             deployment: string;
             /** Embed Model */
             embed_model: string;
+            /** Glossary */
+            glossary: components["schemas"]["GlossaryTerm"][];
             /** Language Profile Loaded */
             language_profile_loaded: boolean;
             /** Llm Extraction */
@@ -680,40 +727,33 @@ export interface components {
             translation: boolean;
         };
         /**
-         * PolicyCandidate
-         * @description maybe-commitment from the pdf. always has a page + verbatim excerpt
+         * Note
+         * @description plain-english take on a queue item + what the ai would decide. never decides itself
          */
-        PolicyCandidate: {
-            /** Code */
-            code: string | null;
-            /** Deadline Year */
-            deadline_year: number | null;
-            /** Document Id */
-            document_id: number;
-            /** Excerpt On Page */
-            excerpt_on_page: boolean | null;
-            /** Id */
-            id: number | null;
-            /** Normalized Title */
-            normalized_title: string;
-            /** Responsible Org */
-            responsible_org: string | null;
-            /** @default unreviewed */
-            review_status: components["schemas"]["ReviewStatus"];
-            /** Source Excerpt */
-            source_excerpt: string;
-            /** Source Page */
-            source_page: number;
-            /** @default unclear */
-            suggested_type: components["schemas"]["CandidateType"];
-            /** Target Value */
-            target_value: number | null;
-            /** Text */
-            text: string;
-            /** Timeframe */
-            timeframe: string | null;
-            /** Unit */
-            unit: string | null;
+        Note: {
+            /** Author */
+            author: string;
+            /**
+             * Reason En
+             * @default
+             */
+            reason_en: string;
+            /** Subject Id */
+            subject_id: number;
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "candidate" | "link";
+            /**
+             * Suggestion
+             * @enum {string}
+             */
+            suggestion: "accept" | "reject" | "unsure";
+            /** Summary En */
+            summary_en: string;
+            /** Title En */
+            title_en: string;
         };
         /**
          * RelationshipType
@@ -814,7 +854,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PolicyCandidate"][];
+                    "application/json": components["schemas"]["CandidateView"][];
                 };
             };
             /** @description Validation Error */

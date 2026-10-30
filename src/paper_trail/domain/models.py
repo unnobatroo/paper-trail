@@ -5,6 +5,7 @@ commitments only exist once a person accepts one
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,6 +39,18 @@ class SourceDocument(DomainModel):
     title: str
     publisher: str
     url: str = ""
+
+
+class Note(DomainModel):
+    """plain-english take on a queue item + what the ai would decide. never decides itself"""
+
+    subject_kind: Literal["candidate", "link"]
+    subject_id: int
+    title_en: str
+    summary_en: str
+    suggestion: Literal["accept", "reject", "unsure"]
+    reason_en: str = ""
+    author: str  # who wrote it, model or person
 
 
 class OfficialSource(DomainModel):

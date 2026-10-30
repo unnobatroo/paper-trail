@@ -206,6 +206,161 @@
         "title": "CandidateType",
         "type": "string"
       },
+      "CandidateView": {
+        "description": "a candidate plus its plain-english note, if someone wrote one",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "deadline_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Year"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "integer"
+          },
+          "excerpt_on_page": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt On Page"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "normalized_title": {
+            "minLength": 1,
+            "title": "Normalized Title",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Note"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "responsible_org": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Org"
+          },
+          "review_status": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "default": "unreviewed"
+          },
+          "source_excerpt": {
+            "minLength": 1,
+            "title": "Source Excerpt",
+            "type": "string"
+          },
+          "source_page": {
+            "minimum": 1.0,
+            "title": "Source Page",
+            "type": "integer"
+          },
+          "suggested_type": {
+            "$ref": "#/components/schemas/CandidateType",
+            "default": "unclear"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "suggested_type",
+          "text",
+          "normalized_title",
+          "source_page",
+          "source_excerpt",
+          "code",
+          "excerpt_on_page",
+          "responsible_org",
+          "timeframe",
+          "deadline_year",
+          "unit",
+          "target_value",
+          "review_status",
+          "note"
+        ],
+        "title": "CandidateView",
+        "type": "object"
+      },
       "Commitment": {
         "description": "accepted objective/measure/target, parent_id is the whole hierarchy",
         "properties": {
@@ -575,6 +730,24 @@
         "title": "EvidencePolarity",
         "type": "string"
       },
+      "GlossaryTerm": {
+        "properties": {
+          "meaning": {
+            "title": "Meaning",
+            "type": "string"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "meaning"
+        ],
+        "title": "GlossaryTerm",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -742,12 +915,23 @@
           },
           "link": {
             "$ref": "#/components/schemas/EvidenceLink"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Note"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "link",
           "evidence",
-          "budgets"
+          "budgets",
+          "note"
         ],
         "title": "LinkView",
         "type": "object"
@@ -802,6 +986,13 @@
             "title": "Embed Model",
             "type": "string"
           },
+          "glossary": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTerm"
+            },
+            "title": "Glossary",
+            "type": "array"
+          },
           "language_profile_loaded": {
             "title": "Language Profile Loaded",
             "type": "boolean"
@@ -844,153 +1035,64 @@
           "llm_extraction",
           "review_required",
           "translation",
-          "language_profile_loaded"
+          "language_profile_loaded",
+          "glossary"
         ],
         "title": "MetaOut",
         "type": "object"
       },
-      "PolicyCandidate": {
-        "description": "maybe-commitment from the pdf. always has a page + verbatim excerpt",
+      "Note": {
+        "description": "plain-english take on a queue item + what the ai would decide. never decides itself",
         "properties": {
-          "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Code"
+          "author": {
+            "title": "Author",
+            "type": "string"
           },
-          "deadline_year": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deadline Year"
+          "reason_en": {
+            "default": "",
+            "title": "Reason En",
+            "type": "string"
           },
-          "document_id": {
-            "title": "Document Id",
+          "subject_id": {
+            "title": "Subject Id",
             "type": "integer"
           },
-          "excerpt_on_page": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
+          "subject_kind": {
+            "enum": [
+              "candidate",
+              "link"
             ],
-            "title": "Excerpt On Page"
-          },
-          "id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id"
-          },
-          "normalized_title": {
-            "minLength": 1,
-            "title": "Normalized Title",
+            "title": "Subject Kind",
             "type": "string"
           },
-          "responsible_org": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+          "suggestion": {
+            "enum": [
+              "accept",
+              "reject",
+              "unsure"
             ],
-            "title": "Responsible Org"
-          },
-          "review_status": {
-            "$ref": "#/components/schemas/ReviewStatus",
-            "default": "unreviewed"
-          },
-          "source_excerpt": {
-            "minLength": 1,
-            "title": "Source Excerpt",
+            "title": "Suggestion",
             "type": "string"
           },
-          "source_page": {
-            "minimum": 1.0,
-            "title": "Source Page",
-            "type": "integer"
-          },
-          "suggested_type": {
-            "$ref": "#/components/schemas/CandidateType",
-            "default": "unclear"
-          },
-          "target_value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Target Value"
-          },
-          "text": {
-            "minLength": 1,
-            "title": "Text",
+          "summary_en": {
+            "title": "Summary En",
             "type": "string"
           },
-          "timeframe": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timeframe"
-          },
-          "unit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unit"
+          "title_en": {
+            "title": "Title En",
+            "type": "string"
           }
         },
         "required": [
-          "id",
-          "document_id",
-          "suggested_type",
-          "text",
-          "normalized_title",
-          "source_page",
-          "source_excerpt",
-          "code",
-          "excerpt_on_page",
-          "responsible_org",
-          "timeframe",
-          "deadline_year",
-          "unit",
-          "target_value",
-          "review_status"
+          "subject_kind",
+          "subject_id",
+          "title_en",
+          "summary_en",
+          "suggestion",
+          "reason_en",
+          "author"
         ],
-        "title": "PolicyCandidate",
+        "title": "Note",
         "type": "object"
       },
       "RelationshipType": {
@@ -1241,7 +1343,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/PolicyCandidate"
+                    "$ref": "#/components/schemas/CandidateView"
                   },
                   "title": "Response Candidates Api Candidates Get",
                   "type": "array"

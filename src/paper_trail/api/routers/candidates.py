@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.enums import ReviewStatus
-from ...domain.models import PolicyCandidate
 from ..deps import get_state, require_review_key
-from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest
+from ..schemas import AcceptCandidateRequest, BulkCandidatesRequest, CandidateView
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 
@@ -16,8 +15,10 @@ router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 @router.get("")
 def candidates(status: ReviewStatus | None = None,
                state: AppState = Depends(get_state)
-               ) -> list[PolicyCandidate]:
-    return state.policy.candidates(status)
+               ) -> list[CandidateView]:
+    rows = state.policy.candidates(status)
+    notes = state.policy.notes("candidate", [c.id for c in rows])
+    return [CandidateView(**c.model_dump(), note=notes.get(c.id)) for c in rows]
 
 
 @router.post("/{candidate_id}/accept",

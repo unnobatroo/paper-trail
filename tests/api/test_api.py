@@ -1,5 +1,6 @@
 """api smoke tests, offline: sqlite, hashing embeddings, fixture search, stub fetcher"""
 
+import json
 import time
 
 import pytest
@@ -160,3 +161,32 @@ def test_request_id_round_trips(client):
     echoed = client.get("/healthz", headers={"X-Request-ID": "a" * 32})
     assert echoed.headers["X-Request-ID"] == "a" * 32
     assert len(client.get("/healthz").headers["X-Request-ID"]) == 32
+
+
+def test_notes_ride_along_but_never_decide(client, state, tmp_path):
+    from paper_trail.domain.enums import CandidateType
+    from paper_trail.domain.models import PolicyCandidate, SourceDocument
+    from paper_trail.maintenance import main
+    doc_id = state.policy.add_document(SourceDocument(title="t", publisher="p"))
+    cand_id = state.policy.add_candidate(PolicyCandidate(
+        document_id=doc_id, suggested_type=CandidateType.MEASURE,
+        text="Utcai fák ültetése", normalized_title="Utcafásítás",
+        source_page=1, source_excerpt="…fák ültetése…", excerpt_on_page=True))
+    f = tmp_path / "notes.jsonl"
+    f.write_text(json.dumps({"subject_kind": "candidate", "subject_id": cand_id,
+                             "title_en": "Street trees", "summary_en": "plant trees on streets",
+                             "suggestion": "accept", "reason_en": "a concrete measure",
+                             "author": "claude"}) + "\n")
+    assert main(["notes", "import", str(f)]) == 0
+    assert main(["notes", "import", str(f)]) == 0  # re-import updates, no dupes
+
+    cand = client.get("/api/candidates").json()[0]
+    assert cand["note"]["title_en"] == "Street trees"
+    assert cand["note"]["suggestion"] == "accept"
+    # a suggestion is just text, the candidate is still waiting for a person
+    assert cand["review_status"] == "unreviewed"
+
+
+def test_meta_glossary_comes_from_the_profile(client):
+    glossary = client.get("/api/meta").json()["glossary"]
+    assert {"term": "M", "meaning": "mitigation: cutting greenhouse gas emissions"} in glossary
