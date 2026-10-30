@@ -27,6 +27,7 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "asgi-correlation-id>=5.0.1",
     "tenacity>=9",
+    "typer>=0.16",
 ]
 
 [project.optional-dependencies]

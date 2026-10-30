@@ -2100,6 +2100,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tenacity" },
     { name = "trafilatura" },
+    { name = "typer" },
     { name = "uvicorn" },
 ]
 
@@ -2144,6 +2145,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2" },
     { name = "tenacity", specifier = ">=9" },
     { name = "trafilatura", specifier = ">=2.2.0" },
+    { name = "typer", specifier = ">=0.16" },
     { name = "uvicorn", specifier = ">=0.30.0" },
 ]
 provides-extras = ["parsing", "hungarian", "ner"]
