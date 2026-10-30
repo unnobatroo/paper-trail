@@ -1,4 +1,4 @@
-"""rest api. `make dev-api`, docs at /docs, slow stuff runs as jobs"""
+"""rest api, served next to the ui by `make dev`. docs at /docs, slow stuff runs as jobs"""
 
 from __future__ import annotations
 

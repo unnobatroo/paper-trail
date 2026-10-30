@@ -8,7 +8,7 @@
   network or keys, it probably doesn't belong in the suite)
 - [ ] Honesty rules preserved: nothing auto-accepted, provenance intact,
   money typed, status quoted, MT labelled
-- [ ] New providers implement the existing ABCs (no vendor logic in services)
+- [ ] New providers match the existing small interface (no vendor logic in services)
 - [ ] If dependencies changed: `uv lock`
 - [ ] Wiki docs updated if behaviour changed
 
