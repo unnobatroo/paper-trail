@@ -64,9 +64,10 @@ def main() -> int:
 
     # the official-source catalogue is DB data — mirror it into the local
     # SQLite so offline evidence searches check the same registry as prod
-    from paper_trail.domain.models import OfficialSource
     from paper_trail.infrastructure.supabase_client import create
     from paper_trail.repositories.store import EvidenceRepository
+
+    from paper_trail.domain.models import OfficialSource
 
     rows = (create(settings.supabase_url, settings.supabase_key)
             .table("official_sources").select("*")
