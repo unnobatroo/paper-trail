@@ -47,7 +47,6 @@ x-application: &application
     MODEL_CACHE: /app/model-cache
     HF_HOME: /app/model-cache/huggingface
     XDG_CACHE_HOME: /app/model-cache
-    DB: /app/data/paper_trail.db
     OMP_NUM_THREADS: "2"
     TOKENIZERS_PARALLELISM: "false"
   volumes:

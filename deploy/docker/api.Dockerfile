@@ -3,7 +3,10 @@ FROM ghcr.io/astral-sh/uv:0.11.2 AS uv
 FROM python:3.12-slim AS base
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 \
+    NICEGUI_STORAGE_PATH=/app/data/.nicegui
+# ^ the ui's per-browser storage (review key, language). /app isn't writable for the app
+# user, the data volume is and survives restarts; dotfile so the document list skips it
 RUN groupadd --gid 10001 papertrail && useradd --uid 10001 --gid 10001 --create-home papertrail
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
