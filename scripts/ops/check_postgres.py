@@ -39,7 +39,7 @@ def refused(what):
 
 
 def main():
-    url = os.environ["PAPER_TRAIL_TEST_DATABASE_URL"]
+    url = os.environ["TEST_DATABASE_URL"]
     with connect(url) as conn:
         if conn.execute("SELECT to_regclass('public.documents') present").fetchone()["present"]:
             raise RuntimeError("integration checks require an empty disposable database")
@@ -56,7 +56,7 @@ def main():
     subprocess.run(
         ["alembic", "-c", "db/alembic.ini", "upgrade", "head"],
         check=True,
-        env={**os.environ, "PAPER_TRAIL_DATABASE_URL": url},
+        env={**os.environ, "DATABASE_URL": url},
     )
     api = make_conninfo(url, user="paper_trail_api")
     worker_url = make_conninfo(url, user="paper_trail_worker")

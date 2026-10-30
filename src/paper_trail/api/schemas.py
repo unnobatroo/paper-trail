@@ -107,7 +107,7 @@ class TranslateRequest(BaseModel):
 class MetaOut(DomainModel):
     """what this deployment runs"""
     deployment: str
-    storage: Literal["postgres", "sqlite"]
+    storage: Literal["postgres"]
     embed_model: str
     reranker: str
     search_provider: str

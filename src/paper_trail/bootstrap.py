@@ -1,8 +1,4 @@
-"""wires one AppState from settings, used by the api, scripts and tests
-
-postgres if PAPER_TRAIL_DATABASE_URL is set, else sqlite + file caches.
-never keep a sqlite connection here, jobs run on other threads
-"""
+"""wires one AppState from settings, used by the api, scripts and tests"""
 
 from __future__ import annotations
 
@@ -10,7 +6,6 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 from .infrastructure.settings import Settings, load
 from .ml.embeddings import get_provider
@@ -19,7 +14,7 @@ from .ml.lang import LanguageProfile
 from .ml.ner import get_ner
 from .ml.rerank import get_reranker
 from .repositories.ports import EvidenceStore, PolicyStore
-from .repositories.sqlite.files import FilePageStore, FileVectorIndex
+from .repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
 from .repositories.store import EvidenceRepository, PolicyRepository
 from .services.evidence_service import EvidenceService
 from .services.ingestion_service import IngestionService
@@ -45,7 +40,7 @@ class AppState:
 
 
 def _baseline_year(settings: Settings, policy) -> int | None:
-    """strategy year: PAPER_TRAIL_BASELINE_YEAR, else the earliest /YYYY/MM/ in a doc url"""
+    """strategy year: BASELINE_YEAR, else the earliest /YYYY/MM/ in a doc url"""
     if settings.baseline_year:
         return settings.baseline_year
     years = [
@@ -70,25 +65,17 @@ def build_state(settings: Settings | None = None) -> AppState:
     settings = settings or load()
     if settings.model_ca_bundle:
         # .env values don't reach os.environ on their own, ModelClient reads it there
-        os.environ.setdefault("PAPER_TRAIL_MODEL_CA_BUNDLE", str(settings.model_ca_bundle))
+        os.environ.setdefault("MODEL_CA_BUNDLE", str(settings.model_ca_bundle))
     analyzer = None
     if settings.nlp == "huspacy":
         from .ml.nlp import HuSpacyAnalyzer
         analyzer = HuSpacyAnalyzer()
-    # one store for both, the url picks postgres or the sqlite file
-    policy = PolicyRepository(settings.database_url or settings.db_path)
-    evidence = EvidenceRepository(settings.database_url or settings.db_path)
+    policy = PolicyRepository(settings.database_url)
+    evidence = EvidenceRepository(settings.database_url)
     profile = load_profile(policy, settings.language)
     docs: DocumentStore = LocalDocumentStore(settings.document_dir or settings.seed_dir)
-    if settings.database_url:
-        from .repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
-        page_store = PostgresPageStore(settings.database_url)
-        vector_index = PostgresVectorIndex(settings.database_url, ts_config=profile.ts_config,
-                                           analyzer=analyzer)
-    else:
-        cache_dir = Path(settings.db_path).parent / "fetched"
-        page_store = FilePageStore(cache_dir)
-        vector_index = FileVectorIndex(cache_dir, stemmer_language=profile.stemmer,
+    page_store = PostgresPageStore(settings.database_url)
+    vector_index = PostgresVectorIndex(settings.database_url, ts_config=profile.ts_config,
                                        analyzer=analyzer)
 
     from .sources.parsers import (

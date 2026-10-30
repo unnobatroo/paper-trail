@@ -1,4 +1,4 @@
-"""what services need from storage. sqlite/ and postgres/ implement all of it,
+"""what services need from storage, postgres/ + store.py implement it,
 services never touch a concrete backend
 """
 
@@ -113,7 +113,7 @@ class EvidenceStore(Protocol):
     def place_names(self) -> list[str]: ...
 
 
-# page + vector caches: files on sqlite, tables + pgvector on postgres
+# page + vector caches: tables + pgvector
 
 
 class PageStore(ABC):

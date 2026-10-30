@@ -33,7 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 parsing = ["docling>=2"]
 hungarian = ["spacy>=3.8,<3.9"]
-# PAPER_TRAIL_NER=gliner, multilingual ner on cpu
+# NER=gliner, multilingual ner on cpu
 ner = ["gliner>=0.2"]
 
 [dependency-groups]

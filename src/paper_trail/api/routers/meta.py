@@ -20,20 +20,13 @@ def healthz() -> dict:
 @router.get("/readyz")
 def readyz(state: AppState = Depends(get_state)) -> dict:
     try:
-        if state.settings.database_url:
-            import psycopg
-            with psycopg.connect(state.settings.database_url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1 FROM jobs LIMIT 1")
-                    cur.execute("INSERT INTO readiness_probe(id,checked_at) VALUES(1,now()) "
-                                "ON CONFLICT(id) DO UPDATE SET checked_at=excluded.checked_at")
-                conn.rollback()
-        else:
-            import sqlite3
-            with sqlite3.connect(state.settings.db_path) as conn:
-                conn.execute("CREATE TEMP TABLE paper_trail_probe (value integer)")
-                conn.execute("INSERT INTO paper_trail_probe VALUES (1)")
-                conn.rollback()
+        import psycopg
+        with psycopg.connect(state.settings.database_url) as conn:
+            # a real write, rolled back: proves the role can still write, not just read
+            conn.execute("SELECT 1 FROM jobs LIMIT 1")
+            conn.execute("INSERT INTO readiness_probe(id,checked_at) VALUES(1,now()) "
+                         "ON CONFLICT(id) DO UPDATE SET checked_at=excluded.checked_at")
+            conn.rollback()
     except Exception as exc:
         raise HTTPException(503, "storage readiness check failed") from exc
     return {"ok": True}
@@ -44,7 +37,7 @@ def meta(state: AppState = Depends(get_state)) -> MetaOut:
     s = state.settings
     return MetaOut(**{
         "deployment": s.deployment,
-        "storage": "postgres" if s.database_url else "sqlite",
+        "storage": "postgres",
         "embed_model": s.embed_model,
         "reranker": s.reranker_model,
         "search_provider": s.search_provider,

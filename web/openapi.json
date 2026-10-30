@@ -1019,10 +1019,7 @@
             "type": "string"
           },
           "storage": {
-            "enum": [
-              "postgres",
-              "sqlite"
-            ],
+            "const": "postgres",
             "title": "Storage",
             "type": "string"
           },

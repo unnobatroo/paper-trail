@@ -17,7 +17,7 @@ def get_state() -> AppState:
 
 
 def require_review_key(request: Request, state: AppState = Depends(get_state)) -> None:
-    """write gate when PAPER_TRAIL_REVIEW_KEY is set. shared secret, not real auth"""
+    """write gate when REVIEW_KEY is set. shared secret, not real auth"""
     key = state.settings.review_key
     given = request.headers.get("x-review-key", "")
     if key and not hmac.compare_digest(given.encode(), key.encode()):
@@ -39,7 +39,7 @@ def _handlers():
         if n == 0:
             # zero candidates looks like a bug, so say why
             result["warnings"] = [
-                "no commitments were extracted. is an llm configured (PAPER_TRAIL_LLM_*) "
+                "no commitments were extracted. is an llm configured (LLM_*) "
                 "and is goethe in the extraction phase?",
             ]
         return result
@@ -58,9 +58,9 @@ def _handlers():
 
 @lru_cache
 def get_jobs():
-    """postgres queue in prod, in-process for dev/tests"""
+    """the postgres queue + worker when JOB_MODE=external (prod), in-process otherwise"""
     settings = get_state().settings
-    if settings.database_url:
+    if settings.job_mode == "external":
         from ..repositories.postgres.jobs import PostgresJobRunner
 
         return PostgresJobRunner(settings.database_url)

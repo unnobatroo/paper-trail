@@ -5,7 +5,7 @@ import os
 from alembic import context
 from sqlalchemy import create_engine
 
-url = os.environ["PAPER_TRAIL_DATABASE_URL"]
+url = os.environ["DATABASE_URL"]
 if url.startswith("postgresql://"):
     url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 if context.is_offline_mode():

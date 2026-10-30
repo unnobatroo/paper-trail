@@ -1,4 +1,4 @@
-"""regression: repos hold a db path, not a connection, so a repo made on one
+"""regression: repos hold a dsn, not a connection, so a repo made on one
 thread works on any other (jobs run on worker threads)
 """
 
@@ -19,9 +19,9 @@ def _seed(policy: PolicyRepository) -> int:
     return policy.add_candidate(cand)
 
 
-def test_repo_created_on_one_thread_used_on_another(db_path):
-    policy = PolicyRepository(db_path)  # created on this thread
-    evidence = EvidenceRepository(db_path)
+def test_repo_created_on_one_thread_used_on_another(dsn):
+    policy = PolicyRepository(dsn)  # created on this thread
+    evidence = EvidenceRepository(dsn)
     cand_id = _seed(policy)
 
     errors = []
@@ -32,7 +32,7 @@ def test_repo_created_on_one_thread_used_on_another(db_path):
             assert [c.id for c in cands] == [cand_id]
             assert policy.documents()[0].title == "Strategy"
             assert evidence.links() == []
-        except Exception as e:  # sqlite3.ProgrammingError
+        except Exception as e:
             errors.append(e)
 
     t = threading.Thread(target=work)
@@ -41,8 +41,8 @@ def test_repo_created_on_one_thread_used_on_another(db_path):
     assert not errors, errors
 
 
-def test_write_from_other_thread_commits(db_path):
-    policy = PolicyRepository(db_path)
+def test_write_from_other_thread_commits(dsn):
+    policy = PolicyRepository(dsn)
     errors = []
 
     def work():

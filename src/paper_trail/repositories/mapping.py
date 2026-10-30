@@ -1,4 +1,4 @@
-"""db rows -> domain models, one place for sqlite and postgres"""
+"""db rows -> domain models, in one place"""
 
 from __future__ import annotations
 

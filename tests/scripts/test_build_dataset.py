@@ -14,8 +14,8 @@ build_dataset = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(build_dataset)
 
 
-def test_only_human_decisions_become_labels(tmp_path, monkeypatch):
-    repo = PolicyRepository(tmp_path / "t.db")
+def test_only_human_decisions_become_labels(dsn, monkeypatch):
+    repo = PolicyRepository(dsn)
     doc = repo.add_document(SourceDocument(title="t", publisher="p"))
 
     def cand(page, text, status):

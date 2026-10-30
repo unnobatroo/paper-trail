@@ -1,7 +1,7 @@
 """seed the gazetteer with a district's named streets, squares and parks from openstreetmap
 
   uv run python scripts/ops/seed_gazetteer.py "VIII. kerület" --admin-level 9   # sqlite
-  PAPER_TRAIL_DATABASE_URL=... uv run python scripts/ops/seed_gazetteer.py "..."   # postgres
+  DATABASE_URL=... uv run python scripts/ops/seed_gazetteer.py "..."   # postgres
 
 --admin-level narrows same-named areas: 9 = budapest district, 8 = most towns
 

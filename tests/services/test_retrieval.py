@@ -5,13 +5,13 @@
 - embeddings cached by content hash, no re-embedding on repeat runs
 """
 
-import hashlib
-import json
+from datetime import date
 
 from paper_trail.domain.enums import CandidateType, ReviewStatus, Status
 from paper_trail.domain.models import Commitment, OfficialSource
 from paper_trail.ml.embeddings import HashingProvider
 from paper_trail.ml.rerank import Reranker
+from paper_trail.repositories.postgres.index import PostgresPageStore
 from paper_trail.repositories.store import EvidenceRepository
 from paper_trail.services.evidence_service import (
     _CHUNK,
@@ -54,15 +54,11 @@ class _Search:
 def _svc(tmp_path, repo: EvidenceRepository, policy, text: str,
          embedder=None, page_date=None, **kw
          ) -> tuple[EvidenceService, Commitment]:
-    cache = tmp_path / "fetched"
-    cache.mkdir(exist_ok=True)
-    key = hashlib.sha256(URL.encode()).hexdigest()[:16]
-    (cache / f"{key}.txt").write_text(text, encoding="utf-8")
-    (cache / f"{key}.json").write_text(
-        json.dumps({"title": "Utcafásítás", "date": page_date}))
+    # the page is already fetched: sits in the page store, the fetcher never runs
+    PostgresPageStore(repo.dsn).put(FetchedPage(
+        URL, "Utcafásítás", text, date.fromisoformat(page_date) if page_date else None))
     svc = EvidenceService(repo, _Search(),
-                          embedder or _CountingEmbedder(),
-                          cache_dir=cache, fetcher=lambda u, d=None: None,
+                          embedder or _CountingEmbedder(), fetcher=lambda u, d=None: None,
                           profile=HU, allowed_domains=("rev8.hu",), **kw)
     cid = policy.add_commitment(
         Commitment(kind=CandidateType.MEASURE, title="Utcafásítás"))

@@ -1,7 +1,7 @@
 services:
   worker:
     environment:
-      PAPER_TRAIL_PARSER_DEVICE: cuda
+      PARSER_DEVICE: cuda
     deploy:
       resources:
         reservations:

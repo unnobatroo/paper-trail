@@ -148,7 +148,7 @@ class NoExtractor:
     """no llm configured: ingest still records the document, it just finds nothing"""
 
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
-        log.warning("no llm configured (PAPER_TRAIL_LLM_*), nothing extracted")
+        log.warning("no llm configured (LLM_*), nothing extracted")
         return []
 
 

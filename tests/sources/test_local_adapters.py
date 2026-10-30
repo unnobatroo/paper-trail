@@ -129,7 +129,7 @@ def test_evidence_entities_see_only_matched_passage(policy, evidence, tmp_path):
             seen.append(text)
             return Found()
     svc = EvidenceService(evidence, SimpleNamespace(search=lambda *a, **kw: []),
-                          HashingProvider(), cache_dir=tmp_path, ner=SpyNer())
+                          HashingProvider(), ner=SpyNer())
     svc._collect_urls = lambda *a: [url]
     svc._fetch_page = lambda *a: page
     svc._rank = lambda *a: [(page, "Matched trees 2024.", 0.8)]
