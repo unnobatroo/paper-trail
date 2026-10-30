@@ -81,13 +81,22 @@ def test_gliner_ner_buckets_and_dedupes(monkeypatch):
             {"label": "street, square or park", "text": "Losonci téren"},
             {"label": "date", "text": "2024. március 15-én"}]
     # stub the model, the real one is a 1 gb download
-    model = type("M", (), {"predict_entities": lambda *a, **k: fake})()
+    model = type("M", (), {"inference": lambda self, chunks, *a, **k: [fake for _ in chunks]})()
     monkeypatch.setattr(GlinerNer, "_model", model)
     found = ner.find("x")
     assert (found.orgs, found.places, found.dates) == (
         ["RÉV8 Zrt."], ["Losonci téren"], ["2024. március 15-én"])
     # bare years ride along, matching compares those
     assert ner.find("terv 2030-ra").dates == ["2024. március 15-én", "2030"]
+    assert ner.find("   ").orgs == []
+
+
+def test_gliner_chunks_split_on_words_and_cover_everything():
+    from paper_trail.ml.ner import _chunks
+    text = " ".join(f"szó{i}" for i in range(500))
+    chunks = _chunks(text, 100)
+    assert all(len(c) <= 100 for c in chunks)
+    assert " ".join(chunks) == text and _chunks("", 100) == []
 
 
 def test_no_ner_keeps_only_years():

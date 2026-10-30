@@ -30,6 +30,8 @@ from peft import LoraConfig
 from transformers import AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
+MAX_LEN = 4096
+
 
 def main(base: str, dataset_repo: str, out_repo: str) -> None:
     # a local .jsonl works too, that's how the smoke test runs it
@@ -38,13 +40,18 @@ def main(base: str, dataset_repo: str, out_repo: str) -> None:
     # prompt/completion: loss on the json answer only, not on the page text
     data = rows.map(lambda r: {"prompt": r["messages"][:1], "completion": r["messages"][1:]},
                     remove_columns=rows.column_names)
+    # trl cuts over-long rows at the end = half a json answer as the target, drop them instead
+    tok = AutoTokenizer.from_pretrained(base)
+    fits = data.filter(lambda r: len(tok.apply_chat_template(
+        r["prompt"] + r["completion"], tokenize=True)) <= MAX_LEN)
+    print(f"{len(data) - len(fits)} rows over {MAX_LEN} tokens dropped")
+    data = fits
     args = SFTConfig(
         output_dir="out", num_train_epochs=3, learning_rate=1e-4,
         per_device_train_batch_size=1, gradient_accumulation_steps=8,
         gradient_checkpointing=True, bf16=torch.cuda.is_available(),
         max_steps=int(os.environ.get("MAX_STEPS", -1)),
-        # 6000-char pages + a json answer fit, longer ones get cut at the end
-        max_length=4096, logging_steps=5, save_strategy="no", report_to="none")
+        max_length=MAX_LEN, logging_steps=5, save_strategy="no", report_to="none")
     lora = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all-linear",
                       task_type="CAUSAL_LM")
     trainer = SFTTrainer(model=base, args=args, train_dataset=data, peft_config=lora)

@@ -48,6 +48,13 @@ def test_llm_turns_off_qwen3_thinking_and_keeps_only_verbatim_receipts(
     assert [c.source_excerpt for c in found] == ["2030-ra 40%-kal csökken"]
 
 
+def test_lead_code_comes_off_the_title():
+    from paper_trail.ml.extraction import lead_code
+    assert [lead_code(t) for t in ("M1.1.2 Távhő", "Ks1: szabályok", "Má-1 ÜHG", "Ms-3",
+                                   "2030-ra csökken", "Távhő fejlesztése", "A1. cél")] == [
+        "M1.1.2", "Ks1", "Má-1", "Ms-3", None, None, "A1"]
+
+
 def test_profile_roundtrips_and_no_llm_finds_nothing():
     from paper_trail.ml.lang import LanguageProfile
     assert LanguageProfile.from_dict(HU.to_dict()) == HU

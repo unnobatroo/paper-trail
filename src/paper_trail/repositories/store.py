@@ -245,7 +245,9 @@ class EvidenceRepository(Repo):
                 " polarity, flags, procurement_ids, parcels) VALUES (:commitment_id, :url,"
                 " :title, :publisher, :published_on, :snippet, :orgs, :locs, :dates, :hint,"
                 " :excerpt, :polarity, :flags, :ids, :parcels) ON CONFLICT(commitment_id, url)"
-                " DO UPDATE SET snippet=excluded.snippet, status_hint=excluded.status_hint,"
+                " DO UPDATE SET snippet=excluded.snippet, organisations=excluded.organisations,"
+                " locations=excluded.locations, dates_mentioned=excluded.dates_mentioned,"
+                " status_hint=excluded.status_hint,"
                 " status_excerpt=excluded.status_excerpt, polarity=excluded.polarity,"
                 " flags=excluded.flags, procurement_ids=excluded.procurement_ids,"
                 " parcels=excluded.parcels WHERE NOT EXISTS (SELECT 1 FROM links l"
@@ -272,6 +274,9 @@ class EvidenceRepository(Repo):
                 " shared_organisations, shared_locations, shared_dates, suggested_relationship,"
                 " reasons) VALUES (:c, :e, :score, :sim, :orgs, :locs, :dates, :rel, :reasons)"
                 " ON CONFLICT(commitment_id, evidence_id) DO UPDATE SET score=excluded.score,"
+                " similarity=excluded.similarity,"
+                " shared_organisations=excluded.shared_organisations,"
+                " shared_locations=excluded.shared_locations, shared_dates=excluded.shared_dates,"
                 " suggested_relationship=excluded.suggested_relationship,"
                 " reasons=excluded.reasons WHERE links.review_status = 'unreviewed'"),
                 {"c": link.commitment_id, "e": link.evidence_id, "score": link.score,

@@ -39,10 +39,13 @@ def main() -> None:
             pages[row["pdf"]] = [squash(p.text) for p in read_pages(args.docs / row["pdf"])]
         text = pages[row["pdf"]]
         on_page = 0 < row["page"] <= len(text)
+        quote = squash(row.get("quote") or "")
         if row.get("empty"):
-            ok = on_page
+            # an "empty" page with a quote is a contradiction, training would get []
+            ok = on_page and not quote
         else:
-            ok = on_page and squash(row["quote"]) in text[row["page"] - 1]
+            # "" is in every string, so a blank quote would sail through
+            ok = on_page and bool(quote) and quote in text[row["page"] - 1]
         (kept if ok else failed).append(row)
     args.out.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in kept))
     by_doc: dict[str, list[int]] = {}
@@ -53,8 +56,12 @@ def main() -> None:
     for r in failed:
         print(f"FAIL {r['doc']} p{r['page']}: {r.get('quote', '')[:80]!r}")
     for doc in sorted(by_doc) if args.sample else []:
-        pool = [r for r in kept if r["doc"] == doc and not r.get("empty")]
+        # empty labels too, a wrong one teaches the model to skip a real page
+        pool = [r for r in kept if r["doc"] == doc]
         for r in random.Random(0).sample(pool, min(args.sample, len(pool))):
+            if r.get("empty"):
+                print(f"CHECK {doc} p{r['page']} (nothing to extract)")
+                continue
             print(f"CHECK {doc} p{r['page']} [{r.get('code') or '-'}] {r['title_en']}"
                   f"\n      \"{r['quote']}\"")
 
