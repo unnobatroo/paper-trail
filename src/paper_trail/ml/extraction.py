@@ -75,13 +75,15 @@ def extraction_prompt(profile: LanguageProfile, pages: list[DocumentPage]) -> st
 
 # leading section code the prompt asks the model to keep: "M1.2", "Ks1", "Má-1"
 # or a dotted number ("1.01"); one dot minimum so a bare year isn't a code
-_CODE = re.compile(r"^([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*|\d+(?:\.\d+)+)"
-                   r"(?=[\s:.)\-]|$)")
+_CODE = re.compile(
+    r"^(?:([A-ZÁÉÍÓÖŐÚÜŰ][a-záéíóöőúüű]{0,2}-?\d+(?:\.\d+)*)(?=[\s:.)\-]|$)"
+    # bare dotted number only before a capitalised heading: "1.01 Carbon", not "1.5 million"
+    r"|(\d+(?:\.\d+)+)(?=\s+[A-ZÁÉÍÓÖŐÚÜŰ]))")
 
 
 def lead_code(title: str) -> str | None:
     m = _CODE.match(title.strip())
-    return m.group(1).rstrip(".") if m else None
+    return (m.group(1) or m.group(2)).rstrip(".") if m else None
 
 
 def grounded_title(title: str, text: str, page_text: str) -> tuple[str, str | None]:
@@ -114,13 +116,15 @@ def form_row(quote: str, labels: tuple[str, ...]) -> bool:
     """fact-sheet row ("Időtáv 2021-2030", "Felelős: Jegyző", "célkitűzés kódja Ms-1.3"):
     starts with a label, or is labels + codes + numbers with barely any words left"""
     low = " ".join(quote.casefold().split()).lstrip("•-–* :")
-    hits = [label for label in labels if label in low]
+    # whole words: "forrás" is a label, "forrásokat biztosít" is a commitment
+    words = {label: re.compile(rf"(?<!\w){re.escape(label)}(?!\w)") for label in labels}
+    hits = [label for label, rx in words.items() if rx.search(low)]
     if not hits:
         return False
-    if any(low.startswith(label) for label in hits):
+    if any(words[label].match(low) for label in hits):
         return True
     for label in sorted(hits, key=len, reverse=True):
-        low = low.replace(label, " ")
+        low = words[label].sub(" ", low)
     return len(re.findall(r"[^\W\d_]{3,}", low)) < 4
 
 
@@ -135,9 +139,11 @@ def norm(text: str) -> str:
 
 def same_passage(a: str, b: str) -> bool:
     """two quotes of the same text: a long shared run, not a stray "a város" or two.
-    numbers decide: "200 fa" and "500 fa" are two commitments however alike the rest is"""
+    numbers decide: "200 fa" and "500 fa" are two commitments however alike the rest is,
+    and a number-free quote isn't the same passage as one carrying a quantity"""
     a, b = sorted((norm(a), norm(b)), key=len)
-    if not a or not b or not set(re.findall(r"\d+", a)) <= set(re.findall(r"\d+", b)):
+    in_short, in_long = set(re.findall(r"\d+", a)), set(re.findall(r"\d+", b))
+    if not a or not b or not in_short <= in_long or (in_long and not in_short):
         return False
     run = SequenceMatcher(None, a, b, autojunk=False).find_longest_match().size
     return run >= 20 and run >= 0.5 * len(a)
@@ -197,10 +203,18 @@ class LLMExtractor:
         if reply is not None or depth == 0 or len(lines) < 2:
             return reply
         mid = len(lines) // 2
-        halves = [self._ask_page(page.model_copy(update={"text": "\n".join(part)}), depth - 1)
+        halves = [self._ask_half(page.model_copy(update={"text": "\n".join(part)}), depth - 1)
                   for part in (lines[:mid], lines[mid:])]
         items = [i for h in halves if h for i in h.items]
         return _Reply(items=items) if any(halves) else None
+
+    def _ask_half(self, half: DocumentPage, depth: int) -> _Reply | None:
+        # a retry is best effort: one bad half shouldn't sink the whole document
+        try:
+            return self._ask_page(half, depth)
+        except openai.APIError as exc:
+            log.warning("llm failed on half of page %s (%s), skipped", half.page_number, exc)
+            return None
 
     def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
         windows = [pages[i:i + self._window] for i in range(0, len(pages), self._window)]
