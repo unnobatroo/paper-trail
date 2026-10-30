@@ -1,4 +1,4 @@
-# Python environment, bytecode and build output
+# python env, bytecode, builds
 .venv/
 __pycache__/
 *.py[cod]
@@ -7,7 +7,7 @@ __pycache__/
 /build/
 /dist/
 
-# Test, lint and coverage caches
+# test/lint/coverage caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -16,7 +16,7 @@ __pycache__/
 htmlcov/
 coverage.xml
 
-# OS/editor leftovers and temporary output
+# os/editor junk
 .DS_Store
 ._*
 *.bak
@@ -26,21 +26,14 @@ coverage.xml
 *~
 *.log
 
-# Local credentials; keep example configuration available
+# secrets stay local, examples get committed
 .env
 .env.*
 !.env.example
 !.env.*.example
 
-# Runtime data and downloaded models — nothing under data/ is source;
-# documents and benchmark files sync via scripts/push_data.py / pull_data.py
+# local docs, sqlite, caches, models. never source, real data lives in the db
 data/
-experiments/checkpoints/
-experiments/results/
 
-# Supabase CLI local state (not migrations)
-supabase/.temp/
-supabase/.branches/
-
-# Local agent state
+# private agent notes
 .agent-vault/
