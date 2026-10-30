@@ -5,8 +5,10 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import date
+from urllib.parse import urlsplit
 
 import psycopg
+from psycopg import sql
 from psycopg.conninfo import make_conninfo
 from sqlalchemy.exc import DBAPIError
 
@@ -51,8 +53,11 @@ def main():
                 CREATE ROLE paper_trail_worker LOGIN;
             END IF;
         END $$""")
-        conn.execute("ALTER ROLE paper_trail_api PASSWORD 'papertrail-integration-only'")
-        conn.execute("ALTER ROLE paper_trail_worker PASSWORD 'papertrail-integration-only'")
+        # same throwaway password as the owner url, so the role urls below just swap the user
+        password = urlsplit(url).password or ""
+        for role in ("paper_trail_api", "paper_trail_worker"):
+            conn.execute(sql.SQL("ALTER ROLE {} PASSWORD {}").format(
+                sql.Identifier(role), sql.Literal(password)))
     subprocess.run(
         ["alembic", "-c", "db/alembic.ini", "upgrade", "head"],
         check=True,
