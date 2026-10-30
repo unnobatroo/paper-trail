@@ -1,0 +1,17 @@
+use_default_settings: true
+general:
+  instance_name: Paper Trail discovery
+search:
+  safe_search: 0
+  formats:
+    - json
+server:
+  bind_address: 0.0.0.0
+  port: 8080
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  secret_key: "overridden-by-SEARXNG_SECRET"
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 20.0

@@ -1,4 +1,4 @@
-# build context — keep the image free of local state and secrets
+# keep local state and secrets out of the image
 .git/
 .venv/
 **/__pycache__/
@@ -7,20 +7,27 @@
 .mypy_cache/
 .ruff_cache/
 
-# credentials — never in an image
+# secrets, never in an image
 .env
 .env.*
 !.env.example
 
-# runtime data — production state lives in Supabase, not the image
+# runtime data lives on volumes
 data/
 experiments/results/
 experiments/checkpoints/
 
-# local agent state
+# private agent notes
 .agent-vault/
 
 # not needed at runtime
 tests/
 docs/
 .github/
+web/node_modules/
+web/.next/
+
+**/._*
+**/.env
+**/.env.*
+!**/.env.example
