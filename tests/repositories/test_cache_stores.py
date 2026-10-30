@@ -2,8 +2,12 @@
 
 import pytest
 
-from paper_trail.repositories.indexing import content_key, fit_vector
-from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
+from paper_trail.repositories.postgres.index import (
+    PostgresPageStore,
+    PostgresVectorIndex,
+    content_key,
+    fit_vector,
+)
 from paper_trail.sources.fetch import FetchedPage
 
 PAGE = FetchedPage(url="https://rev8.hu/utcafasitas/", title="Utcafásítás",

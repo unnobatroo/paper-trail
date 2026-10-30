@@ -117,11 +117,9 @@ class PolicyRepository(Repo):
                  else bool(cand.excerpt_on_page)}).scalar_one()
 
     def candidates(self, status: ReviewStatus | None = None) -> list[PolicyCandidate]:
-        if status:
-            rows = self._all("SELECT * FROM candidates WHERE review_status=:s ORDER BY source_page",
-                             s=status.value)
-        else:
-            rows = self._all("SELECT * FROM candidates ORDER BY source_page")
+        where = " WHERE review_status=:s" if status else ""
+        rows = self._all(f"SELECT * FROM candidates{where} ORDER BY source_page",
+                         s=status and status.value)
         return [to_model(PolicyCandidate, r) for r in rows]
 
     def candidate(self, candidate_id: int) -> PolicyCandidate | None:
@@ -186,11 +184,9 @@ class PolicyRepository(Repo):
                    " author=excluded.author, updated_at=excluded.updated_at", **p)
 
     def commitments(self, kind: CandidateType | None = None) -> list[Commitment]:
-        if kind:
-            rows = self._all("SELECT * FROM commitments WHERE kind=:k ORDER BY code, id",
-                             k=kind.value)
-        else:
-            rows = self._all("SELECT * FROM commitments ORDER BY code, id")
+        where = " WHERE kind=:k" if kind else ""
+        rows = self._all(f"SELECT * FROM commitments{where} ORDER BY code, id",
+                         k=kind and kind.value)
         return [to_model(Commitment, r) for r in rows]
 
     def commitment(self, commitment_id: int) -> Commitment | None:
@@ -283,11 +279,9 @@ class EvidenceRepository(Repo):
                                 {"c": link.commitment_id, "e": link.evidence_id}).scalar_one()
 
     def links(self, status: ReviewStatus | None = None) -> list[EvidenceLink]:
-        if status:
-            rows = self._all("SELECT * FROM links WHERE review_status=:s ORDER BY score DESC",
-                             s=status.value)
-        else:
-            rows = self._all("SELECT * FROM links ORDER BY score DESC")
+        where = " WHERE review_status=:s" if status else ""
+        rows = self._all(f"SELECT * FROM links{where} ORDER BY score DESC",
+                         s=status and status.value)
         return [to_link(r) for r in rows]
 
     def links_for(self, commitment_id: int) -> list[EvidenceLink]:
