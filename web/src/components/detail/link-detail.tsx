@@ -3,6 +3,7 @@
 import {ExternalLink} from "lucide-react";
 import {En} from "@/components/en";
 import {Chip} from "@/components/chip";
+import {EvidenceWarnings} from "@/components/evidence-warnings";
 import {Button} from "@/components/ui/button";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {REL_ICON, REL_TONE, STATUS_ICON, STATUS_TONE} from "@/lib/tones";
@@ -56,6 +57,8 @@ export function LinkDetail({
                 <p className="text-sm">{displayTitle(commitment?.title ?? "")}</p>
             </div>
 
+            <EvidenceWarnings ev={ev} explain/>
+
             <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Matched excerpt
@@ -101,7 +104,7 @@ export function LinkDetail({
                     Money mentioned:{" "}
                     {view.budgets
                         .slice(0, 4)
-                        .map((b) => `${huf(b.amount_huf)} (${BUDGET_LABEL[b.kind]})`)
+                        .map((b) => `${(b.currency === "EUR" ? b.amount_raw : huf(b.amount_huf))} (${BUDGET_LABEL[b.kind]})`)
                         .join(" · ")}
                 </p>
             )}

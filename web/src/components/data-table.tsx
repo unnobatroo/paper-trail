@@ -6,6 +6,7 @@ import {ChevronDown, ChevronRight} from "lucide-react";
 import {useHotkeys} from "react-hotkeys-hook";
 import {type ColumnDef, type RowData, tableFeatures, useTable,} from "@tanstack/react-table";
 import {Checkbox} from "@/components/ui/checkbox";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import {cn} from "@/lib/utils";
 
 const features = tableFeatures({});
@@ -24,8 +25,8 @@ export interface RowKeys {
     onReject?: () => void;
 }
 
-// j/k move the cursor, enter opens, x selects, c/r decide.
-// react-hotkeys-hook ignores form fields by default
+// j/k move, enter opens, x selects, c/r decide
+// react-hotkeys-hook skips form fields by default
 export function useRowKeys(
     count: number,
     cursor: number,
@@ -66,18 +67,18 @@ export function DataTable<T extends RowData>({
     selected?: Set<string>;
     onToggle?: (id: string) => void;
     onToggleAll?: (on: boolean) => void;
-    // rows must arrive ordered by group, collapsed groups keep their header only
+    // rows have to come in grouped, collapsed groups only keep their header
     groupOf?: (row: T) => RowGroup;
     collapsed?: Set<string>;
     onToggleGroup?: (key: string) => void;
-    // column id -> classes, e.g. "hidden lg:table-cell" to drop a column on small screens
+    // column id -> classes, e.g. "hidden lg:table-cell" hides it on small screens
     colClass?: Record<string, string>;
 }) {
     const table = useTable({features, columns, data, getRowId: getId});
     const rows = table.getRowModel().rows;
     const activeRef = useRef<HTMLTableRowElement>(null);
 
-    // keep the cursor row visible while j/k walks the list
+    // keep the cursor row in view while j/k walks
     useEffect(() => {
         activeRef.current?.scrollIntoView({block: "nearest"});
     }, [cursor]);
@@ -88,7 +89,7 @@ export function DataTable<T extends RowData>({
     const chosen = ids.filter((id) => selected?.has(id)).length;
     const all = ids.length > 0 && chosen === ids.length;
 
-    // plain loop so the group/cursor counters stay local to this function
+    // plain loop so the group/cursor counters stay local
     function renderBody() {
         const counts = new Map<string, number>();
         if (groupOf)
@@ -106,8 +107,8 @@ export function DataTable<T extends RowData>({
             if (g && g.key !== lastGroup) {
                 lastGroup = g.key;
                 out.push(
-                    <tr key={`g-${g.key}`} className="border-b bg-muted/40">
-                        <td colSpan={span} className="px-3 py-1.5">
+                    <TableRow key={`g-${g.key}`} className="bg-muted/40 hover:bg-muted/40">
+                        <TableCell colSpan={span} className="py-1.5">
                             <button
                                 type="button"
                                 onClick={() => onToggleGroup?.(g.key)}
@@ -120,8 +121,8 @@ export function DataTable<T extends RowData>({
                                 <span
                                     className="rounded-full bg-background px-1.5 font-normal tabular-nums">{counts.get(g.key)}</span>
                             </button>
-                        </td>
-                    </tr>,
+                        </TableCell>
+                    </TableRow>,
                 );
             }
             if (shut) continue;
@@ -129,12 +130,13 @@ export function DataTable<T extends RowData>({
             const i = visibleIndex;
             const active = i === cursor;
             out.push(
-                <tr
+                <TableRow
                     key={row.id}
                     ref={active ? activeRef : undefined}
                     tabIndex={active ? 0 : -1}
+                    data-state={selected?.has(row.id) ? "selected" : undefined}
                     onKeyDown={(e) => {
-                        // not for keys that bubble up from the row's checkbox
+                        // not for keys bubbling up from the row checkbox
                         if (e.key === "Enter" && e.target === e.currentTarget) {
                             e.preventDefault();
                             onOpen(row.original);
@@ -145,63 +147,63 @@ export function DataTable<T extends RowData>({
                         onOpen(row.original);
                     }}
                     className={cn(
-                        "cursor-pointer border-b last:border-0 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                        "cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                         active && "bg-accent hover:bg-accent",
                     )}
                 >
                     {onToggle && (
-                        <td className="w-10 px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                                 checked={selected?.has(row.id) ?? false}
                                 onCheckedChange={() => onToggle(row.id)}
                                 aria-label="Select row"
                             />
-                        </td>
+                        </TableCell>
                     )}
                     {row.getAllCells().map((cell) => (
-                        <td key={cell.id} className={cn("px-3 py-2 align-top", colClass?.[cell.column.id])}>
+                        <TableCell key={cell.id} className={colClass?.[cell.column.id]}>
                             <table.FlexRender cell={cell}/>
-                        </td>
+                        </TableCell>
                     ))}
-                </tr>,
+                </TableRow>,
             );
         }
         return out;
     }
 
     return (
-        <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full border-collapse text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
-                {table.getHeaderGroups().map((group) => (
-                    <tr key={group.id} className="border-b">
-                        {onToggle && (
-                            <th className="w-10 px-3 py-2">
-                                <Checkbox
-                                    checked={all}
-                                    indeterminate={chosen > 0 && !all}
-                                    onCheckedChange={() => onToggleAll?.(!all)}
-                                    aria-label={all ? "Deselect all" : "Select all"}
-                                />
-                            </th>
-                        )}
-                        {group.headers.map((header) => (
-                            <th
-                                key={header.id}
-                                className={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground", colClass?.[header.column.id])}
-                            >
-                                {header.isPlaceholder ? null : (
-                                    <table.FlexRender header={header}/>
-                                )}
-                            </th>
-                        ))}
-                    </tr>
-                ))}
-                </thead>
-                <tbody>
-                {renderBody()}
-                </tbody>
-            </table>
+        <div className="rounded-lg border bg-card">
+            <Table>
+                <TableHeader className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
+                    {table.getHeaderGroups().map((group) => (
+                        <TableRow key={group.id} className="hover:bg-transparent">
+                            {onToggle && (
+                                <TableHead className="w-10">
+                                    <Checkbox
+                                        checked={all}
+                                        indeterminate={chosen > 0 && !all}
+                                        onCheckedChange={() => onToggleAll?.(!all)}
+                                        aria-label={all ? "Deselect all" : "Select all"}
+                                    />
+                                </TableHead>
+                            )}
+                            {group.headers.map((header) => (
+                                <TableHead
+                                    key={header.id}
+                                    className={colClass?.[header.column.id]}
+                                >
+                                    {header.isPlaceholder ? null : (
+                                        <table.FlexRender header={header}/>
+                                    )}
+                                </TableHead>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableHeader>
+                <TableBody>
+                    {renderBody()}
+                </TableBody>
+            </Table>
         </div>
     );
 }

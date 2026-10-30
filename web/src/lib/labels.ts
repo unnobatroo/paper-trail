@@ -1,5 +1,13 @@
-/** Display helpers — labels, phrasing and grouping for review UI. */
-import type {BudgetKind, CandidateType, RelationshipType, Status,} from "./api";
+// display helpers: labels, phrasing, grouping
+import type {
+    BudgetKind,
+    CandidateType,
+    EvidenceFlag,
+    EvidencePolarity,
+    Jurisdiction,
+    RelationshipType,
+    Status,
+} from "./api";
 
 export const KIND_LABEL: Record<CandidateType, string> = {
     objective: "objective",
@@ -55,8 +63,37 @@ export const REL_HELP: Record<RelationshipType, string> = {
 
 export const BUDGET_LABEL: Record<BudgetKind, string> = {
     estimated_cost: "estimated cost",
-    approved_allocation: "approved funding",
-    reported_expenditure: "reported spending",
+    initial_appropriation: "budget appropriation",
+    amended_appropriation: "amended appropriation",
+    contracted_price: "contracted price",
+    actual_expenditure: "spent (final accounts)",
+    reported_expenditure: "reported spending, unverified",
+};
+
+export const FLAG_LABEL: Record<EvidenceFlag, string> = {
+    regression_warning: "Later amended or cancelled",
+    maintenance_only_suspect: "Maybe routine maintenance",
+};
+
+export const FLAG_HELP: Record<EvidenceFlag, string> = {
+    regression_warning:
+        "Another official source says the contract or project behind this passage was amended or cancelled. Check before relying on it.",
+    maintenance_only_suspect:
+        "The passage talks about repairs or maintenance and never about an upgrade. Routine upkeep may not count as climate action.",
+};
+
+export const POLARITY_LABEL: Record<EvidencePolarity, string> = {
+    affirmative: "",
+    amendment: "Reports an amendment",
+    termination: "Reports a cancellation",
+};
+
+export const JURISDICTION_LABEL: Record<Jurisdiction, string> = {
+    district_municipality: "District municipality",
+    metropolitan_municipality: "City government",
+    public_utility_water: "Water utility",
+    public_utility_heating: "District heating",
+    national_government: "National government",
 };
 
 export function displayTitle(title: string | null | undefined): string {
@@ -72,7 +109,7 @@ export function huf(amount: number | null | undefined): string {
     return `${Math.round(amount).toLocaleString("en-US").replace(/,/g, " ")} Ft`;
 }
 
-/** Exact-title + kind grouping — presentation only, every record kept. */
+// group by exact title + kind, display only, every record kept
 export function titleGroups<T>(
     records: T[],
     title: (r: T) => string | null | undefined,
@@ -88,7 +125,7 @@ export function titleGroups<T>(
     return [...groups.values()];
 }
 
-/** Broad planning docs vs concrete project pages (matches ml/entities.py). */
+// planning docs vs concrete project pages (same rule as ml/entities.py)
 const REPORT_CUES = /strateg|strategy|jelent|report|action.?plan|program/i;
 
 export function evidenceKind(url: string, title: string): string {
@@ -97,7 +134,7 @@ export function evidenceKind(url: string, title: string): string {
         : "Project / update";
 }
 
-/** Page guides — short explainer copy shown on each route. */
+// short explainer copy per page
 export const PAGE_GUIDES: Record<
     string,
     { description: string; terms: [string, string][] }

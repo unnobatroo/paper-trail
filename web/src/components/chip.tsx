@@ -1,5 +1,6 @@
 import type {LucideIcon} from "lucide-react";
 import type {ReactNode} from "react";
+import {Badge} from "@/components/ui/badge";
 import {cn} from "@/lib/utils";
 import {type Tone, TONE_CHIP} from "@/lib/tones";
 
@@ -11,15 +12,16 @@ export interface RowChip {
 
 export function Chip({label, tone, icon: Icon}: RowChip) {
     return (
-        <span
+        <Badge
+            variant="outline"
             className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-px text-[11px] font-medium leading-4 whitespace-nowrap",
+                "h-auto rounded-md px-1.5 py-px text-[11px] leading-4",
                 TONE_CHIP[tone],
             )}
         >
-      {Icon && <Icon className="size-3"/>}
+            {Icon && <Icon className="size-3"/>}
             {label}
-    </span>
+        </Badge>
     );
 }
 

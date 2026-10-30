@@ -5,8 +5,10 @@ import {toast} from "sonner";
 import {useMutation} from "@tanstack/react-query";
 import {Check, ChevronDown, ChevronUp, ExternalLink, X} from "lucide-react";
 import {Chip} from "@/components/chip";
+import {EvidenceWarnings} from "@/components/evidence-warnings";
 import {LinkDetail} from "@/components/detail/link-detail";
 import {Button} from "@/components/ui/button";
+import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
 import {api, type Commitment, errorMessage, type EvidenceItem, type LinkView, type RelationshipType,} from "@/lib/api";
 import {useInvalidateDomain, useLink} from "@/lib/hooks";
 import {displayTitle, evidenceKind, REL_LABEL, STATUS_LABEL} from "@/lib/labels";
@@ -14,12 +16,12 @@ import {REL_ICON, REL_TONE, STATUS_ICON, STATUS_TONE} from "@/lib/tones";
 
 type Full = LinkView & { evidence: EvidenceItem };
 
-// one suggested match: skim it, decide right here, or open the full record
+// one suggested match: skim, decide right here, or open the full record
 export function MatchCard({view, commitment}: { view: Full; commitment?: Commitment }) {
     const invalidate = useInvalidateDomain();
     const [open, setOpen] = useState(false);
     const [rel, setRel] = useState<RelationshipType>(view.link.suggested_relationship);
-    // the list is fetched lite (no snippet, no budgets), so each card loads its full record
+    // the list comes lite (no snippet, no budgets), each card loads its own full record
     const full = useLink(view.link.id);
     const detail = (full.data ?? view) as Full;
     const ev = detail.evidence;
@@ -34,13 +36,14 @@ export function MatchCard({view, commitment}: { view: Full; commitment?: Commitm
     });
 
     return (
-        <div className="rounded-lg border bg-background">
+        <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border bg-background">
             <div className="space-y-2 p-3">
                 <div className="flex items-start justify-between gap-2">
                     <p className="line-clamp-2 text-sm font-medium leading-snug">{displayTitle(ev.title)}</p>
                     <span
                         className="shrink-0 text-xs tabular-nums text-muted-foreground">{view.link.score.toFixed(2)}</span>
                 </div>
+                <EvidenceWarnings ev={ev}/>
                 <p className="text-xs text-muted-foreground">
                     {[ev.publisher ?? "Official source", ev.published_on, evidenceKind(ev.url, ev.title)].filter(Boolean).join(" · ")}
                 </p>
@@ -78,22 +81,15 @@ export function MatchCard({view, commitment}: { view: Full; commitment?: Commitm
                 >
                     <ExternalLink className="size-3.5"/>
                 </Button>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-expanded={open}
-                    onClick={() => setOpen((o) => !o)}
-                >
+                <CollapsibleTrigger render={<Button size="sm" variant="ghost"/>}>
                     {open ? <ChevronUp className="size-3.5"/> : <ChevronDown className="size-3.5"/>}
                     Details
-                </Button>
+                </CollapsibleTrigger>
             </div>
 
-            {open && (
-                <div className="border-t p-3">
-                    <LinkDetail view={detail} commitment={commitment} rel={rel} onRel={setRel}/>
-                </div>
-            )}
-        </div>
+            <CollapsibleContent className="border-t p-3">
+                <LinkDetail view={detail} commitment={commitment} rel={rel} onRel={setRel}/>
+            </CollapsibleContent>
+        </Collapsible>
     );
 }

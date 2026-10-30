@@ -6,8 +6,8 @@ import {TranslateProvider} from "@/components/en";
 import {TopNav} from "@/components/top-nav";
 import {CommandMenu} from "@/components/command-menu";
 
-// latin-ext carries ő and ű; with latin alone every Hungarian quote fell
-// back to the system font mid-word
+// latin-ext has ő and ű, with plain latin every hungarian quote dropped
+// to the system font mid-word (ugly)
 const geistSans = Geist({
     variable: "--font-geist-sans",
     subsets: ["latin", "latin-ext"],

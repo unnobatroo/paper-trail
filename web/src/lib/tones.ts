@@ -1,7 +1,4 @@
-/** Semantic colouring + icons for domain states — one place for the
- * "what does this colour mean" vocabulary, so a green chip always means
- * the same thing across the queue, inspectors and the paper trail.
- */
+// colours + icons for domain states, one place so a green chip always means the same thing
 import type {LucideIcon} from "lucide-react";
 import {
     Banknote,
@@ -30,7 +27,7 @@ export type Tone =
     | "red"
     | "gray";
 
-/** Chip/badge classes per tone — static strings so Tailwind keeps them. */
+// chip classes per tone, static strings or tailwind purges them
 export const TONE_CHIP: Record<Tone, string> = {
     green:
         "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
@@ -44,7 +41,7 @@ export const TONE_CHIP: Record<Tone, string> = {
     gray: "border-border bg-muted text-muted-foreground",
 };
 
-/** Text-only version for section labels etc. */
+// text-only version for section labels
 export const TONE_TEXT: Record<Tone, string> = {
     green: "text-emerald-700 dark:text-emerald-400",
     blue: "text-sky-700 dark:text-sky-400",
@@ -55,7 +52,7 @@ export const TONE_TEXT: Record<Tone, string> = {
     gray: "text-muted-foreground",
 };
 
-/** What the commitment is — objective / target / measure … */
+// what the commitment is: objective / target / measure
 export const KIND_TONE: Record<CandidateType, Tone> = {
     objective: "blue",
     target: "purple",
@@ -74,7 +71,7 @@ export const KIND_ICON: Record<CandidateType, LucideIcon> = {
     unclear: CircleHelp,
 };
 
-/** What a source reports — greener = stronger implementation signal. */
+// what a source reports, greener = stronger implementation signal
 export const STATUS_TONE: Record<Status, Tone> = {
     announced: "gray",
     planned: "amber",
@@ -97,7 +94,7 @@ export const STATUS_ICON: Record<Status, LucideIcon> = {
     unknown: CircleHelp,
 };
 
-/** How a matched source relates to the commitment. */
+// how a matched source relates to the commitment
 export const REL_TONE: Record<RelationshipType, Tone> = {
     direct_implementation: "green",
     supporting: "blue",
@@ -114,7 +111,7 @@ export const REL_ICON: Record<RelationshipType, LucideIcon> = {
     probably_unrelated: Link2Off,
 };
 
-/** Review state of a candidate or match. */
+// review state of a candidate or match
 export const REVIEW_TONE: Record<ReviewStatus, Tone> = {
     accepted: "green",
     rejected: "red",

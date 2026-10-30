@@ -13,10 +13,12 @@ import {En} from "@/components/en";
 import {QueryError} from "@/components/query-error";
 import {PageTitle} from "@/components/toolbar";
 import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
+import {InputGroup, InputGroupAddon, InputGroupInput} from "@/components/ui/input-group";
 import {Kbd} from "@/components/ui/kbd";
+import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from "@/components/ui/resizable";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Skeleton} from "@/components/ui/skeleton";
+import {ToggleGroup, ToggleGroupItem} from "@/components/ui/toggle-group";
 import {WorkDetail} from "@/components/workspace/work-detail";
 import {api, type CandidateType, errorMessage} from "@/lib/api";
 import {useCommitments, useDocuments, useInvalidateDomain} from "@/lib/hooks";
@@ -37,7 +39,7 @@ const KIND_SECTION: Record<CandidateType, string> = {
 };
 const TYPE_FILTER: CandidateType[] = ["objective", "target", "measure", "indicator"];
 
-// drop secondary columns as the screen narrows, the panel takes the space on xl
+// drop extra columns as the screen shrinks, the panel takes the room on xl
 const COL_CLASS = {
     kind: "hidden md:table-cell",
     evidence: "hidden sm:table-cell",
@@ -136,7 +138,7 @@ function WorkspacePage() {
     const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-    // mention shown in the panel per row, so c/r act on what the reviewer sees
+    // the mention shown in the panel, so c/r act on what the reviewer actually sees
     const [mentionSel, setMentionSel] = useState<Record<string, number>>({});
 
     const counts = useMemo(() => {
@@ -257,6 +259,33 @@ function WorkspacePage() {
     const nSearch = by("search").length;
     const nReview = by("review").length;
 
+    const tableView = filtered.length ? (
+        <DataTable
+            columns={columns}
+            data={filtered}
+            getId={(r) => r.id}
+            cursor={at}
+            onCursor={setCursor}
+            onOpen={() => !docked && setOpen(true)}
+            selected={selected}
+            onToggle={toggle}
+            onToggleAll={(on) => setSelected(on ? new Set(visible.map((r) => r.id)) : new Set())}
+            groupOf={groupOf}
+            collapsed={collapsed}
+            onToggleGroup={(k) =>
+                setCollapsed((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(k)) next.delete(k);
+                    else next.add(k);
+                    return next;
+                })
+            }
+            colClass={COL_CLASS}
+        />
+    ) : (
+        <EmptyState>Nothing matches these filters.</EmptyState>
+    );
+
     return (
         <>
             <PageTitle title="Workspace" hint={hint} guide={["commitments", "evidence", "trail"]}/>
@@ -282,17 +311,18 @@ function WorkspacePage() {
 
             <div className="mt-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative w-full sm:w-64">
-                        <Search className="pointer-events-none absolute top-2 left-2.5 size-3.5 text-muted-foreground"/>
-                        <Input
+                    <InputGroup className="w-full sm:w-64">
+                        <InputGroupAddon>
+                            <Search className="size-3.5"/>
+                        </InputGroupAddon>
+                        <InputGroupInput
                             ref={searchRef}
                             value={query}
                             onChange={(e) => setQuery(e.target.value || null)}
                             placeholder="Search commitments"
-                            className="h-8 pl-8"
                             aria-label="Search commitments"
                         />
-                    </div>
+                    </InputGroup>
                     <Select value={type} onValueChange={(v) => setType(v === "all" ? null : (v as string))}
                             items={{all: "All types", ...Object.fromEntries(TYPE_FILTER.map((t) => [t, KIND_SECTION[t]]))}}>
                         <SelectTrigger size="sm" className="w-40" aria-label="Filter by type">
@@ -310,31 +340,40 @@ function WorkspacePage() {
           </span>
                 </div>
 
-                <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="group"
-                     aria-label="Filter by stage">
+                <ToggleGroup
+                    value={[stage]}
+                    onValueChange={(vals) => {
+                        const next = vals[vals.length - 1] as string | undefined;
+                        if (next) setStage(next === "all" ? null : next);
+                    }}
+                    spacing={1.5}
+                    size="sm"
+                    aria-label="Filter by stage"
+                    className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+                >
                     {(["all", ...STAGE_ORDER] as const).map((s) => {
                         const on = stage === s;
                         const Icon = s === "all" ? null : STAGES[s].icon;
                         const n = s === "all" ? rows.length - counts.rejected : counts[s];
                         return (
-                            <button
+                            <ToggleGroupItem
                                 key={s}
-                                type="button"
-                                aria-pressed={on}
+                                value={s}
                                 title={s === "all" ? "Everything except rejected" : STAGES[s].hint}
-                                onClick={() => setStage(s === "all" ? null : s)}
                                 className={cn(
-                                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                                    on ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground",
+                                    "h-auto rounded-full border px-3 py-1 text-xs",
+                                    on
+                                        ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                                        : "bg-card text-muted-foreground hover:text-foreground",
                                 )}
                             >
                                 {Icon && <Icon className="size-3.5"/>}
                                 {s === "all" ? "All" : STAGES[s].label}
                                 <span className={cn("tabular-nums", on ? "opacity-80" : "opacity-60")}>{n}</span>
-                            </button>
+                            </ToggleGroupItem>
                         );
                     })}
-                </div>
+                </ToggleGroup>
 
                 {selected.size > 0 && (
                     <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
@@ -375,51 +414,30 @@ function WorkspacePage() {
                 )}
             </div>
 
-            <div className="mt-3 xl:grid xl:grid-cols-[minmax(0,1fr)_26rem] xl:items-start xl:gap-5">
-                <div className="min-w-0">
-                    {filtered.length ? (
-                        <DataTable
-                            columns={columns}
-                            data={filtered}
-                            getId={(r) => r.id}
-                            cursor={at}
-                            onCursor={setCursor}
-                            onOpen={() => !docked && setOpen(true)}
-                            selected={selected}
-                            onToggle={toggle}
-                            onToggleAll={(on) => setSelected(on ? new Set(visible.map((r) => r.id)) : new Set())}
-                            groupOf={groupOf}
-                            collapsed={collapsed}
-                            onToggleGroup={(k) =>
-                                setCollapsed((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(k)) next.delete(k);
-                                    else next.add(k);
-                                    return next;
-                                })
-                            }
-                            colClass={COL_CLASS}
-                        />
-                    ) : (
-                        <EmptyState>Nothing matches these filters.</EmptyState>
-                    )}
-                </div>
-
-                {docked ? (
-                    <aside
-                        className="sticky top-16 mt-0 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg border bg-card p-4">
-                        {detail ?? (
-                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <MousePointerClick className="size-4"/> Select a commitment to see its detail.
-                            </p>
-                        )}
-                    </aside>
-                ) : (
+            {docked ? (
+                <ResizablePanelGroup orientation="horizontal" className="mt-3 items-start gap-2">
+                    <ResizablePanel defaultSize="68%" minSize="45%" className="min-w-0">
+                        {tableView}
+                    </ResizablePanel>
+                    <ResizableHandle withHandle className="my-2 self-stretch"/>
+                    <ResizablePanel defaultSize="32%" minSize="22%">
+                        <aside className="sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg border bg-card p-4">
+                            {detail ?? (
+                                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <MousePointerClick className="size-4"/> Select a commitment to see its detail.
+                                </p>
+                            )}
+                        </aside>
+                    </ResizablePanel>
+                </ResizablePanelGroup>
+            ) : (
+                <div className="mt-3 min-w-0">
+                    {tableView}
                     <DetailSheet open={open && !!current} onClose={() => setOpen(false)} label="Commitment detail">
                         {detail}
                     </DetailSheet>
-                )}
-            </div>
+                </div>
+            )}
         </>
     );
 }
