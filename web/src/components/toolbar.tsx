@@ -1,6 +1,5 @@
 "use client";
 
-import type {ReactNode} from "react";
 import {CircleHelp} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -42,8 +41,4 @@ export function PageTitle({
             )}
         </div>
     );
-}
-
-export function Toolbar({children}: { children: ReactNode }) {
-    return <div className="mt-4 mb-3 flex flex-wrap items-center gap-2">{children}</div>;
 }
