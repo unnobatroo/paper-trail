@@ -6,8 +6,8 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from uuid import uuid4
 
+from asgi_correlation_id import CorrelationIdMiddleware, correlation_id
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -46,18 +46,18 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def request_log(request, call_next):
-        request_id = uuid4().hex
         started = time.monotonic()
         response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
         logging.getLogger("uvicorn.error").info(json.dumps({
-            "event": "http_request", "request_id": request_id,
+            "event": "http_request", "request_id": correlation_id.get(),
             "method": request.method, "path": request.url.path,
             "status": response.status_code,
             "duration_ms": round((time.monotonic() - started) * 1000),
         }))
         return response
 
+    # X-Request-ID in and out, added last so it wraps the log middleware
+    app.add_middleware(CorrelationIdMiddleware)
     # load() only, building AppState here would drag the embedder in at import
     app.add_middleware(
         CORSMiddleware,

@@ -25,8 +25,9 @@ from pathlib import Path
 
 from .domain.enums import Jurisdiction
 from .domain.models import OfficialSource
+from .repositories.postgres.db import connect
 from .repositories.postgres.jobs import PostgresJobRunner
-from .repositories.postgres.store import PostgresEvidenceRepository, connect
+from .repositories.store import EvidenceRepository, PolicyRepository
 
 # anything a person decided (or that hangs off it) isn't "generated"
 # not exists, not "not in": one null in the subquery and not in matches nothing
@@ -79,12 +80,7 @@ def profile(args) -> int:
     from .infrastructure.settings import load
     from .ml.lang import LanguageProfile
     settings = load()
-    if settings.database_url:
-        from .repositories.postgres.store import PostgresPolicyRepository
-        repo = PostgresPolicyRepository(settings.database_url)
-    else:
-        from .repositories.sqlite.store import PolicyRepository
-        repo = PolicyRepository(settings.db_path)
+    repo = PolicyRepository(settings.database_url or settings.db_path)
     if args.profile_cmd == "import":
         # round-trip through the dataclass so a typo'd field or enum fails here, not at boot
         data = LanguageProfile.from_dict(json.loads(args.file.read_text())).to_dict()
@@ -143,7 +139,7 @@ def main(argv=None) -> int:
         print("deleted" if args.yes else "dry run, nothing deleted: add --yes")
         return 0
     if args.cmd == "source":
-        repo = PostgresEvidenceRepository(url)
+        repo = EvidenceRepository(url)
         if args.source_cmd == "add":
             repo.upsert_official_source(OfficialSource(
                 url=args.source_url, publisher=args.publisher, title=args.title,

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from paper_trail.repositories.sqlite.store import EvidenceRepository, PolicyRepository
+from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 
 
 @pytest.fixture

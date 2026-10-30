@@ -25,6 +25,8 @@ dependencies = [
     "uvicorn>=0.30.0",
     "openai>=3.32.0",
     "rank-bm25>=0.2.2",
+    "asgi-correlation-id>=5.0.1",
+    "tenacity>=9",
 ]
 
 [project.optional-dependencies]

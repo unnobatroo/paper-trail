@@ -26,7 +26,7 @@ def state(tmp_path, monkeypatch):
         monkeypatch.setenv(var, "")
     monkeypatch.setenv("PAPER_TRAIL_DB", str(tmp_path / "t.db"))
     # the profile lives in the db now, load the fixture before the app boots
-    from paper_trail.repositories.sqlite.store import PolicyRepository
+    from paper_trail.repositories.store import PolicyRepository
     from tests.profiles import HU
     PolicyRepository(tmp_path / "t.db").put_language_profile("hu", HU.to_dict())
     monkeypatch.setenv("PAPER_TRAIL_EMBED_MODEL", "hashing")
@@ -153,3 +153,10 @@ def test_active_jobs_endpoint_lists_in_flight_work(client):
     res = client.get("/api/jobs", params={"kind": "find_evidence"})
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+def test_request_id_round_trips(client):
+    # asgi-correlation-id: we echo a caller's id, or mint one
+    echoed = client.get("/healthz", headers={"X-Request-ID": "a" * 32})
+    assert echoed.headers["X-Request-ID"] == "a" * 32
+    assert len(client.get("/healthz").headers["X-Request-ID"]) == 32

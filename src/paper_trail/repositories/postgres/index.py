@@ -6,7 +6,7 @@ from ...ml.retrieval import reciprocal_rank_fusion
 from ...sources.fetch import FetchedPage
 from ..indexing import content_key, fit_vector
 from ..ports import PageStore, VectorIndex
-from .store import connect
+from .db import connect
 
 
 def _vector(values):

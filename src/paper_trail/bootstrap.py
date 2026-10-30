@@ -19,7 +19,7 @@ from .ml.lang import LanguageProfile
 from .ml.rerank import get_reranker
 from .repositories.ports import EvidenceStore, PolicyStore
 from .repositories.sqlite.files import FilePageStore, FileVectorIndex
-from .repositories.sqlite.store import EvidenceRepository, PolicyRepository
+from .repositories.store import EvidenceRepository, PolicyRepository
 from .services.evidence_service import EvidenceService
 from .services.ingestion_service import IngestionService
 from .services.metrics_service import MetricsService
@@ -74,28 +74,21 @@ def build_state(settings: Settings | None = None) -> AppState:
     if settings.nlp == "huspacy":
         from .ml.nlp import HuSpacyAnalyzer
         analyzer = HuSpacyAnalyzer()
+    # one store for both, the url picks postgres or the sqlite file
+    policy = PolicyRepository(settings.database_url or settings.db_path)
+    evidence = EvidenceRepository(settings.database_url or settings.db_path)
+    profile = load_profile(policy, settings.language)
+    docs: DocumentStore = LocalDocumentStore(settings.document_dir or settings.seed_dir)
     if settings.database_url:
         from .repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
-        from .repositories.postgres.store import (
-            PostgresEvidenceRepository,
-            PostgresPolicyRepository,
-        )
-        policy = PostgresPolicyRepository(settings.database_url)
-        evidence = PostgresEvidenceRepository(settings.database_url)
-        profile = load_profile(policy, settings.language)
         page_store = PostgresPageStore(settings.database_url)
         vector_index = PostgresVectorIndex(settings.database_url, ts_config=profile.ts_config,
                                            analyzer=analyzer)
-        docs: DocumentStore = LocalDocumentStore(settings.document_dir or settings.seed_dir)
     else:
-        policy = PolicyRepository(settings.db_path)
-        evidence = EvidenceRepository(settings.db_path)
-        profile = load_profile(policy, settings.language)
         cache_dir = Path(settings.db_path).parent / "fetched"
         page_store = FilePageStore(cache_dir)
         vector_index = FileVectorIndex(cache_dir, stemmer_language=profile.stemmer,
                                        analyzer=analyzer)
-        docs = LocalDocumentStore(settings.document_dir or settings.seed_dir)
 
     from .sources.parsers import (
         DoclingDocumentParser,
