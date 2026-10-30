@@ -4,8 +4,8 @@ import {useTheme} from "next-themes";
 import {Moon, Sun} from "lucide-react";
 import {Button} from "@/components/ui/button";
 
-// icon switches in css (the .dark class next-themes sets before paint),
-// so server and client markup match and there's no flash
+// icon swaps in css (next-themes sets .dark before paint),
+// so server + client markup match and nothing flashes
 export function ThemeToggle() {
     const {resolvedTheme, setTheme} = useTheme();
     return (

@@ -1,25 +1,19 @@
-/** Typed client for the Paper Trail FastAPI backend.
- *
- * Mirrors src/paper_trail/api/schemas.py + domain/enums.py.
- * The backend speaks from NEXT_PUBLIC_API_URL. Nothing here is secret:
- * NEXT_PUBLIC_* values ship in the bundle — NEXT_PUBLIC_REVIEW_KEY is
- * for private deployments only (public ones use the browser-stored key).
- */
+// typed client for the fastapi backend via openapi-fetch + generated api-schema.ts
+// nothing here is secret: NEXT_PUBLIC_* ships in the bundle, review keys are typed in at runtime
+
+import createClient from "openapi-fetch";
+import type {components, paths} from "./api-schema";
 
 export const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    process.env.NEXT_PUBLIC_API_URL ??
+    (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 
-// ---- review key ---------------------------------------------------------------
-// Sent as X-Review-Key on every request; the API only checks it on
-// mutations, and only when the deployment sets PAPER_TRAIL_REVIEW_KEY.
-// NEXT_PUBLIC_REVIEW_KEY bakes it in for private deployments (visible in
-// the bundle); otherwise the sidebar dialog stores it in this browser.
+// ---- review key ----
+// sent as X-Review-Key on mutations when PAPER_TRAIL_REVIEW_KEY is set
 
-const ENV_REVIEW_KEY = process.env.NEXT_PUBLIC_REVIEW_KEY ?? "";
 const LS_REVIEW_KEY = "pt-review-key";
 
 export function getReviewKey(): string {
-    if (ENV_REVIEW_KEY) return ENV_REVIEW_KEY;
     if (typeof window === "undefined") return "";
     return localStorage.getItem(LS_REVIEW_KEY) ?? "";
 }
@@ -29,179 +23,62 @@ export function setReviewKey(key: string) {
     else localStorage.removeItem(LS_REVIEW_KEY);
 }
 
-// ---- enums (string values match Python exactly) ------------------------------
+// ---- types: generated from the openapi schema, never hand-written ----
+// after a backend model change:
+//   uv run python scripts/ops/export_openapi.py && (cd web && npm run gen:api)
 
-export type CandidateType =
-    | "objective"
-    | "measure"
-    | "target"
-    | "indicator"
-    | "background"
-    | "unclear";
+type Schemas = components["schemas"];
+// stored records always have an id, python only defaults it for new rows
+type Stored<T extends { id: number | null }> = Omit<T, "id"> & { id: number };
 
-export type ReviewStatus = "unreviewed" | "accepted" | "rejected";
+export type CandidateType = Schemas["CandidateType"];
+export type ReviewStatus = Schemas["ReviewStatus"];
+export type RelationshipType = Schemas["RelationshipType"];
+export type Status = Schemas["Status"];
+export type BudgetKind = Schemas["BudgetKind"];
+export type EvidencePolarity = Schemas["EvidencePolarity"];
+export type EvidenceFlag = Schemas["EvidenceFlag"];
+export type Jurisdiction = Schemas["Jurisdiction"];
 
-export type RelationshipType =
-    | "direct_implementation"
-    | "supporting"
-    | "budget"
-    | "related_but_indirect"
-    | "probably_unrelated";
+export type SourceDocument = Stored<Schemas["SourceDocument"]>;
+export type PolicyCandidate = Stored<Schemas["PolicyCandidate"]>;
+export type Commitment = Stored<Schemas["Commitment"]>;
+export type EvidenceItem = Stored<Schemas["EvidenceItem"]>;
+export type MatchFeatures = Schemas["MatchFeatures"];
+export type EvidenceLink = Stored<Schemas["EvidenceLink"]>;
+export type BudgetRecord = Stored<Schemas["BudgetRecord"]>;
 
-export type Status =
-    | "announced"
-    | "planned"
-    | "in_preparation"
-    | "in_implementation"
-    | "completed"
-    | "budget_evidence"
-    | "background_only"
-    | "unknown";
-
-export type BudgetKind =
-    | "estimated_cost"
-    | "approved_allocation"
-    | "reported_expenditure";
-
-// ---- models ------------------------------------------------------------------
-
-export interface SourceDocument {
-    id: number;
-    title: string;
-    publisher: string | null;
-    url: string | null;
-}
-
-export interface PolicyCandidate {
-    id: number;
-    document_id: number;
-    suggested_type: CandidateType;
-    text: string;
-    normalized_title: string;
-    source_page: number;
-    source_excerpt: string;
-    code: string | null;
-    excerpt_on_page: boolean | null;
-    responsible_org: string | null;
-    timeframe: string | null;
-    deadline_year: number | null;
-    unit: string | null;
-    target_value: number | null;
-    review_status: ReviewStatus;
-}
-
-export interface Commitment {
-    id: number;
-    candidate_id: number | null;
-    parent_id: number | null;
-    kind: CandidateType;
-    title: string;
-    summary: string;
-    code: string | null;
-    responsible_org: string | null;
-    timeframe: string | null;
-    deadline_year: number | null;
-    unit: string | null;
-    target_value: number | null;
-    source_page: number | null;
-}
-
-export interface EvidenceItem {
-    id: number;
-    commitment_id: number;
-    url: string;
-    title: string;
-    publisher: string | null;
-    published_on: string | null;
-    snippet: string;
-    organisations: string[];
-    locations: string[];
-    dates_mentioned: string[];
-    status_hint: Status;
-    status_excerpt: string | null;
-}
-
-export interface MatchFeatures {
-    semantic_similarity: number;
-    shared_organisations: string[];
-    shared_locations: string[];
-    shared_dates: string[];
-}
-
-export interface EvidenceLink {
-    id: number;
-    commitment_id: number;
-    evidence_id: number;
-    features: MatchFeatures;
-    score: number;
-    suggested_relationship: RelationshipType;
-    reasons: string[];
-    relationship: RelationshipType | null;
-    review_status: ReviewStatus;
-}
-
-export interface BudgetRecord {
-    id: number;
-    evidence_id: number;
-    kind: BudgetKind;
-    amount_huf: number | null;
-    amount_raw: string | null;
-    fiscal_year: number | null;
-    description: string;
-    source_url: string;
-}
-
-export interface LinkView {
+export type LinkView = Omit<Schemas["LinkView"], "link" | "evidence" | "budgets"> & {
     link: EvidenceLink;
     evidence: EvidenceItem | null;
     budgets: BudgetRecord[];
-}
+};
 
-export interface TrailRow {
+export type TrailRow = Omit<Schemas["TrailRowView"], "commitment" | "evidence" | "budgets"> & {
     commitment: Commitment;
     evidence: EvidenceItem[];
-    relationships: RelationshipType[];
     budgets: BudgetRecord[];
-    status: Status;
-    status_excerpt: string | null;
-    gaps: string[];
-}
+};
 
+// backend types these loosely (str / object), we narrow what we read
 export type JobStatus = "queued" | "running" | "done" | "failed";
 
-export interface Job {
-    id: string;
-    kind: string;
+export type Job = Omit<Schemas["JobOut"], "status" | "result"> & {
     status: JobStatus;
-    /** Latest progress line (overwritten as the job advances). */
-    progress: string;
-    /** Kind-specific payload, e.g. {links, warnings} for find_evidence. */
+    // per-kind payload, e.g. {links, warnings} for find_evidence
     result: { links?: number; warnings?: string[] } | null;
-    error: string | null;
-    created_at: string;
-}
+};
 
-export interface Meta {
-    deployment: string;
-    storage: "supabase" | "sqlite";
-    embed_model: string;
-    reranker: string;
-    search_provider: string;
-    llm_extraction: boolean;
-    translation: boolean;
-    /** True when the API requires X-Review-Key on mutations. */
-    review_required: boolean;
-}
+export type Meta = Schemas["MetaOut"];
 
-// ---- client ------------------------------------------------------------------
+// ---- client ----
 
-/** Human text for any thrown value: toasts used to show "ApiError: …"
- * or "[object Object]". */
+// readable text for anything thrown, toasts used to say "[object Object]" lol
 export function errorMessage(e: unknown): string {
     return e instanceof Error ? e.message : String(e);
 }
 
-/** FastAPI sends 422 details as a list of {loc, msg}; flatten it. */
+// fastapi sends 422 details as a list of {loc, msg}, flatten it
 export function formatDetail(detail: unknown): string {
     if (Array.isArray(detail)) {
         return detail
@@ -224,130 +101,191 @@ export class ApiError extends Error {
     }
 }
 
-async function req<T>(
-    path: string,
-    init?: RequestInit,
-): Promise<T> {
-    // The free-tier API idles out; a hung request should become a visible,
-    // retryable error rather than an infinite spinner. 90s covers the worst
-    // observed cold start (~60s) with headroom.
-    let res: Response;
-    try {
+const ORIGIN_PLACEHOLDER = "http://_pt_same_origin_";
+
+export const client = createClient<paths>({
+    baseUrl: API_URL || ORIGIN_PLACEHOLDER,
+    fetch: async (request: Request) => {
+        const url = request.url.startsWith(ORIGIN_PLACEHOLDER)
+            ? request.url.slice(ORIGIN_PLACEHOLDER.length)
+            : request.url;
+        const headers = Object.fromEntries(request.headers.entries());
         const reviewKey = getReviewKey();
-        res = await fetch(`${API_URL}${path}`, {
-            ...init,
-            signal: AbortSignal.timeout(90_000),
-            // only send what the request needs: a bare GET with no custom
-            // headers skips the CORS preflight, which doubles a cold start
-            headers: {
-                ...(init?.body ? {"content-type": "application/json"} : {}),
-                ...(reviewKey && init?.method && init.method !== "GET"
-                    ? {"x-review-key": reviewKey}
-                    : {}),
-                ...init?.headers,
-            },
-        });
-    } catch (e) {
-        if (e instanceof DOMException && e.name === "TimeoutError") {
-            throw new ApiError(
-                0,
-                "The API took too long to answer — it may be waking up. Try again in a few seconds.",
-            );
+        if (reviewKey && request.method !== "GET") {
+            headers["x-review-key"] = reviewKey;
         }
-        if (e instanceof TypeError) {
-            // fetch() throws TypeError on network failure — unreadable as-is
-            throw new ApiError(0, "Cannot reach the API — it may be down or still waking up. Try again.");
-        }
-        throw e;
-    }
-    if (!res.ok) {
-        let detail = res.statusText;
+        const body = request.method !== "GET" && request.method !== "HEAD"
+            ? await request.text()
+            : undefined;
         try {
-            const body = await res.json();
-            if (body?.detail !== undefined) detail = formatDetail(body.detail);
-        } catch {
-            /* non-JSON error body */
+            return await globalThis.fetch(url, {
+                method: request.method,
+                headers,
+                ...(body ? {body} : {}),
+                signal: AbortSignal.timeout(90_000),
+            });
+        } catch (e) {
+            if (e instanceof DOMException && e.name === "TimeoutError") {
+                throw new ApiError(
+                    0,
+                    "The API took too long to answer — it may be waking up. Try again in a few seconds.",
+                );
+            }
+            if (e instanceof TypeError) {
+                throw new ApiError(
+                    0,
+                    "Cannot reach the API — it may be down or still waking up. Try again.",
+                );
+            }
+            throw e;
         }
-        throw new ApiError(res.status, detail);
+    },
+});
+
+async function unwrap<T>(
+    p: Promise<{ data?: unknown; error?: unknown; response: Response }>,
+): Promise<T> {
+    const {data, error, response} = await p;
+    if (!response.ok) {
+        const errObj = error as { detail?: unknown } | null | undefined;
+        const detail =
+            errObj && typeof errObj === "object" && "detail" in errObj && errObj.detail !== undefined
+                ? formatDetail(errObj.detail)
+                : response.statusText;
+        throw new ApiError(response.status, detail);
     }
-    return (await res.json()) as T;
+    return data as T;
 }
 
 export const api = {
-    meta: () => req<Meta>("/api/meta"),
-    healthz: () => req<{ ok: boolean }>("/healthz"),
+    meta: () => unwrap<Meta>(client.GET("/api/meta")),
+    healthz: () => unwrap<{ ok: boolean }>(client.GET("/healthz")),
 
-    documents: () => req<SourceDocument[]>("/api/documents"),
-    availableDocuments: () => req<string[]>("/api/documents/available"),
+    documents: () => unwrap<SourceDocument[]>(client.GET("/api/documents")),
+    availableDocuments: () => unwrap<string[]>(client.GET("/api/documents/available")),
     ingest: (payload: {
         name: string;
         title: string;
         publisher?: string;
         url?: string;
     }) =>
-        req<Job>("/api/documents/ingest", {
-            method: "POST",
-            body: JSON.stringify(payload),
-        }),
+        unwrap<Job>(
+            client.POST("/api/documents/ingest", {
+                body: {
+                    name: payload.name,
+                    title: payload.title,
+                    publisher: payload.publisher ?? "",
+                    url: payload.url ?? "",
+                },
+            }),
+        ),
 
     candidates: (status?: ReviewStatus) =>
-        req<PolicyCandidate[]>(
-            `/api/candidates${status ? `?status=${status}` : ""}`,
+        unwrap<PolicyCandidate[]>(
+            client.GET("/api/candidates", status ? {params: {query: {status}}} : {}),
         ),
     acceptCandidate: (
         id: number,
         body?: { kind?: CandidateType; title?: string; parent_id?: number | null },
     ) =>
-        req<{ commitment_id: number }>(`/api/candidates/${id}/accept`, {
-            method: "POST",
-            body: JSON.stringify(body ?? {}),
-        }),
+        unwrap<{ commitment_id: number }>(
+            client.POST("/api/candidates/{candidate_id}/accept", {
+                params: {path: {candidate_id: id}},
+                body: {
+                    kind: body?.kind ?? null,
+                    title: body?.title ?? null,
+                    parent_id: body?.parent_id ?? null,
+                },
+            }),
+        ),
     rejectCandidate: (id: number) =>
-        req<{ ok: boolean }>(`/api/candidates/${id}/reject`, {method: "POST"}),
+        unwrap<{ ok: boolean }>(
+            client.POST("/api/candidates/{candidate_id}/reject", {
+                params: {path: {candidate_id: id}},
+            }),
+        ),
     bulkCandidates: (body: {
         accept?: number[];
         reject?: number[];
         reject_rest?: boolean;
     }) =>
-        req<{ accepted: number; rejected: number }>("/api/candidates/bulk", {
-            method: "POST",
-            body: JSON.stringify(body),
-        }),
+        unwrap<{ accepted: number; rejected: number }>(
+            client.POST("/api/candidates/bulk", {
+                body: {
+                    accept: body.accept ?? [],
+                    reject: body.reject ?? [],
+                    reject_rest: body.reject_rest ?? false,
+                },
+            }),
+        ),
 
-    commitments: () => req<Commitment[]>("/api/commitments"),
+    commitments: () => unwrap<Commitment[]>(client.GET("/api/commitments")),
     findEvidence: (commitmentId: number) =>
-        req<Job>(`/api/commitments/${commitmentId}/find-evidence`, {
-            method: "POST",
-        }),
+        unwrap<Job>(
+            client.POST("/api/commitments/{commitment_id}/find-evidence", {
+                params: {path: {commitment_id: commitmentId}},
+            }),
+        ),
 
     links: (lite = false) =>
-        req<LinkView[]>(`/api/links${lite ? "?lite=1" : ""}`),
-    link: (id: number) => req<LinkView>(`/api/links/${id}`),
-    decideLink: (id: number, accept: boolean, relationship?: RelationshipType) =>
-        req<{ ok: boolean }>(`/api/links/${id}/decide`, {
-            method: "POST",
-            body: JSON.stringify({
-                decision: accept ? "accept" : "reject",
-                relationship,
+        unwrap<LinkView[]>(
+            client.GET("/api/links", lite ? {params: {query: {lite: true}}} : {}),
+        ),
+    link: (id: number) =>
+        unwrap<LinkView>(
+            client.GET("/api/links/{link_id}", {
+                params: {path: {link_id: id}},
             }),
-        }),
+        ),
+    setJurisdiction: (id: number, jurisdiction: Jurisdiction) =>
+        unwrap<Commitment>(
+            client.POST("/api/commitments/{commitment_id}/jurisdiction", {
+                params: {path: {commitment_id: id}},
+                body: {jurisdiction},
+            }),
+        ),
+    decideLink: (id: number, accept: boolean, relationship?: RelationshipType) =>
+        unwrap<{ ok: boolean }>(
+            client.POST("/api/links/{link_id}/decide", {
+                params: {path: {link_id: id}},
+                body: {
+                    decision: accept ? "accept" : "reject",
+                    relationship: relationship ?? null,
+                },
+            }),
+        ),
     bulkLinks: (body: {
         accept?: number[];
         reject?: number[];
         relationships?: Record<number, RelationshipType>;
     }) =>
-        req<{ accepted: number; rejected: number }>("/api/links/bulk", {
-            method: "POST",
-            body: JSON.stringify(body),
-        }),
+        unwrap<{ accepted: number; rejected: number }>(
+            client.POST("/api/links/bulk", {
+                body: {
+                    accept: body.accept ?? [],
+                    reject: body.reject ?? [],
+                    relationships: body.relationships ?? {},
+                },
+            }),
+        ),
 
-    trail: () => req<TrailRow[]>("/api/trail"),
-    job: (id: string) => req<Job>(`/api/jobs/${id}`),
+    trail: () => unwrap<TrailRow[]>(client.GET("/api/trail")),
+    job: (id: string) =>
+        unwrap<Job>(
+            client.GET("/api/jobs/{job_id}", {
+                params: {path: {job_id: id}},
+            }),
+        ),
     activeJobs: (kind: string) =>
-        req<Job[]>(`/api/jobs?kind=${encodeURIComponent(kind)}`),
+        unwrap<Job[]>(
+            client.GET("/api/jobs", {
+                params: {query: {kind}},
+            }),
+        ),
     translate: (texts: string[]) =>
-        req<{ translations: string[]; disclaimer: string }>("/api/translate", {
-            method: "POST",
-            body: JSON.stringify({texts}),
-        }),
+        unwrap<{ translations: string[]; disclaimer: string }>(
+            client.POST("/api/translate", {
+                body: {texts},
+            }),
+        ),
 };

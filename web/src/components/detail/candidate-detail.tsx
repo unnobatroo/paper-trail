@@ -57,7 +57,7 @@ export function CandidateDetail({
 }) {
     const invalidate = useInvalidateDomain();
     const cand = group.find((c) => c.id === mentionId) ?? group[0];
-    // each mention links to its own document, groups can span several
+    // each mention links its own doc, a group can span several
     const docUrl = documents.find((d) => d.id === cand.document_id)?.url;
     const [editing, setEditing] = useState(false);
 

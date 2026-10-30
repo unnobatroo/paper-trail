@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/** Error mapping + review-key plumbing of the API client — the parts
- * where silent wrongness would hang the UI or drop a gate. */
+// error mapping + review-key plumbing, where silent wrongness hangs the ui or skips a gate
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {api, getReviewKey, setReviewKey} from "./api";
 

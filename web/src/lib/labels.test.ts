@@ -1,6 +1,4 @@
-/** Ported from tests/test_presentation.py + test_bulk_review.py —
- * the honesty-rule helpers that moved from presentation/ to this file.
- */
+// the honesty-rule helpers, ported from the old python presentation tests
 import {describe, expect, it} from "vitest";
 import {displayTitle, evidenceKind, huf, titleGroups,} from "./labels";
 
@@ -35,7 +33,7 @@ describe("titleGroups", () => {
         expect(groups).toHaveLength(3);
         const main = groups.find((g) => g.length === 2)!;
         expect(main.map((r) => r.id).sort()).toEqual([1, 2]);
-        // kind is part of the key — a target never merges with an objective
+        // kind is part of the key, a target never merges with an objective
         expect(groups.flat().map((r) => r.id).sort()).toEqual([1, 2, 3, 4]);
     });
 

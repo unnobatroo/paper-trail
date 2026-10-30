@@ -5,14 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
     ...nextVitals,
     ...nextTs,
-    // Override default ignores of eslint-config-next.
+    // override eslint-config-next's default ignores
     globalIgnores([
-        // Default ignores of eslint-config-next:
+        // its defaults:
         ".next/**",
         "out/**",
         "build/**",
         "next-env.d.ts",
-        // Local Vercel build output:
+        // local build output:
         ".vercel/**",
     ]),
 ]);

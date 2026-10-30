@@ -1,6 +1,6 @@
 import {redirect} from "next/navigation";
 
-// the three stages became one workspace, keep old links working
+// three stages became one workspace, old links still work
 export default function Page() {
     redirect("/?stage=confirm");
 }

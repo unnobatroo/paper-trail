@@ -3,7 +3,7 @@
 import type {ReactNode} from "react";
 import {Sheet, SheetContent, SheetDescription, SheetTitle} from "@/components/ui/sheet";
 
-// slide-over for one row's detail, the table stays visible behind it
+// slide-over for one row, the table stays visible behind it
 export function DetailSheet({
                                 open,
                                 onClose,

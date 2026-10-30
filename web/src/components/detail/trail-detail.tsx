@@ -4,6 +4,8 @@ import {Fragment, type ReactNode} from "react";
 import {ExternalLink} from "lucide-react";
 import {En} from "@/components/en";
 import {Chip} from "@/components/chip";
+import {EvidenceWarnings} from "@/components/evidence-warnings";
+import {JurisdictionSelect} from "@/components/jurisdiction-select";
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
@@ -121,6 +123,7 @@ export function TrailDetail({
                         </Fragment>
                     ))}
             </p>
+            <JurisdictionSelect commitment={com}/>
             {row.status !== "unknown" && (
                 <div>
                     <Chip
@@ -180,7 +183,7 @@ export function TrailDetail({
                     ))}
                     {row.budgets.slice(0, MAX_BUDGET_LINES).map((b) => (
                         <p key={b.id} className="mt-1 text-xs text-muted-foreground">
-                            {huf(b.amount_huf)} — {BUDGET_LABEL[b.kind]} (
+                            {(b.currency === "EUR" ? b.amount_raw : huf(b.amount_huf))} — {BUDGET_LABEL[b.kind]} (
                             {b.fiscal_year ?? "year unknown"}) — “{b.description}”{" "}
                             <a
                                 className="underline"
@@ -207,6 +210,24 @@ export function TrailDetail({
                     {unrelated.map((ev) => (
                         <EvidenceLine key={ev.id} ev={ev}/>
                     ))}
+                </div>
+            )}
+
+            {row.financial_states.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                    Money on record: {row.financial_states.map((k) => BUDGET_LABEL[k]).join(" → ")}
+                    {row.financially_executed ? " · spending confirmed" : " · spending not confirmed"}
+                </p>
+            )}
+
+            {row.findings.length > 0 && (
+                <div>
+                    <SectionLabel tone="red">Audit findings</SectionLabel>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                        {row.findings.map((f, i) => (
+                            <li key={i}>{f}</li>
+                        ))}
+                    </ul>
                 </div>
             )}
 
@@ -276,6 +297,7 @@ function EvidenceLine({ev}: { ev: EvidenceItem }) {
                     .filter(Boolean)
                     .join(" · ")}
             </p>
+            <EvidenceWarnings ev={ev}/>
         </div>
     );
 }

@@ -6,8 +6,8 @@ import {useMutation, useQuery} from "@tanstack/react-query";
 import {api, errorMessage} from "./api";
 import {keys, useInvalidateDomain, useJobs} from "./hooks";
 
-// starts evidence searches and follows them, the server is the source of truth
-// for what is running so a reload or another tab keeps following in-flight jobs
+// starts evidence searches and follows them. the server knows what's running,
+// so a reload or another tab keeps following
 export function useSearchJobs() {
     const invalidate = useInvalidateDomain();
     const [startedIds, setStartedIds] = useState<string[]>([]);

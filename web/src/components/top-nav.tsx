@@ -21,7 +21,7 @@ export function TopNav() {
     const {data: documents} = useDocuments();
     const {on: translateOn, setOn: setTranslateOn} = useTranslate();
     const [startedIds, setJobIds] = useState<string[]>([]);
-    // the server knows what is running, so a reload keeps following an ingest
+    // the server knows what's running, so a reload keeps following an ingest
     const {data: inFlight} = useQuery({
         queryKey: keys.activeJobs("ingest"),
         queryFn: () => api.activeJobs("ingest"),

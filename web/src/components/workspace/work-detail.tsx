@@ -33,7 +33,7 @@ export function WorkDetail({
 }) {
     const [trailSel, setTrailSel] = useState<number | undefined>();
 
-    // before confirmation the panel is the review form itself
+    // before confirmation the panel is the review form
     if (row.stage === "confirm")
         return (
             <CandidateDetail

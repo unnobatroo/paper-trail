@@ -1,10 +1,13 @@
 "use client";
 
-/** Shared TanStack Query hooks + query keys for the Paper Trail API. */
+// shared tanstack query hooks + openapi-react-query client
 
 import {useCallback} from "react";
-import {useQueries, useQuery, useQueryClient,} from "@tanstack/react-query";
-import {api, type Job} from "./api";
+import createQueryClient from "openapi-react-query";
+import {useQueries, useQuery, useQueryClient} from "@tanstack/react-query";
+import {api, client, type Job} from "./api";
+
+export const $api = createQueryClient(client);
 
 export const keys = {
     meta: ["meta"] as const,
@@ -37,8 +40,7 @@ export function useCommitments() {
 }
 
 export function useLinks() {
-    // lite=1 keeps the queue payload small — the inspector fetches the
-    // full evidence record on demand via useLink
+    // lite=1 keeps the queue small, the inspector grabs the full record via useLink
     return useQuery({queryKey: keys.links, queryFn: () => api.links(true)});
 }
 
@@ -54,20 +56,20 @@ export function useTrail() {
     return useQuery({queryKey: keys.trail, queryFn: api.trail});
 }
 
-/** Invalidate every domain list after a review mutation. */
+// refetch every domain list after a review mutation
 export function useInvalidateDomain() {
     const qc = useQueryClient();
     return useCallback(() =>
         qc.invalidateQueries({
             predicate: (q) =>
-                // "jobs" so a finished batch drops out of the in-flight list
-                ["candidates", "commitments", "links", "link", "trail", "documents", "jobs"].includes(
+                // "jobs" so a finished batch leaves the in-flight list
+                ["candidates", "commitments", "links", "link", "trail", "documents", "jobs", "get"].includes(
                     q.queryKey[0] as string,
                 ),
         }), [qc]);
 }
 
-/** Poll a set of durable jobs until all reach done/failed. */
+// poll durable jobs until they're all done/failed
 export function useJobs(jobIds: string[]) {
     const results = useQueries({
         queries: jobIds.map((id) => ({

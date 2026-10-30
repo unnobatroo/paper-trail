@@ -5,7 +5,7 @@ import {useQuery} from "@tanstack/react-query";
 import {api} from "@/lib/api";
 import {keys} from "@/lib/hooks";
 
-/** Translation toggle context — EN is always visibly secondary. */
+// translation toggle, english always looks secondary
 const TranslateCtx = createContext<{
     on: boolean;
     setOn: (v: boolean) => void;
@@ -27,8 +27,7 @@ export function useTranslate() {
     return useContext(TranslateCtx);
 }
 
-/** Renders the machine translation of the source text when enabled —
- * cached per-text forever via TanStack Query. */
+// machine translation under the source text when on, cached per text forever
 export function En({text}: { text: string | null | undefined }) {
     const {on} = useTranslate();
     const {data} = useQuery({

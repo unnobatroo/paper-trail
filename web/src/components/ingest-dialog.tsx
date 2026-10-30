@@ -67,7 +67,7 @@ export function IngestDialog({onJob}: { onJob: (ids: string[]) => void }) {
 
     const name = useWatch({control: form.control, name: "name"});
 
-    // a name typed before the list loaded may not exist in the store
+    // a name typed before the list loaded may not exist
     useEffect(() => {
         if (names?.length && name && !names.includes(name)) form.setValue("name", "");
     }, [names, name, form]);
