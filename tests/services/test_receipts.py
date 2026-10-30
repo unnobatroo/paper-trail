@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
@@ -13,10 +15,11 @@ class ForgedExtractor:
                                       (1, " ")]]
 
 
-def test_ingestion_recomputes_receipts(policy, monkeypatch):
-    monkeypatch.setattr("paper_trail.services.ingestion_service.read_pages",
-                        lambda _: [DocumentPage(page_number=1, text="A real quote here")])
-    _, count = IngestionService(policy, ForgedExtractor()).ingest(b"pdf", "title", "publisher")
+def test_ingestion_recomputes_receipts(policy):
+    page = DocumentPage(page_number=1, text="A real quote here")
+    parser = SimpleNamespace(parse=lambda _: SimpleNamespace(pages=[page]))
+    _, count = IngestionService(policy, ForgedExtractor(), parser=parser).ingest(
+        b"pdf", "title", "publisher")
     assert count == 1
     assert [c.source_excerpt for c in policy.candidates()] == ["real quote"]
 

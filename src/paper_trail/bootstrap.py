@@ -97,11 +97,8 @@ def build_state(settings: Settings | None = None) -> AppState:
                             settings.embed_api_key, str(settings.model_cache))
     extractor = get_extractor(settings.llm_base_url, settings.llm_api_key, settings.llm_model,
                               profile, settings.llm_window_pages, settings.llm_concurrency)
-    if settings.search_provider == "searxng":
-        from .sources.web_search import SearxngSearchProvider
-        search = SearxngSearchProvider(settings.searxng_url, settings.allowed_domains)
-    else:
-        search = get_search_provider(settings.search_provider, settings.fixture_dir)
+    search = get_search_provider(settings.search_provider, settings.fixture_dir,
+                                 settings.searxng_url, settings.allowed_domains)
     reranker = get_reranker(settings.reranker_model, settings.rerank_base_url,
                             settings.rerank_api_key, settings.rerank_model, settings.rerank_batch)
     return AppState(
