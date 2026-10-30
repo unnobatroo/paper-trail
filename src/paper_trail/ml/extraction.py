@@ -13,11 +13,11 @@ from difflib import SequenceMatcher
 from itertools import chain
 
 import openai
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..domain.enums import CandidateType
 from ..domain.models import DocumentPage, PolicyCandidate
-from .client import model_client
+from .client import ask_json, model_client
 from .lang import LanguageProfile
 
 log = logging.getLogger(__name__)
@@ -160,20 +160,8 @@ class LLMExtractor:
         self._max_tokens = max_tokens
 
     def _ask(self, pages: list[DocumentPage]) -> _Reply | None:
-        """one call. None when the reply isn't valid json for the schema, http errors raise"""
-        resp = self._client.chat.completions.create(
-            model=self._model, temperature=0, max_tokens=self._max_tokens,
-            messages=[{"role": "user", "content": extraction_prompt(self._profile, pages)}],
-            response_format={"type": "json_schema", "json_schema": {
-                "name": "policy_candidates", "strict": True,
-                "schema": _Reply.model_json_schema()}},
-            # hybrid qwen3 thinks the whole budget away and answers nothing otherwise
-            extra_body=({"chat_template_kwargs": {"enable_thinking": False}}
-                        if "qwen3" in self._model.lower() else None))
-        try:
-            return _Reply.model_validate_json(resp.choices[0].message.content or "")
-        except ValidationError:
-            return None
+        return ask_json(self._client, self._model, extraction_prompt(self._profile, pages),
+                        _Reply, "policy_candidates", self._max_tokens)
 
     def _ask_window(self, window: list[DocumentPage]) -> list[tuple[list[DocumentPage],
                                                                     _Reply | None]]:

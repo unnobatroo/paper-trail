@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+
+from pydantic import Field
 
 from ..domain.enums import BudgetKind, EvidenceFlag, RelationshipType, ReviewStatus, Status
-from ..domain.models import BudgetRecord, Commitment, EvidenceItem
+from ..domain.models import BudgetRecord, Commitment, DomainModel, EvidenceItem
 from ..ml.accountability import FinancialAuditor, PassageAuditor
 from ..ml.lang import LanguageProfile
 from ..repositories.store import EvidenceRepository, PolicyRepository
@@ -36,21 +37,20 @@ _STATUS_ORDER = [
 ]
 
 
-@dataclass
-class TrailRow:
-    """a commitment + everything verified about it"""
+class TrailRow(DomainModel):
+    """a commitment + everything verified about it, the api returns it as is"""
 
     commitment: Commitment
-    evidence: list[EvidenceItem] = field(default_factory=list)
-    relationships: list[RelationshipType] = field(default_factory=list)
-    budgets: list[BudgetRecord] = field(default_factory=list)
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+    relationships: list[RelationshipType] = Field(default_factory=list)
+    budgets: list[BudgetRecord] = Field(default_factory=list)
     status: Status = Status.UNKNOWN
     status_excerpt: str | None = None
-    gaps: list[str] = field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
     # money accepted evidence proves, one entry per state, never a sum
-    financial_states: list[BudgetKind] = field(default_factory=list)
+    financial_states: list[BudgetKind] = Field(default_factory=list)
     financially_executed: bool = False
-    findings: list[str] = field(default_factory=list)
+    findings: list[str] = Field(default_factory=list)
 
 
 class MetricsService:

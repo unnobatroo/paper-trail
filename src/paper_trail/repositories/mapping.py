@@ -5,17 +5,10 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
+from pydantic import BaseModel
+
 from ..domain.enums import ArtifactStatus, EvidencePolarity
-from ..domain.models import (
-    BudgetRecord,
-    Commitment,
-    EvidenceItem,
-    EvidenceLink,
-    ImplementationArtifact,
-    MatchFeatures,
-    OfficialSource,
-    PolicyCandidate,
-)
+from ..domain.models import EvidenceLink, MatchFeatures
 
 # status only ever escalates: active -> amended -> terminated
 ARTIFACT_RANK = {ArtifactStatus.ACTIVE: 0, ArtifactStatus.AMENDED: 1,
@@ -33,28 +26,8 @@ def _row(row: Mapping) -> dict:
     return {k: json.loads(v) if k in _JSON and isinstance(v, str) else v for k, v in row.items()}
 
 
-def to_candidate(row: Mapping) -> PolicyCandidate:
-    return PolicyCandidate.model_validate(_row(row))
-
-
-def to_commitment(row: Mapping) -> Commitment:
-    return Commitment.model_validate(_row(row))
-
-
-def to_evidence(row: Mapping) -> EvidenceItem:
-    return EvidenceItem.model_validate(_row(row))
-
-
-def to_budget(row: Mapping) -> BudgetRecord:
-    return BudgetRecord.model_validate(_row(row))
-
-
-def to_official_source(row: Mapping) -> OfficialSource:
-    return OfficialSource.model_validate(_row(row))
-
-
-def to_artifact(row: Mapping) -> ImplementationArtifact:
-    return ImplementationArtifact.model_validate(_row(row))
+def to_model[M: BaseModel](model: type[M], row: Mapping) -> M:
+    return model.model_validate(_row(row))
 
 
 def to_link(row: Mapping) -> EvidenceLink:
