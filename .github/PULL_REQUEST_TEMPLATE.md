@@ -9,8 +9,8 @@
 - [ ] Honesty rules preserved: nothing auto-accepted, provenance intact,
   money typed, status quoted, MT labelled
 - [ ] New providers implement the existing ABCs (no vendor logic in services)
-- [ ] If dependencies changed: `uv lock` + `requirements.txt` regenerated
-  (`uv export --format requirements-txt --no-hashes --no-dev --no-group ml`)
+- [ ] If dependencies changed: `uv lock`
+- [ ] If api models changed: frontend types regenerated (`npm run gen:api`)
 - [ ] Wiki docs updated if behaviour changed
 
 ## Test plan

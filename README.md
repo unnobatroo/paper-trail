@@ -2,89 +2,21 @@
 
 **Did they actually do what they promised?**
 
-Paper Trail started with a simple frustration: councils publish big,
-ambitious climate strategies, and a few years later nobody can say which
-of those promises turned into anything real. The evidence is out there —
-in annual reports, procurement notices, budget resolutions — but it's
-scattered across official websites in PDFs and news posts that nobody has
-time to cross-reference by hand.
+Paper Trail reads a municipality's climate strategy, pulls out every
+commitment with a verbatim receipt, hunts for evidence in the official
+sources of whoever owns the asset, and hands it all to a person to review.
+The software only suggests: nothing reaches the public record until
+someone clicks Confirm, and a commitment with no evidence shows up as a gap.
 
-So Paper Trail does the tedious part for you. It reads the Józsefváros (Budapest District VIII) climate strategy, pulls
-out every commitment it
-finds, then searches the district's official websites for pages and
-documents that look like follow-through — the municipality's own site (jozsefvaros.hu, including the
-participatory-budget votes), the district
-developer RÉV8 (rev8.hu), and Budapest's city portal (budapest.hu). It
-ranks the best candidates, quotes the passages it thinks matter, and lays
-it all out for review.
-
-And here's the part we care about most: **the software only ever
-suggests.** Nothing enters the public record until a person clicks
-Confirm. Every suggestion comes with its receipts — the page number, the
-verbatim quote, the source URL — so you can always check where a claim
-came from. If nothing was found, the tool shows a gap instead of
-pretending otherwise.
-
-See it live at [paper-trail.vercel.app](https://paper-trail.vercel.app).
-
-## Run it yourself
-
-```bash
-git clone https://github.com/unnobatroo/paper-trail
-cd paper-trail
-uv sync                                                # install the backend
-uv run uvicorn paper_trail.api.app:app --app-dir src   # API on :8000
-
-cd web
-npm install && npm run dev                             # interface on :3000
+```sh
+make setup && make dev     # api on :8000, ui on :3000, fully offline by default
+make check                 # what ci runs
 ```
 
-Or `make setup && make dev` for both at once. `make check` runs what CI does.
+Everything else (how it works, the audit rules, running, deploying, the
+models, the database, every setting) is in the
+**[wiki](https://github.com/unnobatroo/paper-trail/wiki)**.
 
-Open http://localhost:3000. Everything happens in one workspace: each
-commitment is a row that moves through confirm, search, review and done,
-and the panel next to it shows the quote, the matches and the trail.
-Everything works offline with stub providers — the first real search
-downloads a ~220 MB open-source embedding model, and that's the only
-heavyweight thing the app ever does. If you have your own GPU box, the
-embeddings and the extraction LLM can run there instead (any
-OpenAI-compatible server, see [Running](https://github.com/unnobatroo/paper-trail/wiki/Running)).
-
-## Where things stand
-
-The production stack is boring on purpose: a Next.js frontend on Vercel,
-a FastAPI service on Azure, and Supabase holding Postgres, pgvector
-embeddings, and the source PDFs. Evidence searches run as durable
-background jobs, so a busy or restarted server never loses your work.
-
-Review writes are open by default — convenient for a local run. For a
-deployment where strangers shouldn't click Confirm, set
-`PAPER_TRAIL_REVIEW_KEY` on the API: every mutating endpoint then
-requires the `X-Review-Key` header, and the web UI asks reviewers for
-the key once and keeps it in their browser. (For a private UI,
-`NEXT_PUBLIC_REVIEW_KEY` bakes it into the bundle instead.)
-
-## Read more
-
-The [project wiki](https://github.com/unnobatroo/paper-trail/wiki) is
-where the detail lives — how the pieces fit together, how evidence is
-actually ranked, what the database looks like, and how to deploy your
-own:
-
-- [How It Works](https://github.com/unnobatroo/paper-trail/wiki/How-It-Works) — the pipeline from PDF to reviewed trail,
-  step by step
-- [Reference](https://github.com/unnobatroo/paper-trail/wiki/Reference) — the schema, every endpoint, every env var
-- [Running](https://github.com/unnobatroo/paper-trail/wiki/Running) — local setup, offline mode, and deployment
-
-## Contributing
-
-Bug reports and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md)
-has the ground rules (the short version: nothing may bypass human
-review, and every claim needs a quotable source). Security issues go to
-[SECURITY.md](SECURITY.md), and everyone is covered by the
-[Code of Conduct](CODE_OF_CONDUCT.md).
-
-## License
-
-[GPL-3.0](LICENSE) — free to use, study, share and improve; derivatives
-stay open. Copyright © 2026 Paper Trail contributors.
+[Contributing](https://github.com/unnobatroo/paper-trail/wiki/Contributing) ·
+[Security](SECURITY.md) · [Code of Conduct](CODE_OF_CONDUCT.md) ·
+[GPL-3.0](LICENSE)

@@ -16,13 +16,12 @@ land there.
 
 ## What we care about most
 
-- **Leaked secrets.** The Supabase service key and any API tokens must
-  never end up in the browser, in logs, or in git. If you find a path
+- **Leaked secrets.** Database passwords, the review key and model or API
+  tokens must never end up in the browser, in logs, or in git. If you find a path
   where they could, that's a reportable bug.
-- **Escaped fetching.** The app only ever fetches allowlisted official
-  domains (jozsefvaros.hu, rev8.hu, budapest.hu). Anything that lets
-  untrusted input widen that list or send requests elsewhere is
-  reportable.
+- **Escaped fetching.** The app only ever fetches domains in its official
+  source registry. Anything that lets untrusted input widen that list or
+  send requests elsewhere (including private addresses) is reportable.
 - **Untrusted content.** Fetched pages and PDF text flow into the UI
   and the database — XSS or injection through crafted content is
   reportable.
