@@ -16,7 +16,7 @@ import {
     Target,
     Wrench,
 } from "lucide-react";
-import type {CandidateType, RelationshipType, ReviewStatus, Status,} from "./api";
+import type {CandidateType, RelationshipType, Status} from "./api";
 
 export type Tone =
     | "green"
@@ -109,11 +109,4 @@ export const REL_ICON: Record<RelationshipType, LucideIcon> = {
     budget: Banknote,
     related_but_indirect: Link2,
     probably_unrelated: Link2Off,
-};
-
-// review state of a candidate or match
-export const REVIEW_TONE: Record<ReviewStatus, Tone> = {
-    accepted: "green",
-    rejected: "red",
-    unreviewed: "amber",
 };

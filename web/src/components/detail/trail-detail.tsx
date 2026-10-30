@@ -6,8 +6,6 @@ import {Bi, En} from "@/components/en";
 import {Chip} from "@/components/chip";
 import {EvidenceWarnings} from "@/components/evidence-warnings";
 import {JurisdictionSelect} from "@/components/jurisdiction-select";
-import {Button} from "@/components/ui/button";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {STATUS_ICON, STATUS_TONE, type Tone, TONE_TEXT} from "@/lib/tones";
 import {type Commitment, type EvidenceItem, type TrailRow} from "@/lib/api";
@@ -297,44 +295,5 @@ function EvidenceLine({ev}: { ev: EvidenceItem }) {
             </p>
             <EvidenceWarnings ev={ev}/>
         </div>
-    );
-}
-
-export function Timeline({
-                             commitments,
-                             links,
-                         }: {
-    commitments: Commitment[];
-    links: { link: { review_status: string }; evidence: { published_on: string | null; title: string } | null }[];
-}) {
-    const events = new Set<string>();
-    for (const c of commitments)
-        if (c.deadline_year)
-            events.add(`${c.deadline_year}deadline — ${c.title}`);
-    for (const l of links)
-        if (l.link.review_status === "accepted" && l.evidence?.published_on)
-            events.add(
-                `${l.evidence.published_on.slice(0, 4)}published — ${l.evidence.title}`,
-            );
-    if (!events.size) return null;
-    return (
-        <Popover>
-            <PopoverTrigger
-                render={<Button variant="outline" size="sm" className="mt-6"/>}
-            >
-                Dates we know
-            </PopoverTrigger>
-            <PopoverContent className="w-96">
-                <p className="mb-2 font-medium">Dates we know</p>
-                <div className="max-h-64 space-y-1 overflow-y-auto">
-                    {[...events].sort().map((e) => (
-                        <p key={e} className="text-xs">
-                            <span className="font-medium">{e.slice(0, 4)}</span> —{" "}
-                            {e.slice(4)}
-                        </p>
-                    ))}
-                </div>
-            </PopoverContent>
-        </Popover>
     );
 }
