@@ -45,8 +45,9 @@ def test_lead_code_comes_off_the_title():
     from paper_trail.ml.extraction import lead_code
     assert [lead_code(t) for t in ("M1.1.2 Távhő", "Ks1: szabályok", "Má-1 ÜHG", "Ms-3",
                                    "2030-ra csökken", "Távhő fejlesztése", "A1. cél",
-                                   "1.01 Carbon roadmap", "2030 target")] == [
-        "M1.1.2", "Ks1", "Má-1", "Ms-3", None, None, "A1", "1.01", None]
+                                   "1.01 Carbon roadmap", "2030 target",
+                                   "1.5 million trees planted")] == [
+        "M1.1.2", "Ks1", "Má-1", "Ms-3", None, None, "A1", "1.01", None, None]
 
 
 def test_profile_roundtrips_and_no_llm_finds_nothing():
@@ -120,6 +121,10 @@ def test_dedupe_drops_the_same_passage_twice_on_a_page():
     assert dedupe([two, five]) == [two, five]
     # a shorter quote of the same passage still merges
     assert dedupe([two, _cand(1, "Plant 200 street trees")]) == [two]
+    # a number-free quote doesn't swallow the one that carries the quantity
+    roofs = _cand(1, "Install green roofs on primary schools.")
+    both = _cand(1, "Install green roofs on primary schools by 2027 and plant 200 trees.")
+    assert dedupe([roofs, both]) == [roofs, both]
 
 
 def test_fact_sheet_rows_are_not_commitments():
@@ -131,7 +136,28 @@ def test_fact_sheet_rows_are_not_commitments():
                  "• Lehetséges forrás VMOP, ZIKOP, TOP Plusz"):
         assert form_row(junk, labels), junk
     for real in ("Zöldtető alkalmazására pilot projektet kell tervezni 2025-ig.",
+                 "Forrásokat biztosít az önkormányzat a fák ültetésére.",
                  "Az önkormányzat felelős a fasorok gondozásáért és bővítéséért."):
         assert not form_row(real, labels), real
     # no labels in the profile = rule off
     assert not form_row("Időtáv 2021-2030", ())
+
+
+def test_a_failed_half_page_retry_skips_that_half_only():
+    import openai
+
+    from paper_trail.domain.models import DocumentPage
+    from paper_trail.ml.extraction import LLMExtractor, _Item, _Reply
+    page = DocumentPage(page_number=3, text="Fák ültetése.\nNapelemek az iskolákon.")
+
+    def ask(pages):
+        text = pages[0].text
+        if "\n" in text:
+            return None  # cut off json, retry in halves
+        if text.startswith("Fák"):
+            raise openai.APIConnectionError(request=None)
+        return _Reply(items=[_Item(type="measure", normalized_title="Napelemek", text=text,
+                                   page=3, excerpt="Napelemek az iskolákon")])
+    ex = LLMExtractor(None, "fake", HU, window=1)
+    ex._ask = ask
+    assert [c.source_excerpt for c in ex.extract([page])] == ["Napelemek az iskolákon"]

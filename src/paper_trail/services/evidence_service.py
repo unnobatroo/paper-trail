@@ -79,7 +79,7 @@ class EvidenceService:
     ):
         self._analyzer = analyzer
         self._crawler = crawler
-        self._fetch_workers = max_fetch_workers
+        self._fetch_workers = max(1, max_fetch_workers)  # scripts skip the settings bound
         self._repo = repo
         self._search = search
         self._embed = embedder
