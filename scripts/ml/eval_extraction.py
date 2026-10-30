@@ -112,6 +112,8 @@ def main() -> None:
     ap.add_argument("--ca")
     ap.add_argument("--out")
     ap.add_argument("--concurrency", type=int, default=1)
+    ap.add_argument("--baseline", type=Path,
+                    help="an earlier --out report: exit 1 unless holdout recall goes up")
     args = ap.parse_args()
     if args.ca:
         os.environ["PAPER_TRAIL_MODEL_CA_BUNDLE"] = args.ca
@@ -151,6 +153,22 @@ def main() -> None:
     if args.out:
         Path(args.out).write_text(json.dumps({"summary": summary, "docs": per_doc},
                                              indent=2, ensure_ascii=False))
+    if args.baseline:
+        raise SystemExit(gate(json.loads(args.baseline.read_text()), summary, per_doc))
+
+
+def gate(baseline: dict, summary: dict, per_doc: dict) -> int:
+    """the ship rule: better on documents it never trained on, or it doesn't ship"""
+    for name, d in per_doc.items():
+        old = baseline["docs"].get(name, {}).get("recall")
+        if old is not None:
+            print(f"{name:30} {d['split']:8} {old:.3f} -> {d['recall']:.3f}")
+    old, new = (baseline["summary"]["recall_macro_holdout"], summary["recall_macro_holdout"])
+    if old is None or new is None:
+        print("no holdout docs on one side, can't gate")
+        return 1
+    print(f"holdout macro recall {old:.3f} -> {new:.3f}: {'SHIP' if new > old else 'NO SHIP'}")
+    return 0 if new > old else 1
 
 
 if __name__ == "__main__":
