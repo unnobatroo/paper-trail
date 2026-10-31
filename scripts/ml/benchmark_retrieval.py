@@ -16,7 +16,7 @@ from pathlib import Path
 
 from paper_trail.ml.embeddings import get_provider
 from paper_trail.ml.rerank import get_reranker
-from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
+from paper_trail.repositories.index import PostgresPageStore, PostgresVectorIndex
 from paper_trail.sources.fetch import FetchedPage
 
 CHUNK = 2400  # same as evidence_service, part of the cache key only

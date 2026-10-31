@@ -9,9 +9,9 @@ from urllib.parse import urlsplit
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ..ml.embeddings import DEFAULT_EMBED_MODEL
+from .ml.embeddings import DEFAULT_EMBED_MODEL
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):

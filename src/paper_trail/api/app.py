@@ -11,7 +11,7 @@ from asgi_correlation_id import CorrelationIdMiddleware, correlation_id
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..infrastructure.settings import load
+from ..settings import load
 from .routers import (
     candidates,
     commitments,

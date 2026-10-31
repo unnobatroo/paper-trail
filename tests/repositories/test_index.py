@@ -2,7 +2,7 @@
 
 import pytest
 
-from paper_trail.repositories.postgres.index import (
+from paper_trail.repositories.index import (
     PostgresPageStore,
     PostgresVectorIndex,
     content_key,

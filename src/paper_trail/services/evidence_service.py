@@ -29,7 +29,7 @@ from ..ml.lang import LanguageProfile
 from ..ml.ner import NoNer
 from ..ml.nlp import Analysis, HuSpacyAnalyzer
 from ..ml.rerank import Reranker
-from ..repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
+from ..repositories.index import PostgresPageStore, PostgresVectorIndex
 from ..repositories.store import EvidenceRepository
 from ..sources import fetch as fetching
 from ..sources.chunking import structure_chunks

@@ -5,7 +5,7 @@ import pytest
 
 from paper_trail.ml.extraction import source_excerpt
 from paper_trail.ml.rerank import Reranker
-from paper_trail.repositories.postgres.index import reciprocal_rank_fusion
+from paper_trail.repositories.index import reciprocal_rank_fusion
 from paper_trail.sources.chunking import structure_chunks
 from paper_trail.sources.parsers import FallbackDocumentParser, ParsedDocument
 from paper_trail.sources.web_search import SearxngSearchProvider, allowed

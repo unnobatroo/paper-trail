@@ -12,8 +12,8 @@ import httpx
 import requests
 from sqlalchemy import text
 
-from ...domain.jobs import Job, dedupe_key
-from ..store import Repo
+from ..repositories.store import Repo
+from . import Job, dedupe_key
 
 log = logging.getLogger(__name__)
 

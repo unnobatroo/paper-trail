@@ -33,7 +33,7 @@ body:
     id: env
     attributes:
       label: Environment
-      description: "local / zakazserver; backend: sqlite or postgres; embed model + reranker settings"
+      description: "local or self-hosted; embed model, reranker and LLM settings"
   - type: checkboxes
     id: honesty
     attributes:
