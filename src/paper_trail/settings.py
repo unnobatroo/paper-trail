@@ -31,8 +31,6 @@ class Settings(BaseSettings):
         default="internal", validation_alias="JOB_MODE")
     parser: Literal["pypdf", "docling"] = Field(
         default="pypdf", validation_alias="PARSER")
-    parser_device: Literal["cpu", "cuda"] = Field(
-        default="cpu", validation_alias="PARSER_DEVICE")
     nlp: Literal["rules", "huspacy"] = Field(
         default="rules", validation_alias="NLP")
     # who/where/when in passages: gliner on cpu (prod worker, `uv sync --extra ner`),

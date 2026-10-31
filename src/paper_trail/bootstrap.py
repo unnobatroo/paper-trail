@@ -83,7 +83,7 @@ def build_state(settings: Settings | None = None) -> AppState:
     if settings.parser == "docling":
         artifact_dir = (settings.document_dir or settings.seed_dir) / "parsed"
         parser = FallbackDocumentParser(
-            DoclingDocumentParser(device=settings.parser_device, artifact_dir=artifact_dir),
+            DoclingDocumentParser(artifact_dir=artifact_dir),
             parser)
     crawler = SitemapCrawler() if settings.enable_sitemaps else None
 
