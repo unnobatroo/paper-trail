@@ -39,3 +39,19 @@ def test_compare_binary_counts_two_and_up():
     b = {("q", "x"): 3, ("q", "y"): 1, ("q", "w"): 2}
     got = agree.compare(a, b)
     assert got["pairs"] == 2 and got["exact"] == 0.0 and got["binary"] == 1.0
+
+
+def test_read_docx_sheet(tmp_path):
+    import zipfile
+
+    def p(text):
+        return f'<w:p><w:r><w:t xml:space="preserve">{text}</w:t></w:r></w:p>'
+
+    xml = "".join([p("Pair 1 / 2"), p("ID: c1 / e1"), p("Grade (0–3)"),
+                   p("one number: 0, 1, 2 or 3"), p("2 maybe"), p("Note"),
+                   p("Pair 2 / 2"), p("ID: c1 / e2"), p("Grade (0–3)"),
+                   p("one number: 0, 1, 2 or 3"), p(""), p("Note")])
+    path = tmp_path / "anna.docx"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", f"<w:document><w:body>{xml}</w:body></w:document>")
+    assert agree.read_sheet(path) == {("c1", "e1"): 2}
