@@ -1,0 +1,7 @@
+# no domain yet: publish the app on localhost only and let tailscale do https in front,
+#   COMPOSE_FILE=docker-compose.yml:expose.yml docker compose up -d api worker searxng backup
+#   sudo tailscale funnel --bg 8000
+# once DNS points here, start caddy instead and drop this file from COMPOSE_FILE
+services:
+  api:
+    ports: ["127.0.0.1:8000:8000"]
