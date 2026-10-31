@@ -108,12 +108,16 @@ class PostgresVectorIndex(Repo):
         if not pages or not any(query):
             return []
         by_url = {p.url: p for p in pages}
+        # OR the stemmed terms: the query is a whole commitment, no chunk has every word,
+        # so an AND query (websearch/plainto) matches nothing and hybrid goes dense-only
         if self.analyzer:
             # lemmas are stored pre-analyzed, so the 'simple' config is enough
-            tsv, tsq = "c.lemma_search", "websearch_to_tsquery('simple', :terms)"
+            tsv = "c.lemma_search"
+            tsq = "replace(plainto_tsquery('simple', :terms)::text, '&', '|')::tsquery"
         else:
             tsv = "to_tsvector(CAST(:cfg AS regconfig), c.text)"
-            tsq = "websearch_to_tsquery(CAST(:cfg AS regconfig), :terms)"
+            tsq = ("replace(plainto_tsquery(CAST(:cfg AS regconfig), :terms)::text,"
+                   " '&', '|')::tsquery")
         params = {"q": _vector(query), "urls": list(by_url),
                   "models": [self._key(p, model, chunk_size) for p in pages],
                   "terms": self._lemmas(query_text), "cfg": self.ts_config,
