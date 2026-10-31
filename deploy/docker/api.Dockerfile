@@ -3,7 +3,7 @@ FROM ghcr.io/astral-sh/uv:0.11.2 AS uv
 FROM python:3.12-slim AS base
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 \
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_CACHE=1 PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 \
     NICEGUI_STORAGE_PATH=/app/data/.nicegui
 # ^ the ui's per-browser storage (review key, language). /app isn't writable for the app
 # user, the data volume is and survives restarts; dotfile so the document list skips it
