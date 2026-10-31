@@ -1,18 +1,15 @@
 # Paper Trail
 
-**Did they actually do what they promised?**
+**Did a city actually do what its climate strategy promised?**
 
-Paper Trail reads a municipality's climate strategy, pulls out every
-commitment with a verbatim receipt, hunts for evidence in the official
-sources of whoever owns the asset, and hands it all to a person to review.
-The software only suggests: nothing reaches the public record until
-someone clicks Confirm, and a commitment with no evidence shows up as a gap.
+Paper Trail reads the strategy, pulls out every commitment with a verbatim quote as proof,
+searches the official sources for evidence, and hands everything to a person to confirm.
+Nothing reaches the public record without a human click.
 
 ```sh
 make setup && make dev     # api + review ui on :8000, fully offline by default
-make check                 # what ci runs
 ```
 
-Everything else (how it works, the audit rules, running, deploying, the
-models, the database, every setting) is in the
-**[wiki](https://github.com/unnobatroo/paper-trail/wiki)**.
+All documentation lives in the **[wiki](https://github.com/unnobatroo/paper-trail/wiki)**:
+start with [Home](https://github.com/unnobatroo/paper-trail/wiki), then
+[Getting Started](https://github.com/unnobatroo/paper-trail/wiki/Getting-Started).

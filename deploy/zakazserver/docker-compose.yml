@@ -42,6 +42,7 @@ x-application: &application
     PARSER: docling
     PARSER_DEVICE: cpu
     NLP: huspacy
+    NER: gliner
     # extra evidence domains, normally empty, sources live in official_sources
     ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
     MODEL_CACHE: /app/model-cache

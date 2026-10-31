@@ -35,8 +35,9 @@ class Settings(BaseSettings):
         default="cpu", validation_alias="PARSER_DEVICE")
     nlp: Literal["rules", "huspacy"] = Field(
         default="rules", validation_alias="NLP")
-    # who/where/when in passages: gliner on cpu, none = bare years only (tests, dev boxes)
-    ner: Literal["gliner", "none"] = Field(default="gliner", validation_alias="NER")
+    # who/where/when in passages: gliner on cpu (prod worker, `uv sync --extra ner`),
+    # none = bare years only. none by default so a fresh `make setup` just works
+    ner: Literal["gliner", "none"] = Field(default="none", validation_alias="NER")
     searxng_url: str | None = Field(default=None, validation_alias="SEARXNG_URL")
     rerank_base_url: str | None = Field(
         default=None, validation_alias="RERANK_BASE_URL")
