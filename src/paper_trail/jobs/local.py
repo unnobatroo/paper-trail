@@ -1,11 +1,11 @@
-"""in-process job runner for dev/tests. prod uses repositories/postgres/jobs.py"""
+"""in-process job runner for dev/tests. prod uses the postgres queue in jobs/postgres.py"""
 
 from __future__ import annotations
 
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
-from ..domain.jobs import IN_FLIGHT, Handler, Job
+from . import IN_FLIGHT, Handler, Job
 
 
 class JobRunner:

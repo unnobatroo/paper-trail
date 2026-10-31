@@ -16,8 +16,8 @@ import typer
 
 from .domain.enums import Jurisdiction
 from .domain.models import OfficialSource
-from .repositories.postgres.db import connect
-from .repositories.postgres.jobs import PostgresJobRunner
+from .jobs.postgres import PostgresJobRunner
+from .repositories.db import connect
 from .repositories.store import EvidenceRepository, PolicyRepository
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=__doc__)
@@ -37,7 +37,7 @@ def _owner_dsn() -> str:
 
 
 def _local_repo():
-    from .infrastructure.settings import load
+    from .settings import load
     settings = load()
     return settings, PolicyRepository(settings.database_url)
 

@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.models import Commitment
+from ...jobs.local import JobRunner
 from ..deps import get_jobs, get_state, require_review_key
-from ..jobs import JobRunner
 from ..schemas import JobOut, JurisdictionRequest
 
 router = APIRouter(prefix="/api/commitments", tags=["commitments"])

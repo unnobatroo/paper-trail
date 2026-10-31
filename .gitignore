@@ -32,7 +32,7 @@ coverage.xml
 !.env.example
 !.env.*.example
 
-# local docs, sqlite, caches, models. never source, real data lives in the db
+# local docs, caches, models. never source, real data lives in the db
 data/
 
 # private agent notes

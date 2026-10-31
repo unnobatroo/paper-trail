@@ -106,7 +106,7 @@ def main() -> None:
     args = ap.parse_args()
     if not args.doc and not args.gold:
         ap.error("nothing to build from, pass --doc and/or --gold")
-    from paper_trail.infrastructure.settings import load
+    from paper_trail.settings import load
     settings = load()
     repo = PolicyRepository(settings.database_url)
     profile = load_profile(repo, args.language)

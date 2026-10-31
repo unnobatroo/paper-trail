@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...bootstrap import AppState
 from ...domain.models import SourceDocument
+from ...jobs.local import JobRunner
 from ..deps import get_jobs, get_state, require_review_key
-from ..jobs import JobRunner
 from ..schemas import IngestRequest, JobOut
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])

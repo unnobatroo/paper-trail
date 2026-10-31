@@ -14,8 +14,8 @@ import sys
 
 import requests
 
-from paper_trail.infrastructure.settings import load
 from paper_trail.repositories.store import EvidenceRepository
+from paper_trail.settings import load
 
 # public instances are often overloaded (502/504), try the next one
 OVERPASS = ("https://overpass-api.de/api/interpreter",

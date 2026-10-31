@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import psycopg
 
-from paper_trail.repositories.postgres.jobs import PostgresJobRunner, PostgresWorker
+from paper_trail.jobs.postgres import PostgresJobRunner, PostgresWorker
 
 
 def _sql(dsn, sql, *params):

@@ -7,8 +7,8 @@ from collections.abc import Iterable
 
 from sqlalchemy import text
 
-from ...sources.fetch import FetchedPage
-from ..store import Repo
+from ..sources.fetch import FetchedPage
+from .store import Repo
 
 # pgvector column width, shorter vectors get zero-padded (cosine doesn't care)
 VECTOR_DIM = 1024

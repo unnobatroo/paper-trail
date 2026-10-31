@@ -10,7 +10,7 @@ from datetime import date
 from paper_trail.domain.enums import CandidateType, ReviewStatus, Status
 from paper_trail.domain.models import Commitment, OfficialSource
 from paper_trail.ml.embeddings import HashingProvider
-from paper_trail.repositories.postgres.index import PostgresPageStore
+from paper_trail.repositories.index import PostgresPageStore
 from paper_trail.repositories.store import EvidenceRepository
 from paper_trail.services.evidence_service import (
     _CHUNK,

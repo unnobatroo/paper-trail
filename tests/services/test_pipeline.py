@@ -12,7 +12,7 @@ from paper_trail.domain.enums import (
 )
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
 from paper_trail.ml.embeddings import HashingProvider
-from paper_trail.repositories.postgres.index import PostgresPageStore
+from paper_trail.repositories.index import PostgresPageStore
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.services.evidence_service import EvidenceService
 from paper_trail.services.metrics_service import MetricsService

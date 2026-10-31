@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from paper_trail.infrastructure.settings import Settings
+from paper_trail.settings import Settings
 
 
 def config(**overrides):

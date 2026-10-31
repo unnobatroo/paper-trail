@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ...jobs.local import JobRunner
 from ..deps import get_jobs
-from ..jobs import JobRunner
 from ..schemas import JobOut
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])

@@ -8,7 +8,7 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, Request
 
 from ..bootstrap import AppState, build_state
-from .jobs import JobRunner
+from ..jobs.local import JobRunner
 
 
 @lru_cache
@@ -61,7 +61,7 @@ def get_jobs():
     """the postgres queue + worker when JOB_MODE=external (prod), in-process otherwise"""
     settings = get_state().settings
     if settings.job_mode == "external":
-        from ..repositories.postgres.jobs import PostgresJobRunner
+        from ..jobs.postgres import PostgresJobRunner
 
         return PostgresJobRunner(settings.database_url)
     return JobRunner(_handlers())

@@ -13,7 +13,7 @@ import secrets
 from nicegui import ui
 
 from ..api.app import create_app
-from ..infrastructure.settings import load
+from ..settings import load
 from . import pages  # noqa: F401  registers the @ui.page routes
 
 

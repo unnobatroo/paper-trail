@@ -21,9 +21,9 @@ from paper_trail.domain.models import (
     PolicyCandidate,
     SourceDocument,
 )
-from paper_trail.repositories.postgres.db import connect
-from paper_trail.repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
-from paper_trail.repositories.postgres.jobs import PostgresJobRunner, PostgresWorker
+from paper_trail.jobs.postgres import PostgresJobRunner, PostgresWorker
+from paper_trail.repositories.db import connect
+from paper_trail.repositories.index import PostgresPageStore, PostgresVectorIndex
 from paper_trail.repositories.store import EvidenceRepository, PolicyRepository
 from paper_trail.sources.fetch import FetchedPage
 

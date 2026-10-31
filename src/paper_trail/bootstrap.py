@@ -7,18 +7,18 @@ import os
 import re
 from dataclasses import dataclass
 
-from .infrastructure.settings import Settings, load
 from .ml.embeddings import get_provider
 from .ml.extraction import get_extractor
 from .ml.lang import LanguageProfile
 from .ml.ner import get_ner
 from .ml.rerank import get_reranker
-from .repositories.postgres.index import PostgresPageStore, PostgresVectorIndex
+from .repositories.index import PostgresPageStore, PostgresVectorIndex
 from .repositories.store import EvidenceRepository, PolicyRepository
 from .services.evidence_service import EvidenceService
 from .services.ingestion_service import IngestionService
 from .services.metrics_service import MetricsService
 from .services.review_service import ReviewService
+from .settings import Settings, load
 from .sources.document_store import DocumentStore
 from .sources.parsers import DoclingDocumentParser, FallbackDocumentParser, PypdfDocumentParser
 from .sources.sitemaps import SitemapCrawler
