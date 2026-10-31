@@ -29,10 +29,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-parsing = ["docling>=2"]
+# torch listed here only so the cpu index below applies, docling/gliner pull it anyway
+parsing = ["docling>=2", "torch", "torchvision"]
 hungarian = ["spacy>=3.8,<3.9"]
 # NER=gliner, multilingual ner on cpu
-ner = ["gliner>=0.2"]
+ner = ["gliner>=0.2", "torch"]
 
 [dependency-groups]
 dev = [
@@ -58,3 +59,14 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP"]
 # B008: fastapi's Depends() in defaults is the idiom. E741: `l` for link reads fine here
 ignore = ["B008", "E741"]
+
+# cpu torch: the gpu belongs to goethe (8 gb, no room for docling), and the cuda wheels
+# add ~5 gb of nvidia libs that made the worker image too big to build on the server
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
