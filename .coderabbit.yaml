@@ -25,13 +25,13 @@ reviews:
         - Nothing may enter the public record without a human decision. Flag any path that auto-accepts.
         - Re-runs must never rewrite evidence or links a reviewer already decided on.
         - Every suggestion keeps its receipts: source URL, page, verbatim quote.
-        - Job status writes must be guarded by status='running' and claimed_by (see api/jobs.py).
+        - Job status writes must be fenced by status='running', worker_id and lease_token (see jobs/postgres.py).
         - Mutating endpoints sit behind require_review_key. Open endpoints must be bounded.
         - Prefer an existing dependency or framework feature over new bespoke code (AGENTS.md).
     - path: "db/sql/**"
       instructions: |
         - Migrations are append-only. Never edit a shipped one; add the next number.
-        - Lexical search must stay OR-style over stemmed lexemes (007), matching the file backend.
+        - Lexical search must stay OR-style over stemmed lexemes (007).
     - path: ".github/workflows/**"
       instructions: |
         - Prefer maintained actions and pre-commit hooks over inline shell logic.
