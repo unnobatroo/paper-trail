@@ -35,8 +35,7 @@ class PypdfDocumentParser(DocumentParser):
 
 
 class DoclingDocumentParser(DocumentParser):
-    def __init__(self, device: str = "cpu", artifact_dir: Path | None = None):
-        self.device = device
+    def __init__(self, artifact_dir: Path | None = None):
         self.artifact_dir = artifact_dir
 
     def parse(self, content: bytes) -> ParsedDocument:
@@ -48,7 +47,8 @@ class DoclingDocumentParser(DocumentParser):
         options = ThreadedPdfPipelineOptions(
             do_ocr=True, do_table_structure=True,
             ocr_batch_size=1, layout_batch_size=1, table_batch_size=1,
-            accelerator_options=AcceleratorOptions(device=self.device, num_threads=4))
+            # cpu on purpose: torch comes from the cpu index, the gpu belongs to goethe
+            accelerator_options=AcceleratorOptions(device="cpu", num_threads=4))
         converter = DocumentConverter(format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
         stream = DocumentStream(name="source.pdf", stream=io.BytesIO(content))

@@ -10,6 +10,8 @@ Nothing reaches the public record without a human click.
 make setup && make dev     # api + review ui on :8000, fully offline by default
 ```
 
+Live instance (Józsefváros, Budapest District VIII): https://paper-trail.jismailov.com
+
 All documentation lives in the **[wiki](https://github.com/unnobatroo/paper-trail/wiki)**:
 start with [Home](https://github.com/unnobatroo/paper-trail/wiki), then
 [Getting Started](https://github.com/unnobatroo/paper-trail/wiki/Getting-Started).
