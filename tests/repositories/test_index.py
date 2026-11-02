@@ -50,6 +50,9 @@ def test_vector_index_roundtrip_and_match(dsn):
     top = index.match([1.0, 0.0], "ültetés", "hyb", 2400, [PAGE], k=2)
     assert top[0][1] == "ültetés szakasz"
     assert top[1][1] == "fák szakasz"
+    # a whole commitment as the query: one shared word is enough to count
+    top = index.match([1.0, 0.0], "ültetés program bővítése 2030", "hyb", 2400, [PAGE], k=2)
+    assert top[0][1] == "ültetés szakasz"
 
 
 def test_content_keys_stable():
