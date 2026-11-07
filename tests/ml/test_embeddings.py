@@ -5,7 +5,13 @@ import httpx
 import pytest
 from openai import OpenAI
 
-from paper_trail.ml.embeddings import HashingProvider, HttpEmbedder, LocalEmbedder, get_provider
+from paper_trail.ml.embeddings import (
+    HashingProvider,
+    HttpEmbedder,
+    LocalEmbedder,
+    StaticEmbedder,
+    get_provider,
+)
 
 
 def _server(calls, shuffle=True):
@@ -62,3 +68,38 @@ def test_get_provider_picks_by_name():
     assert isinstance(get_provider("some/fastembed-model"), LocalEmbedder)
     with pytest.raises(ValueError):
         get_provider("openai:m")  # no server url
+
+
+def test_model2vec_prefix_picks_static():
+    embedder = get_provider("model2vec:minishlab/potion-multilingual-128M")
+    assert isinstance(embedder, StaticEmbedder)
+    assert embedder.model_name == "model2vec:minishlab/potion-multilingual-128M"
+
+
+def test_model2vec_loads_cache_first_and_keeps_order(monkeypatch):
+    import huggingface_hub
+    import model2vec
+    import numpy as np
+    from huggingface_hub.errors import LocalEntryNotFoundError
+
+    calls, loaded = [], []
+
+    def snapshot(repo, local_files_only=False, **kw):
+        calls.append((repo, local_files_only, kw["cache_dir"], kw["allow_patterns"]))
+        if local_files_only:
+            raise LocalEntryNotFoundError("not cached")
+        return "/models/snap"
+
+    class Model:
+        def encode(self, texts):
+            return np.array([[float(len(t)), 0.0] for t in texts], dtype=np.float32)
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", snapshot)
+    monkeypatch.setattr(model2vec.StaticModel, "from_pretrained",
+                        staticmethod(lambda path: loaded.append(path) or Model()))
+    embedder = StaticEmbedder("org/m", cache_dir="/cache")
+    assert embedder.embed(["a", "bbb", "cc"]) == [[1.0, 0.0], [3.0, 0.0], [2.0, 0.0]]
+    embedder.embed(["x"])  # loads once
+    assert [c[1] for c in calls] == [True, False]  # cache first, then the network
+    assert calls[0][0] == "org/m" and calls[0][2] == "/cache"
+    assert "*.safetensors" in calls[0][3] and loaded == ["/models/snap"]

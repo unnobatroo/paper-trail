@@ -1,4 +1,4 @@
-"""embedders: local fastembed for offline dev, an openai-style server for real, hashing for tests"""
+"""embedders: fastembed or model2vec offline, an openai-style server for real, hashing for tests"""
 
 from __future__ import annotations
 
@@ -35,6 +35,32 @@ class LocalEmbedder(EmbeddingProvider):
                 self._model = TextEmbedding(model_name=self.model_name, cache_dir=self._cache_dir,
                                             threads=min(4, os.cpu_count() or 1))
         return [list(map(float, v)) for v in self._model.embed(texts)]
+
+
+class StaticEmbedder(EmbeddingProvider):
+    """model2vec static embeddings: a lookup + mean, no transformer, ms per batch on any cpu"""
+
+    def __init__(self, model: str, cache_dir: str | None = None):
+        self.model_name = f"model2vec:{model}"
+        self._repo, self._cache_dir = model, cache_dir
+        self._model = None
+        self._lock = threading.Lock()
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        with self._lock:
+            if self._model is None:
+                from huggingface_hub import snapshot_download
+                from huggingface_hub.errors import LocalEntryNotFoundError
+                from model2vec import StaticModel
+                # snapshot first, from_pretrained has no cache_dir and re-downloads,
+                # cache before network so an offline worker doesn't wait on a timeout
+                args = dict(cache_dir=self._cache_dir, allow_patterns=["*.json", "*.safetensors"])
+                try:
+                    path = snapshot_download(self._repo, local_files_only=True, **args)
+                except LocalEntryNotFoundError:
+                    path = snapshot_download(self._repo, **args)
+                self._model = StaticModel.from_pretrained(path)
+        return self._model.encode(texts).astype(float).tolist()
 
 
 class HttpEmbedder(EmbeddingProvider):
@@ -74,9 +100,12 @@ class HashingProvider(EmbeddingProvider):
 
 def get_provider(model: str, base_url: str | None = None, api_key: str | None = None,
                  cache_dir: str | None = None) -> EmbeddingProvider:
-    """"openai:<model>" -> server, "hashing" -> stub, anything else -> local fastembed"""
+    """"openai:<model>" -> server, "model2vec:<repo>" -> static, "hashing" -> stub,
+    anything else -> local fastembed"""
     if model == "hashing":
         return HashingProvider()
     if model.startswith("openai:"):
         return HttpEmbedder(model_client(base_url, api_key), model.removeprefix("openai:"))
+    if model.startswith("model2vec:"):
+        return StaticEmbedder(model.removeprefix("model2vec:"), cache_dir)
     return LocalEmbedder(model or DEFAULT_EMBED_MODEL, cache_dir)
