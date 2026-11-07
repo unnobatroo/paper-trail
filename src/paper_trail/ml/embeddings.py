@@ -50,10 +50,15 @@ class StaticEmbedder(EmbeddingProvider):
         with self._lock:
             if self._model is None:
                 from huggingface_hub import snapshot_download
+                from huggingface_hub.errors import LocalEntryNotFoundError
                 from model2vec import StaticModel
-                # snapshot first, from_pretrained has no cache_dir and re-downloads
-                path = snapshot_download(self._repo, cache_dir=self._cache_dir,
-                                         allow_patterns=["*.json", "*.safetensors"])
+                # snapshot first, from_pretrained has no cache_dir and re-downloads,
+                # cache before network so an offline worker doesn't wait on a timeout
+                args = dict(cache_dir=self._cache_dir, allow_patterns=["*.json", "*.safetensors"])
+                try:
+                    path = snapshot_download(self._repo, local_files_only=True, **args)
+                except LocalEntryNotFoundError:
+                    path = snapshot_download(self._repo, **args)
                 self._model = StaticModel.from_pretrained(path)
         return self._model.encode(texts).astype(float).tolist()
 
