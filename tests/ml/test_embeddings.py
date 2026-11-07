@@ -5,7 +5,13 @@ import httpx
 import pytest
 from openai import OpenAI
 
-from paper_trail.ml.embeddings import HashingProvider, HttpEmbedder, LocalEmbedder, get_provider
+from paper_trail.ml.embeddings import (
+    HashingProvider,
+    HttpEmbedder,
+    LocalEmbedder,
+    StaticEmbedder,
+    get_provider,
+)
 
 
 def _server(calls, shuffle=True):
@@ -62,3 +68,9 @@ def test_get_provider_picks_by_name():
     assert isinstance(get_provider("some/fastembed-model"), LocalEmbedder)
     with pytest.raises(ValueError):
         get_provider("openai:m")  # no server url
+
+
+def test_model2vec_prefix_picks_static():
+    embedder = get_provider("model2vec:minishlab/potion-multilingual-128M")
+    assert isinstance(embedder, StaticEmbedder)
+    assert embedder.model_name == "model2vec:minishlab/potion-multilingual-128M"

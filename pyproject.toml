@@ -26,6 +26,7 @@ dependencies = [
     "tenacity>=9",
     "typer>=0.16",
     "nicegui>=3",
+    "model2vec>=0.10",
 ]
 
 [project.optional-dependencies]
