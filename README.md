@@ -35,7 +35,8 @@ flowchart LR
   accepts agreed with blind grading only 58% of the time, so they're no longer used as labels
 - **Runs on one 8 GB GPU**: a 4-bit AWQ Qwen3-4B
   ([on Hugging Face](https://huggingface.co/unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq)),
-  an embedder and a reranker, all self-hosted, no paid AI APIs. CPU-only works too
+  an embedder and a reranker, all self-hosted, no paid AI APIs. Search also runs CPU-only
+  (model2vec), extraction needs an OpenAI-compatible LLM server
 
 Caveats (pooled gold, small test set) are on the [Models](https://github.com/unnobatroo/paper-trail/wiki/Models) page.
 
@@ -43,8 +44,9 @@ Caveats (pooled gold, small test set) are on the [Models](https://github.com/unn
 
 - **Receipts or nothing**: every commitment points to a page and an exact quote, and
   every piece of evidence to a URL and a passage
-- **Humans decide, and the database enforces it**: the worker's Postgres role can't accept
-  anything, triggers freeze reviewed rows, and the worker won't start with a stronger login
+- **Humans decide, and the database backs it up**: the worker's Postgres role can't confirm a
+  candidate or accept a link, triggers stop it rewriting links and evidence a reviewer already
+  decided on (reviewers can still change their minds), and it won't start with a stronger login
 - **Audit rules** catch cancelled contracts, money that was budgeted but never spent, and
   work owned by a different public body ([Accountability Rules](https://github.com/unnobatroo/paper-trail/wiki/Accountability-Rules))
 
