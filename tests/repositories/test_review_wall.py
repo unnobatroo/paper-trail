@@ -1,5 +1,6 @@
 """the db keeps the worker off reviewed rows, whatever the python does"""
 
+import threading
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
@@ -52,4 +53,30 @@ def test_store_skips_money_when_a_reviewer_got_there_first(dsn, policy, evidence
     worker = EvidenceRepository(as_worker)
     assert worker.add_budget(BudgetRecord(
         evidence_id=ev_id, kind=BudgetKind.ACTUAL_EXPENDITURE, amount_raw="1 millió Ft")) is None
+    assert evidence.budgets_for_evidence(ev_id) == []
+
+
+def test_raw_worker_insert_waits_for_a_click_in_flight(dsn, policy, evidence):
+    ev_id = _evidence(policy, evidence, "https://jozsefvaros.hu/szerzodes", None)
+    [link] = evidence.links()
+    errors = []
+
+    def worker():
+        try:
+            _worker_adds_budget(dsn, ev_id)
+        except psycopg.DatabaseError as e:
+            errors.append(e)
+
+    # reviewer's transaction, held open: same lock + update decide_link does
+    with psycopg.connect(dsn) as reviewer:
+        reviewer.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                         (f"budget:{ev_id}",))
+        reviewer.execute("UPDATE links SET review_status='accepted' WHERE id=%s", (link.id,))
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=1)
+        assert t.is_alive(), "the worker's insert should be waiting on the reviewer"
+        reviewer.commit()
+    t.join(timeout=10)
+    assert [e.sqlstate for e in errors] == ["PTR01"]
     assert evidence.budgets_for_evidence(ev_id) == []
