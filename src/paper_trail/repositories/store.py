@@ -7,6 +7,7 @@ from functools import lru_cache
 
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import DBAPIError
 
 from ..domain.enums import (
     ArtifactStatus,
@@ -294,12 +295,28 @@ class EvidenceRepository(Repo):
 
     def decide_link(self, link_id: int, status: ReviewStatus,
                     relationship: RelationshipType | None = None) -> None:
-        self._exec("UPDATE links SET review_status=:s, relationship=:r WHERE id=:id",
-                   s=status.value, r=relationship.value if relationship else None, id=link_id)
+        with self._engine.begin() as conn:
+            # same lock as add_budget: money committing right after the click can't sneak in
+            ev_id = conn.execute(text("SELECT evidence_id FROM links WHERE id=:id"),
+                                 {"id": link_id}).scalar()
+            if ev_id is not None:
+                self._lock(conn, f"budget:{ev_id}")
+            conn.execute(text("UPDATE links SET review_status=:s, relationship=:r WHERE id=:id"),
+                         {"s": status.value, "r": relationship.value if relationship else None,
+                          "id": link_id})
 
-    def add_budget(self, b: BudgetRecord) -> int:
+    def add_budget(self, b: BudgetRecord) -> int | None:
         p = {"e": b.evidence_id, "kind": b.kind.value, "raw": b.amount_raw, "year": b.fiscal_year,
              "desc": b.description, "cur": b.currency}
+        try:
+            return self._insert_budget(b, p)
+        except DBAPIError as exc:
+            # a reviewer decided on this evidence mid-run (013 trigger): hands off, keep going
+            if getattr(exc.orig, "sqlstate", None) == "PTR01":
+                return None
+            raise
+
+    def _insert_budget(self, b: BudgetRecord, p: dict) -> int:
         with self._engine.begin() as conn:
             # evidence upserts, so a re-run lands here again: don't store the figure twice
             self._lock(conn, f"budget:{b.evidence_id}")

@@ -7,7 +7,8 @@ language plpgsql as $$
 begin
   if current_user = 'paper_trail_worker' and exists
     (select 1 from links where evidence_id=new.evidence_id and review_status <> 'unreviewed') then
-    raise exception 'workers cannot add money to reviewed evidence';
+    -- own sqlstate so the store can tell this apart and skip the figure
+    raise exception 'workers cannot add money to reviewed evidence' using errcode = 'PTR01';
   end if;
   return new;
 end $$;
