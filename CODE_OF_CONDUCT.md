@@ -1,7 +1,5 @@
 # Code of Conduct
 
-## The short version
-
 Be decent. Paper Trail is a small open-source project, and everyone who
 shows up here — to file an issue, review a change, or contribute code —
 gets treated with respect regardless of who they are, where they're
