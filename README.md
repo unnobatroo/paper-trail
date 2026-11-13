@@ -1,9 +1,3 @@
-# Paper Trail
-
-[![CI](https://github.com/unnobatroo/paper-trail/actions/workflows/ci.yml/badge.svg)](https://github.com/unnobatroo/paper-trail/actions/workflows/ci.yml)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![Model on HF](https://img.shields.io/badge/%F0%9F%A4%97-extraction%20model-yellow)](https://huggingface.co/unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq)
-
 **Did a city actually do what its climate strategy promised?**
 
 Paper Trail reads the strategy, pulls out every commitment with a verbatim quote as proof,
