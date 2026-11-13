@@ -1,3 +1,5 @@
+## Paper Trail
+
 **Did a city actually do what its climate strategy promised?**
 
 Paper Trail reads the strategy, pulls out every commitment with a verbatim quote as proof,
