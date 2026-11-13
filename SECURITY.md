@@ -1,7 +1,5 @@
 # Security Policy
 
-## Reporting a problem
-
 Please don't open a public issue for security problems — use GitHub's
 private reporting instead:
 
