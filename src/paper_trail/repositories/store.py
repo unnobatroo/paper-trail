@@ -116,11 +116,15 @@ class PolicyRepository(Repo):
                 [{"d": document_id, "x": extractor, "p": p} for p in pages])
 
     def _insert_candidate(self, conn: Connection, cand: PolicyCandidate) -> int:
-        # same (doc, page, text) = same candidate, re-ingest keeps its review status
-        self._lock(conn, f"candidate:{cand.document_id}:{cand.source_page}:{cand.text}")
+        # same (doc, page, receipt) = same candidate however the model words it, so a
+        # re-ingest keeps its review status. whitespace doesn't count (015's index)
+        receipt = "".join(cand.source_excerpt.split())
+        self._lock(conn, f"candidate:{cand.document_id}:{cand.source_page}:{receipt}")
         found = conn.execute(text(
-            "SELECT id FROM candidates WHERE document_id=:d AND source_page=:p AND text=:t"),
-            {"d": cand.document_id, "p": cand.source_page, "t": cand.text}).scalar()
+            "SELECT id FROM candidates WHERE document_id=:d AND source_page=:p"
+            " AND md5(regexp_replace(source_excerpt, '\\s', '', 'g'))"
+            " = md5(regexp_replace(:e, '\\s', '', 'g'))"),
+            {"d": cand.document_id, "p": cand.source_page, "e": cand.source_excerpt}).scalar()
         if found:
             return found
         return conn.execute(text(

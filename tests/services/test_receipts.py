@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from paper_trail.domain.enums import ReviewStatus
 from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
 from paper_trail.services.ingestion_service import IngestionService
 from paper_trail.services.review_service import ReviewService
@@ -25,6 +26,42 @@ def test_ingestion_recomputes_receipts(policy):
         b"pdf", "title", "publisher")
     assert count == 1
     assert [c.source_excerpt for c in policy.candidates()] == ["real quote"]
+
+
+class WordingExtractor:
+    """same receipts every run, the model's own wording drifts. each run is another
+    model, so its checkpoints don't skip the page"""
+
+    def __init__(self, run: int):
+        self.run, self.name = run, f"llm:run{run}"
+
+    def extract_windows(self, pages):
+        yield pages, [
+            PolicyCandidate(document_id=0, text=f"{what} (run {self.run})",
+                            normalized_title=what, source_page=1, source_excerpt=quote)
+            for what, quote in [("trees", "Plant 200 trees"), ("shrubs", "Plant 500 shrubs")]]
+
+
+def test_reingest_dedupes_on_the_receipt_not_the_wording(policy):
+    page = DocumentPage(page_number=1, text="Plant 200 trees. Plant 500 shrubs.")
+    parser = SimpleNamespace(parse=lambda _: SimpleNamespace(pages=[page]))
+    def ingest(run):
+        return IngestionService(policy, WordingExtractor(run), parser=parser).ingest(
+            b"pdf", "t", "p")
+
+    ingest(1)
+    trees = next(c for c in policy.candidates() if c.normalized_title == "trees")
+    ReviewService(policy, None).reject_candidate(trees.id)
+
+    assert ingest(2)[1] == 2  # the page really was extracted again
+    # two receipts on the page = two candidates, still the run-1 rows; the rejection stands
+    rows = sorted(policy.candidates(), key=lambda c: c.id)
+    assert [(c.text, c.review_status) for c in rows] == [
+        ("trees (run 1)", ReviewStatus.REJECTED), ("shrubs (run 1)", ReviewStatus.UNREVIEWED)]
+    # pdf text splits words ("tr ees"): whitespace isn't part of the receipt's identity
+    split = PolicyCandidate(document_id=rows[0].document_id, text="other", normalized_title="x",
+                            source_page=1, source_excerpt="Plant 200 tr ees")
+    assert policy.add_candidate(split) == trees.id
 
 
 @pytest.mark.parametrize("verified", [None, False])
