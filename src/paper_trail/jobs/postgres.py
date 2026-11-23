@@ -9,6 +9,7 @@ import uuid
 from datetime import timedelta
 
 import httpx
+import openai
 import requests
 from sqlalchemy import text
 
@@ -17,9 +18,12 @@ from . import Job, dedupe_key
 
 log = logging.getLogger(__name__)
 
-# network hiccups get another go, anything else is a real failure
+# network hiccups get another go, anything else is a real failure. the openai sdk wraps
+# httpx errors in its own classes (APITimeoutError subclasses APIConnectionError); a busy
+# or restarting model server answers 429/5xx. 400/401/422 stay failures, retrying won't fix them
 _RETRYABLE = (TimeoutError, ConnectionError, httpx.TimeoutException, httpx.NetworkError,
-              requests.Timeout, requests.ConnectionError)
+              requests.Timeout, requests.ConnectionError,
+              openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError)
 
 
 def _job(row) -> Job:
