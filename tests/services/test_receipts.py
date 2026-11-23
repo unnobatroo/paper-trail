@@ -8,11 +8,14 @@ from paper_trail.services.review_service import ReviewService
 
 
 class ForgedExtractor:
-    def extract(self, pages):
-        return [PolicyCandidate(document_id=0, text="promise", normalized_title="promise",
-                                source_page=page, source_excerpt=excerpt, excerpt_on_page=True)
-                for page, excerpt in [(1, "real quote"), (1, "invented"), (99, "real quote"),
-                                      (1, " ")]]
+    name = "llm:forged"
+
+    def extract_windows(self, pages):
+        yield pages, [
+            PolicyCandidate(document_id=0, text="promise", normalized_title="promise",
+                            source_page=page, source_excerpt=excerpt, excerpt_on_page=True)
+            for page, excerpt in [(1, "real quote"), (1, "invented"), (99, "real quote"),
+                                  (1, " ")]]
 
 
 def test_ingestion_recomputes_receipts(policy):

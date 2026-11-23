@@ -114,7 +114,8 @@ def test_find_evidence_job_and_link_review(client, state):
 
 
 def test_ingest_job_from_document_store(client, state, strategy_pdf):
-    """a synced document ingests end to end, offline"""
+    """a synced document ingests end to end, offline: no llm, so no candidates, and the job
+    says why instead of looking like a silent bug"""
     r = client.post("/api/documents/ingest", json={
         "name": strategy_pdf.name, "title": "t", "publisher": "p"})
     assert r.status_code == 202
@@ -125,7 +126,7 @@ def test_ingest_job_from_document_store(client, state, strategy_pdf):
             break
         time.sleep(0.1)
     assert job["status"] == "done", job
-    assert job["result"]["candidates"] > 0
+    assert job["result"]["candidates"] == 0 and job["result"]["warnings"]
 
 
 def test_review_key_gates_mutations(client, state):

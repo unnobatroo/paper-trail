@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
-from itertools import chain
 
 import openai
 from pydantic import BaseModel, ConfigDict, Field
@@ -173,6 +173,8 @@ class LLMExtractor:
         self._concurrency = max(1, concurrency)
         # set it ourselves, a server default can chop the json mid-object
         self._max_tokens = max_tokens
+        # ingest checkpoints are per extractor: another model reads every page again
+        self.name = f"llm:{model}"
 
     def _ask(self, pages: list[DocumentPage]) -> _Reply | None:
         return ask_json(self._client, self._model, extraction_prompt(self._profile, pages),
@@ -216,11 +218,28 @@ class LLMExtractor:
             log.warning("llm failed on half of page %s (%s), skipped", half.page_number, exc)
             return None
 
-    def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
+    def extract_windows(self, pages: list[DocumentPage]
+                        ) -> Iterator[tuple[list[DocumentPage], list[PolicyCandidate]]]:
+        """(window, its candidates) as each window finishes, `concurrency` of them in flight
+        the whole time, so ingest can checkpoint pages while the gpu stays busy. http errors
+        re-raise; once the caller stops listening the windows not yet sent are dropped"""
         windows = [pages[i:i + self._window] for i in range(0, len(pages), self._window)]
-        with ThreadPoolExecutor(self._concurrency) as pool:
-            # map keeps page order and re-raises the first http error
-            answers = list(chain.from_iterable(pool.map(self._ask_window, windows)))
+        pool = ThreadPoolExecutor(self._concurrency)
+        try:
+            sent = {pool.submit(self._ask_window, w): w for w in windows}
+            for done in as_completed(sent):
+                yield sent[done], self._candidates(done.result(), sent[done])
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
+        """every candidate in page order"""
+        results = sorted(self.extract_windows(pages), key=lambda r: r[0][0].page_number)
+        return [c for _, cands in results for c in cands]
+
+    def _candidates(self, answers: list[tuple[list[DocumentPage], _Reply | None]],
+                    pages: list[DocumentPage]) -> list[PolicyCandidate]:
+        """typed, receipted, deduped candidates from one window's answers"""
         text = {p.page_number: p.text for p in pages}
         out = []
         for scope, reply in answers:
@@ -245,9 +264,12 @@ class LLMExtractor:
 class NoExtractor:
     """no llm configured: ingest still records the document, it just finds nothing"""
 
-    def extract(self, pages: list[DocumentPage]) -> list[PolicyCandidate]:
-        log.warning("no llm configured (LLM_*), nothing extracted")
-        return []
+    name = "none"
+
+    def extract_windows(self, pages: list[DocumentPage]
+                        ) -> Iterator[tuple[list[DocumentPage], list[PolicyCandidate]]]:
+        for page in pages:
+            yield [page], []
 
 
 def get_extractor(base_url: str | None, api_key: str | None, model: str | None,
@@ -255,4 +277,5 @@ def get_extractor(base_url: str | None, api_key: str | None, model: str | None,
                   concurrency: int = 1) -> LLMExtractor | NoExtractor:
     if base_url and model:
         return LLMExtractor(model_client(base_url, api_key), model, profile, window, concurrency)
+    log.warning("no llm configured (LLM_*), ingest will extract nothing")
     return NoExtractor()
