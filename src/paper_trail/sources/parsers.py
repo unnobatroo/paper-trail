@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import logging
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +25,10 @@ class DocumentParser(ABC):
     @abstractmethod
     def parse(self, content: bytes) -> ParsedDocument: ...
 
+    def pages(self, content: bytes) -> list[DocumentPage]:
+        """page text only, all ingestion reads. parsers that can skip work override it"""
+        return self.parse(content).pages
+
 
 class PypdfDocumentParser(DocumentParser):
     def parse(self, content: bytes) -> ParsedDocument:
@@ -38,7 +43,8 @@ class DoclingDocumentParser(DocumentParser):
     def __init__(self, artifact_dir: Path | None = None):
         self.artifact_dir = artifact_dir
 
-    def parse(self, content: bytes) -> ParsedDocument:
+    @staticmethod
+    def _convert(content: bytes, page_range: tuple[int, int] = (1, sys.maxsize)):
         from docling.datamodel.accelerator_options import AcceleratorOptions
         from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import ThreadedPdfPipelineOptions
@@ -52,17 +58,34 @@ class DoclingDocumentParser(DocumentParser):
         converter = DocumentConverter(format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
         stream = DocumentStream(name="source.pdf", stream=io.BytesIO(content))
-        doc = converter.convert(stream).document
+        # page numbers in the result stay absolute inside a range
+        return converter.convert(stream, page_range=page_range).document
+
+    @staticmethod
+    def _ocr(doc, pages: list[DocumentPage]) -> list[int]:
+        """fill the pages pypdf found empty from docling's items, gives their numbers.
+        ocr items carry exact page provenance, markdown is never a receipt"""
+        blank = [p for p in pages if not p.text.strip()]
+        for page in blank:
+            page.text = "\n".join(
+                item.text for item, _ in doc.iterate_items()
+                if getattr(item, "text", "") and any(
+                    p.page_no == page.page_number for p in getattr(item, "prov", [])))
+        return [p.page_number for p in blank]
+
+    def pages(self, content: bytes) -> list[DocumentPage]:
+        """pypdf's text, docling only over the pages without a text layer: a born-digital
+        strategy skips the layout and table models, which only the markdown needs"""
+        from .pdf import read_pages
+        pages = read_pages(content)
+        if blank := [p.page_number for p in pages if not p.text.strip()]:
+            self._ocr(self._convert(content, (blank[0], blank[-1])), pages)
+        return pages
+
+    def parse(self, content: bytes) -> ParsedDocument:
+        doc = self._convert(content)
         raw = PypdfDocumentParser().parse(content)
-        ocr_pages = []
-        for page in raw.pages:
-            if not page.text.strip():
-                # ocr items carry exact page provenance, markdown is never a receipt
-                page.text = "\n".join(
-                    item.text for item, _ in doc.iterate_items()
-                    if getattr(item, "text", "") and any(
-                        p.page_no == page.page_number for p in getattr(item, "prov", [])))
-                ocr_pages.append(page.page_number)
+        ocr_pages = self._ocr(doc, raw.pages)
         markdown = "\n\n".join(
             f"<!-- page {p.page_number} -->\n{doc.export_to_markdown(page_no=p.page_number)}"
             for p in raw.pages)
@@ -94,3 +117,11 @@ class FallbackDocumentParser(DocumentParser):
             result = self.fallback.parse(content)
             result.provenance["fallback_warning"] = type(exc).__name__
             return result
+
+    def pages(self, content: bytes) -> list[DocumentPage]:
+        try:
+            return self.primary.pages(content)
+        except Exception as exc:
+            log.warning("document parser failed (%s), using lightweight fallback",
+                        type(exc).__name__)
+            return self.fallback.pages(content)

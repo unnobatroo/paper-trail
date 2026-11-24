@@ -21,7 +21,7 @@ class ForgedExtractor:
 
 def test_ingestion_recomputes_receipts(policy):
     page = DocumentPage(page_number=1, text="A real quote here")
-    parser = SimpleNamespace(parse=lambda _: SimpleNamespace(pages=[page]))
+    parser = SimpleNamespace(pages=lambda _: [page])
     _, count = IngestionService(policy, ForgedExtractor(), parser=parser).ingest(
         b"pdf", "title", "publisher")
     assert count == 1
@@ -44,7 +44,7 @@ class WordingExtractor:
 
 def test_reingest_dedupes_on_the_receipt_not_the_wording(policy):
     page = DocumentPage(page_number=1, text="Plant 200 trees. Plant 500 shrubs.")
-    parser = SimpleNamespace(parse=lambda _: SimpleNamespace(pages=[page]))
+    parser = SimpleNamespace(pages=lambda _: [page])
     def ingest(run):
         return IngestionService(policy, WordingExtractor(run), parser=parser).ingest(
             b"pdf", "t", "p")

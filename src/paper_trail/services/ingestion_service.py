@@ -31,7 +31,7 @@ class IngestionService:
             title=title, publisher=publisher, url=url,
         ))
         content = pdf if isinstance(pdf, bytes) else Path(pdf).read_bytes()
-        pages = self._parser.parse(content).pages
+        pages = self._parser.pages(content)
         key = self._extractor.name
         done = self._repo.ingested_pages(doc_id, key)
         todo = [p for p in pages if p.page_number not in done]

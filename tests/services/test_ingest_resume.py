@@ -14,7 +14,7 @@ from paper_trail.services.ingestion_service import IngestionService
 
 PAGES = [DocumentPage(page_number=n, text=f"Intro. Plant {n}00 trees by 2030.")
          for n in (1, 2, 3, 4)]
-PARSER = SimpleNamespace(parse=lambda _: SimpleNamespace(pages=PAGES))
+PARSER = SimpleNamespace(pages=lambda _: PAGES)
 
 
 class PageExtractor:
