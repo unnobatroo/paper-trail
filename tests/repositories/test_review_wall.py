@@ -76,3 +76,12 @@ def test_raw_worker_insert_waits_for_a_click_in_flight(dsn, policy, evidence):
     t.join(timeout=10)
     assert [e.sqlstate for e in errors] == ["PTR01"]
     assert evidence.budgets_for_evidence(ev_id) == []
+
+
+def test_worker_reads_the_source_registry(worker_dsn, evidence):
+    """the worker's evidence search needs the registry: no RLS hiding rows from app roles"""
+    from paper_trail.domain.models import OfficialSource
+    evidence.upsert_official_source(OfficialSource(
+        url="https://jozsefvaros.hu", publisher="Józsefváros", title="Józsefváros"))
+    assert [s.url for s in EvidenceRepository(worker_dsn).official_sources()] == [
+        "https://jozsefvaros.hu"]
