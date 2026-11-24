@@ -89,10 +89,11 @@ def test_model_server_timeouts_back_off_bad_requests_fail(dsn):
     PostgresWorker(dsn, handlers).run_once()
     with psycopg.connect(dsn) as conn:
         status, attempts, backoff = conn.execute(
-            "SELECT status, attempts, available_at > now() FROM jobs WHERE id=%s",
+            "SELECT status, attempts, extract(epoch FROM available_at - now())::int"
+            " FROM jobs WHERE id=%s",
             (retry.id,)).fetchone()
-    # back in the queue, not runnable until the 2^attempts backoff has passed
-    assert (status, attempts, backoff) == ("queued", 1, True)
+    # back in the queue, runnable again after the first 15 s backoff step
+    assert (status, attempts) == ("queued", 1) and 10 <= backoff <= 15
     assert queue.get(fail.id).status == "failed"
     assert queue.get(fail.id).error.startswith("BadRequestError")
 
