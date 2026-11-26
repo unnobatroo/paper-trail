@@ -35,7 +35,7 @@ x-application: &application
     SEARXNG_URL: http://searxng:8080
     LLM_BASE_URL: https://goethe:8443/v1
     LLM_API_KEY: ${GOETHE_API_KEY:?required}
-    LLM_MODEL: unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq
+    LLM_MODEL: jismailov/paper-trail-extract-4b
     LLM_WINDOW: "1"
     LLM_CONCURRENCY: "4"
     RERANK_BATCH: "20"
