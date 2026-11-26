@@ -35,7 +35,10 @@ JSON of the form {{"items": [...]}} where each item is:
   page: the N from the "--- page N ---" marker above the text you quote
   excerpt: one short verbatim quote from that page supporting it
 Numbered or coded headings are objectives
-or measures too. Rules: only report what the text actually says; never invent
+or measures too. Do NOT report: background or situation analysis, vision statements,
+SWOT lists, opinions from residents or partners (surveys, feedback tables), and
+funding programmes or laws of other bodies (EU, state) that the municipality only
+describes. Rules: only report what the text actually says; never invent
 targets, dates or bodies; if unsure, omit the item. Write titles in {language}
 as in the source.
 
