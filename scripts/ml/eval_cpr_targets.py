@@ -109,9 +109,14 @@ def predict(d: pd.DataFrame, args) -> dict[int, bool]:
                 # page_number = row id, so each candidate maps back to its passage
                 pages = [DocumentPage(page_number=int(i) + 1, text=t)
                          for i, t in zip(chunk.id, chunk.text, strict=True)]
-                kept = {c.source_page for c in ex.extract(pages)}
+                finished, kept = set(), set()
+                for done, cands in ex.extract_windows(pages):
+                    finished |= {p.page_number for p in done}
+                    kept |= {c.source_page for c in cands}
                 for i in chunk.id:
                     cache[int(i)] = (int(i) + 1) in kept
+                    if (int(i) + 1) not in finished:
+                        continue  # unreadable answer: scored as not kept now, asked again next run
                     row = {"id": int(i), "kept": cache[int(i)], "stamp": stamp[int(i)]}
                     f.write(json.dumps(row) + "\n")
                 f.flush()

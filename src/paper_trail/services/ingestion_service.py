@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
@@ -33,7 +34,9 @@ class IngestionService:
         content = pdf if isinstance(pdf, bytes) else Path(pdf).read_bytes()
         pages = self._parser.pages(content)
         key = self._extractor.name
-        done = self._repo.ingested_pages(doc_id, key)
+        # checkpoints belong to these bytes: the same url may serve a revised pdf next time
+        digest = hashlib.sha256(content).hexdigest()
+        done = self._repo.ingested_pages(doc_id, key, digest)
         # a page with no text is never sent or checkpointed: if its ocr failed, a later run
         # with working ocr must still be able to read it, and checking a blank costs nothing
         todo = [p for p in pages if p.page_number not in done and p.text.strip()]
@@ -53,7 +56,8 @@ class IngestionService:
                         c.source_excerpt in page_text.get(c.source_page, ""))
                     if c.excerpt_on_page:
                         kept.append(c)
-                n += self._repo.add_page_candidates(doc_id, key, list(page_text), kept)
+                n += self._repo.add_page_candidates(doc_id, key, digest, list(page_text),
+                                                      kept)
                 finished += len(window)
                 say(f"page {finished}/{len(pages)}")
         return doc_id, n

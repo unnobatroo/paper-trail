@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from paper_trail.domain.enums import CandidateType
-from paper_trail.domain.models import DocumentPage, PolicyCandidate
+from paper_trail.domain.models import DocumentPage, PolicyCandidate, SourceDocument
 from paper_trail.jobs.postgres import PostgresJobRunner, PostgresWorker
 from paper_trail.maintenance import reset
 from paper_trail.ml.extraction import NoExtractor
@@ -122,3 +122,31 @@ def test_pages_without_text_are_not_checkpointed_so_a_later_ocr_can_read_them(po
     assert extractor.calls == [[1], [3]]  # the blank page never reaches the model
     assert policy.ingested_pages(doc_id, "llm:stub") == {1, 3}
     assert found == 2
+
+
+def test_a_revised_pdf_at_the_same_url_is_read_again_but_the_same_bytes_are_not(policy):
+    def ingest(content, extractor):
+        return IngestionService(policy, extractor, parser=PARSER).ingest(
+            content, "Strategy", "City", url="https://city.example/strategy.pdf")
+
+    first = PageExtractor()
+    doc_id, _ = ingest(b"pdf v1", first)
+    assert first.calls == [[1], [2], [3], [4]]
+
+    same = PageExtractor()
+    assert ingest(b"pdf v1", same)[0] == doc_id
+    assert same.calls == []  # nothing changed, nothing to read
+
+    revised = PageExtractor()
+    assert ingest(b"pdf v2, pages corrected", revised)[0] == doc_id  # same document row
+    assert revised.calls == [[1], [2], [3], [4]]  # but the new bytes need reading
+    # the old candidates keep their rows: receipts dedupe, so nothing is stored twice
+    assert sorted(c.source_page for c in policy.candidates()) == [1, 2, 3, 4]
+
+
+def test_checkpoints_from_before_content_versioning_still_count(policy):
+    doc_id = policy.add_document(SourceDocument(title="Strategy", publisher="City"))
+    policy.add_page_candidates(doc_id, "llm:stub", "", [1, 2], [])  # pre-018 rows: no digest
+    extractor = PageExtractor()
+    IngestionService(policy, extractor, parser=PARSER).ingest(b"anything", "Strategy", "City")
+    assert extractor.calls == [[3], [4]]

@@ -97,30 +97,39 @@ class PolicyRepository(Repo):
         with self._engine.begin() as conn:
             return self._insert_candidate(conn, cand)
 
-    def ingested_pages(self, document_id: int, extractor: str) -> set[int]:
-        """pages this extractor already finished for the document"""
+    def ingested_pages(self, document_id: int, extractor: str,
+                       content_sha: str | None = None) -> set[int]:
+        """pages this extractor already finished for the document. with a content digest,
+        only checkpoints made from those bytes count (plus the pre-018 ones, stored with
+        an empty digest); without one, every checkpoint does"""
+        if content_sha is None:
+            return {r["page_number"] for r in self._all(
+                "SELECT page_number FROM document_ingest_pages WHERE document_id=:d"
+                " AND extractor=:x", d=document_id, x=extractor)}
         return {r["page_number"] for r in self._all(
             "SELECT page_number FROM document_ingest_pages WHERE document_id=:d"
-            " AND extractor=:x", d=document_id, x=extractor)}
+            " AND extractor=:x AND content_sha IN (:c, '')",
+            d=document_id, x=extractor, c=content_sha)}
 
-    def add_page_candidates(self, document_id: int, extractor: str, pages: list[int],
-                            cands: list[PolicyCandidate]) -> int:
+    def add_page_candidates(self, document_id: int, extractor: str, content_sha: str,
+                            pages: list[int], cands: list[PolicyCandidate]) -> int:
         """a batch of pages + their candidates, all or nothing: a crash mid-batch leaves
         neither, so the retry redoes exactly the pages that didn't land. gives how many
-        candidates were new, a re-read page whose receipts already exist adds none"""
+        candidates this call inserted, a re-read page whose receipts already exist adds
+        none. the checkpoints are for the pdf bytes `content_sha` digests"""
         with self._engine.begin() as conn:
-            count = "SELECT count(*) FROM candidates WHERE document_id=:d"
-            before = conn.execute(text(count), {"d": document_id}).scalar()
-            for cand in cands:
-                self._insert_candidate(conn, cand)
-            added = conn.execute(text(count), {"d": document_id}).scalar() - before
+            added = sum(self._upsert_candidate(conn, cand)[1] for cand in cands)
             conn.execute(text(
-                "INSERT INTO document_ingest_pages(document_id, extractor, page_number)"
-                " VALUES (:d, :x, :p) ON CONFLICT DO NOTHING"),
-                [{"d": document_id, "x": extractor, "p": p} for p in pages])
+                "INSERT INTO document_ingest_pages(document_id, extractor, content_sha,"
+                " page_number) VALUES (:d, :x, :c, :p) ON CONFLICT DO NOTHING"),
+                [{"d": document_id, "x": extractor, "c": content_sha, "p": p} for p in pages])
         return added
 
     def _insert_candidate(self, conn: Connection, cand: PolicyCandidate) -> int:
+        return self._upsert_candidate(conn, cand)[0]
+
+    def _upsert_candidate(self, conn: Connection, cand: PolicyCandidate) -> tuple[int, bool]:
+        """(id, whether this call inserted it)"""
         # same (doc, page, receipt) = same candidate however the model words it, so a
         # re-ingest keeps its review status. whitespace doesn't count (015's index)
         receipt = "".join(cand.source_excerpt.split())
@@ -131,7 +140,7 @@ class PolicyRepository(Repo):
             " = md5(regexp_replace(:e, '\\s', '', 'g'))"),
             {"d": cand.document_id, "p": cand.source_page, "e": cand.source_excerpt}).scalar()
         if found:
-            return found
+            return found, False
         return conn.execute(text(
             "INSERT INTO candidates(document_id, suggested_type, text, normalized_title,"
             " source_page, source_excerpt, code, excerpt_on_page, responsible_org,"
@@ -145,7 +154,7 @@ class PolicyRepository(Repo):
                 "target_value"}),
              "suggested_type": cand.suggested_type.value,
              "excerpt_on_page": None if cand.excerpt_on_page is None
-             else bool(cand.excerpt_on_page)}).scalar_one()
+             else bool(cand.excerpt_on_page)}).scalar_one(), True
 
     def candidates(self, status: ReviewStatus | None = None) -> list[PolicyCandidate]:
         where = " WHERE review_status=:s" if status else ""
