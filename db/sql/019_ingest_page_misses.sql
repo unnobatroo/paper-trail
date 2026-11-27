@@ -16,9 +16,9 @@ create table if not exists document_ingest_misses
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='paper_trail_api') THEN
-    GRANT SELECT, INSERT, UPDATE ON document_ingest_misses TO paper_trail_api;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON document_ingest_misses TO paper_trail_api;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='paper_trail_worker') THEN
-    GRANT SELECT, INSERT, UPDATE ON document_ingest_misses TO paper_trail_worker;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON document_ingest_misses TO paper_trail_worker;
   END IF;
 END $$;

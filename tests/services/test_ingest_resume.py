@@ -1,5 +1,6 @@
 """ingest checkpoints: a crashed job resumes after its last finished page, a lost lease stops it"""
 
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -175,3 +176,44 @@ def test_a_page_that_never_reads_is_given_up_on_after_the_cap(policy):
     other = StubbornExtractor(name="llm:other")
     _ingest(policy, other)
     assert [2] in other.calls
+
+
+def test_a_server_outage_does_not_count_toward_giving_a_page_up(policy):
+    class Flaky(StubbornExtractor):
+        def drain_api_failures(self):
+            return {2}  # page 2 was left unread because requests failed, not its answer
+
+    for _ in range(MAX_PAGE_MISSES + 1):
+        extractor = Flaky()
+        _ingest(policy, extractor)
+        assert [2] in extractor.calls  # still asked every run
+
+
+def test_a_page_that_reads_again_starts_its_count_over(policy):
+    for _ in range(MAX_PAGE_MISSES - 1):
+        _ingest(policy, StubbornExtractor())
+    [doc] = policy.documents()
+    digest = hashlib.sha256(b"pdf").hexdigest()
+    assert policy.page_misses(doc.id, "llm:stub", digest) == {2: MAX_PAGE_MISSES - 1}
+    _ingest(policy, PageExtractor())  # page 2 reads this time
+    assert policy.page_misses(doc.id, "llm:stub", digest) == {}
+
+
+def test_misses_before_a_crash_are_still_counted(policy):
+    class Crashy(StubbornExtractor):
+        def extract_windows(self, pages):
+            yield from super().extract_windows(pages)
+            raise RuntimeError("server died")
+
+    with pytest.raises(RuntimeError):
+        _ingest(policy, Crashy())
+    [doc] = policy.documents()
+    assert policy.page_misses(doc.id, "llm:stub", hashlib.sha256(b"pdf").hexdigest()) == {2: 1}
+
+
+def test_giving_up_is_said_in_the_progress(policy):
+    for _ in range(MAX_PAGE_MISSES):
+        _ingest(policy, StubbornExtractor())
+    progress = []
+    _ingest(policy, StubbornExtractor(), on_progress=progress.append)
+    assert progress[-1] == "page 4/4, skipped unreadable pages [2]"

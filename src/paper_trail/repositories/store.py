@@ -142,6 +142,13 @@ class PolicyRepository(Repo):
                 "INSERT INTO document_ingest_pages(document_id, extractor, content_sha,"
                 " page_number) VALUES (:d, :x, :c, :p) ON CONFLICT DO NOTHING"),
                 [{"d": document_id, "x": extractor, "c": content_sha, "p": p} for p in pages])
+            # read now: earlier misses no longer count, the cap is for runs in a row. misses are
+            # keyed by the extractor's miss_key (its config too), so match on the name's prefix
+            conn.execute(text(
+                "DELETE FROM document_ingest_misses WHERE document_id=:d AND content_sha=:c"
+                " AND page_number = ANY(:p) AND (extractor = :x"
+                " OR left(extractor, length(:x) + 1) = :x || '/')"),
+                {"d": document_id, "c": content_sha, "p": pages, "x": extractor})
         return added
 
     def _insert_candidate(self, conn: Connection, cand: PolicyCandidate) -> int:
