@@ -88,10 +88,16 @@ def report(name: str, frame: pd.DataFrame, col: str) -> dict:
 
 
 def predict(d: pd.DataFrame, args) -> dict[int, bool]:
-    """one extractor call per passage; answers are cached so a crash resumes"""
+    """one extractor call per passage; answers are cached so a crash resumes. an answer is
+    reused only for the same model and the same passage text, so another model or a changed
+    dataset never reads a stale one"""
+    stamp = {int(i): hashlib.sha256(f"{args.model}|{t}".encode()).hexdigest()[:16]
+             for i, t in zip(d.id, d.text, strict=True)}
     cache = {}
     if args.cache.exists():
-        cache = {r["id"]: r["kept"] for r in map(json.loads, args.cache.read_text().splitlines())}
+        for row in map(json.loads, args.cache.read_text().splitlines()):
+            if stamp.get(row["id"]) == row.get("stamp"):
+                cache[row["id"]] = row["kept"]
     todo = d[~d.id.isin(cache)]
     if len(todo):
         client = model_client(args.base_url, args.key)
@@ -106,7 +112,8 @@ def predict(d: pd.DataFrame, args) -> dict[int, bool]:
                 kept = {c.source_page for c in ex.extract(pages)}
                 for i in chunk.id:
                     cache[int(i)] = (int(i) + 1) in kept
-                    f.write(json.dumps({"id": int(i), "kept": cache[int(i)]}) + "\n")
+                    row = {"id": int(i), "kept": cache[int(i)], "stamp": stamp[int(i)]}
+                    f.write(json.dumps(row) + "\n")
                 f.flush()
                 print(f"{len(cache)}/{len(d)}", flush=True)
     return cache

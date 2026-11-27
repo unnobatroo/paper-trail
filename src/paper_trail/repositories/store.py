@@ -104,16 +104,21 @@ class PolicyRepository(Repo):
             " AND extractor=:x", d=document_id, x=extractor)}
 
     def add_page_candidates(self, document_id: int, extractor: str, pages: list[int],
-                            cands: list[PolicyCandidate]) -> None:
+                            cands: list[PolicyCandidate]) -> int:
         """a batch of pages + their candidates, all or nothing: a crash mid-batch leaves
-        neither, so the retry redoes exactly the pages that didn't land"""
+        neither, so the retry redoes exactly the pages that didn't land. gives how many
+        candidates were new, a re-read page whose receipts already exist adds none"""
         with self._engine.begin() as conn:
+            count = "SELECT count(*) FROM candidates WHERE document_id=:d"
+            before = conn.execute(text(count), {"d": document_id}).scalar()
             for cand in cands:
                 self._insert_candidate(conn, cand)
+            added = conn.execute(text(count), {"d": document_id}).scalar() - before
             conn.execute(text(
                 "INSERT INTO document_ingest_pages(document_id, extractor, page_number)"
                 " VALUES (:d, :x, :p) ON CONFLICT DO NOTHING"),
                 [{"d": document_id, "x": extractor, "p": p} for p in pages])
+        return added
 
     def _insert_candidate(self, conn: Connection, cand: PolicyCandidate) -> int:
         # same (doc, page, receipt) = same candidate however the model words it, so a

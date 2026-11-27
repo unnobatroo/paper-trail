@@ -111,3 +111,14 @@ def test_a_slow_page_doesnt_idle_the_other_model_slots(policy):
     _ingest(policy, LLMExtractor(client, "m", HU, window=1, concurrency=2))
     [doc] = policy.documents()
     assert policy.ingested_pages(doc.id, "llm:m") == {1, 2, 3, 4}
+
+
+def test_pages_without_text_are_not_checkpointed_so_a_later_ocr_can_read_them(policy):
+    pages = [PAGES[0], DocumentPage(page_number=2, text="  "), PAGES[2]]
+    extractor = PageExtractor()
+    doc_id, found = IngestionService(
+        policy, extractor, parser=SimpleNamespace(pages=lambda _: pages)).ingest(
+        b"pdf", "Strategy", "City")
+    assert extractor.calls == [[1], [3]]  # the blank page never reaches the model
+    assert policy.ingested_pages(doc_id, "llm:stub") == {1, 3}
+    assert found == 2

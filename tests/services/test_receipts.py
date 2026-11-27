@@ -53,7 +53,9 @@ def test_reingest_dedupes_on_the_receipt_not_the_wording(policy):
     trees = next(c for c in policy.candidates() if c.normalized_title == "trees")
     ReviewService(policy, None).reject_candidate(trees.id)
 
-    assert ingest(2)[1] == 2  # the page really was extracted again
+    # the page really was extracted again (another model, so no checkpoint), yet both
+    # receipts already exist: the job reports what it stored, not what the model returned
+    assert ingest(2)[1] == 0
     # two receipts on the page = two candidates, still the run-1 rows; the rejection stands
     rows = sorted(policy.candidates(), key=lambda c: c.id)
     assert [(c.text, c.review_status) for c in rows] == [
