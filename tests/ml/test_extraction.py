@@ -144,22 +144,45 @@ def test_fact_sheet_rows_are_not_commitments():
     assert not form_row("Időtáv 2021-2030", ())
 
 
-def test_a_failed_half_page_retry_skips_that_half_only():
+def _fake(replies):
+    """an extractor whose model answers come from `replies`: page text -> reply, or raises"""
+    from paper_trail.ml.extraction import LLMExtractor
+
+    def ask(pages):
+        out = replies(pages[0].text if len(pages) == 1 else None)
+        if isinstance(out, Exception):
+            raise out
+        return out
+    ex = LLMExtractor(None, "fake", HU, window=1)
+    ex._ask = ask
+    return ex
+
+
+def test_a_page_with_a_failed_half_is_left_unfinished_so_it_is_retried():
     import openai
 
     from paper_trail.domain.models import DocumentPage
-    from paper_trail.ml.extraction import LLMExtractor, _Item, _Reply
-    page = DocumentPage(page_number=3, text="Fák ültetése.\nNapelemek az iskolákon.")
+    from paper_trail.ml.extraction import _Item, _Reply
+    lines = ["Fák ültetése.", "Napelemek az iskolákon."]
+    page = DocumentPage(page_number=3, text=chr(10).join(lines))
 
-    def ask(pages):
-        text = pages[0].text
-        if "\n" in text:
+    def replies(text):
+        if text is not None and chr(10) in text:
             return None  # cut off json, retry in halves
         if text.startswith("Fák"):
-            raise openai.APIConnectionError(request=None)
+            return openai.APIConnectionError(request=None)
         return _Reply(items=[_Item(type="measure", normalized_title="Napelemek", text=text,
                                    page=3, excerpt="Napelemek az iskolákon")])
-    ex = LLMExtractor(None, "fake", HU, window=1)
-    ex._ask = ask
-    assert [c.source_excerpt for c in ex.extract([page])] == ["Napelemek az iskolákon"]
+    # one half couldn't be read: the page isn't finished, so ingest won't checkpoint it
+    assert list(_fake(replies).extract_windows([page])) == []
 
+
+def test_unusable_json_leaves_the_page_unfinished_but_an_empty_answer_finishes_it():
+    from paper_trail.domain.models import DocumentPage
+    from paper_trail.ml.extraction import _Reply
+    bad = DocumentPage(page_number=1, text="Egy sor.")
+    empty = DocumentPage(page_number=2, text="Másik sor.")
+    ex = _fake(lambda text: None if text == "Egy sor." else _Reply(items=[]))
+    done = [([p.page_number for p in pages], cands)
+            for pages, cands in ex.extract_windows([bad, empty])]
+    assert done == [([2], [])]

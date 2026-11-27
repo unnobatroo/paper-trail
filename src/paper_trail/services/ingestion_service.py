@@ -34,7 +34,9 @@ class IngestionService:
         pages = self._parser.pages(content)
         key = self._extractor.name
         done = self._repo.ingested_pages(doc_id, key)
-        todo = [p for p in pages if p.page_number not in done]
+        # a page with no text is never sent or checkpointed: if its ocr failed, a later run
+        # with working ocr must still be able to read it, and checking a blank costs nothing
+        todo = [p for p in pages if p.page_number not in done and p.text.strip()]
         say = on_progress or (lambda _msg: None)
         finished = len(pages) - len(todo)
         say(f"page {finished}/{len(pages)}")
@@ -51,8 +53,7 @@ class IngestionService:
                         c.source_excerpt in page_text.get(c.source_page, ""))
                     if c.excerpt_on_page:
                         kept.append(c)
-                self._repo.add_page_candidates(doc_id, key, list(page_text), kept)
-                n += len(kept)
+                n += self._repo.add_page_candidates(doc_id, key, list(page_text), kept)
                 finished += len(window)
                 say(f"page {finished}/{len(pages)}")
         return doc_id, n

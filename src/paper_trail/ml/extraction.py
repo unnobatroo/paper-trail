@@ -210,11 +210,12 @@ class LLMExtractor:
         mid = len(lines) // 2
         halves = [self._ask_half(page.model_copy(update={"text": "\n".join(part)}), depth - 1)
                   for part in (lines[:mid], lines[mid:])]
-        items = [i for h in halves if h for i in h.items]
-        return _Reply(items=items) if any(halves) else None
+        if not all(halves):
+            return None  # a half we couldn't read means the page isn't done, so it is retried
+        return _Reply(items=[i for h in halves for i in h.items])
 
     def _ask_half(self, half: DocumentPage, depth: int) -> _Reply | None:
-        # a retry is best effort: one bad half shouldn't sink the whole document
+        # one failed half shouldn't sink the whole document: it leaves just this page unread
         try:
             return self._ask_page(half, depth)
         except openai.APIError as exc:
@@ -223,15 +224,21 @@ class LLMExtractor:
 
     def extract_windows(self, pages: list[DocumentPage]
                         ) -> Iterator[tuple[list[DocumentPage], list[PolicyCandidate]]]:
-        """(window, its candidates) as each window finishes, `concurrency` of them in flight
-        the whole time, so ingest can checkpoint pages while the gpu stays busy. http errors
-        re-raise; once the caller stops listening the windows not yet sent are dropped"""
+        """(pages finished, their candidates) as each window completes, `concurrency` of them
+        in flight the whole time, so ingest can checkpoint pages while the gpu stays busy.
+        a page whose answer was unusable (bad json after splitting, a failed half) is left
+        out, so it isn't checkpointed and the next run reads it again; a valid empty answer
+        is finished. http errors re-raise; once the caller stops listening the windows not
+        yet sent are dropped"""
         windows = [pages[i:i + self._window] for i in range(0, len(pages), self._window)]
         pool = ThreadPoolExecutor(self._concurrency)
         try:
             sent = {pool.submit(self._ask_window, w): w for w in windows}
             for done in as_completed(sent):
-                yield sent[done], self._candidates(done.result(), sent[done])
+                answers = done.result()
+                finished = [p for scope, reply in answers if reply is not None for p in scope]
+                if finished:
+                    yield finished, self._candidates(answers, sent[done])
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
 
