@@ -18,7 +18,7 @@ type Props = {
 }
 
 // One header for the whole ledger, kept on screen while the rows scroll under it.
-const HEAD = "sticky top-0 z-10 h-9 border-b bg-background/60 font-semibold text-foreground backdrop-blur-md"
+const HEAD = "sticky top-0 z-10 h-9 border-b bg-background/90 font-semibold text-foreground backdrop-blur-md"
 
 /** The strategy's page numbers of a row, as it would be cited: "p. 6", or "p. 6, 138" for a repeated passage. */
 export function folio(row: WorkspaceRow): string {
@@ -66,9 +66,9 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
           </TableHead>
           <TableHead scope="col" className={cn(HEAD, "w-28")}>Page</TableHead>
           <TableHead scope="col" className={HEAD}>Commitment</TableHead>
-          <TableHead scope="col" className={cn(HEAD, "hidden w-28 lg:table-cell")}>Type</TableHead>
+          <TableHead scope="col" className={cn(HEAD, "hidden w-28 md:table-cell")}>Type</TableHead>
           {trailing && (
-            <TableHead scope="col" className={cn(HEAD, "hidden w-28 pr-5 text-right xl:table-cell")}>
+            <TableHead scope="col" className={cn(HEAD, "hidden w-28 pr-5 text-right lg:table-cell")}>
               {showStage ? "Stage" : "Open"}
             </TableHead>
           )}
@@ -99,7 +99,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                   onCheckedChange={(on) => onSelectMany([r.id], on)}
                 />
               </TableCell>
-              <TableCell className="text-muted-foreground tabular-nums">{folio(r)}</TableCell>
+              <TableCell className="whitespace-normal text-muted-foreground tabular-nums">{folio(r)}</TableCell>
               <TableCell className="whitespace-normal">
                 <button
                   type="button"
@@ -115,11 +115,11 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                   </p>
                 )}
               </TableCell>
-              <TableCell className="hidden text-muted-foreground lg:table-cell">
+              <TableCell className="hidden text-muted-foreground md:table-cell">
                 {KIND_LABEL[r.kind]}
               </TableCell>
               {trailing && (
-                <TableCell className="hidden pr-5 text-right text-muted-foreground xl:table-cell">{left}</TableCell>
+                <TableCell className="hidden pr-5 text-right text-muted-foreground lg:table-cell">{left}</TableCell>
               )}
             </TableRow>
           )

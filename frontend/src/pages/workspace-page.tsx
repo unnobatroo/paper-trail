@@ -16,11 +16,11 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCanReview } from "@/lib/can-review"
 import { displayTitle, type Stage } from "@/lib/labels"
-import { shown } from "@/lib/rows"
+import { firstPage, shown } from "@/lib/rows"
 
 const TYPING = /^(INPUT|TEXTAREA|SELECT)$/
 
-/** The review workspace: stages in the sidebar, the commitments in the middle, the detail beside them. */
+/** The review workspace: stages along the top, the commitments in the middle, the detail beside them. */
 export function WorkspacePage() {
   const [params, setParams] = useSearchParams()
   const stage = params.get("stage") ?? "all"
@@ -51,9 +51,9 @@ export function WorkspacePage() {
   // The server filters by stage and search; the kind filter is applied here, so the kind
   // counts stay whole while one kind is selected.
   const ws = useWorkspace({ stage, type: "all", q })
-  // In the order of the strategy: by page, then as the server listed them.
+  // In the order of the strategy: by the row's first page (the one its folio starts with), then as listed.
   const stageRows: WorkspaceRow[] = useMemo(
-    () => [...(ws.data?.rows ?? [])].sort((a, b) => shown(a).source_page - shown(b).source_page || a.id - b.id),
+    () => [...(ws.data?.rows ?? [])].sort((a, b) => firstPage(a) - firstPage(b) || a.id - b.id),
     [ws.data],
   )
   const kindCounts = useMemo(() => {

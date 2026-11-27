@@ -81,7 +81,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
             <UploadIcon data-icon="inline-start" />
             {ingesting ? "Reading…" : "Ingest"}
           </Button>
-          {meta.data?.language_profile_loaded && (
+          {!!meta.data?.glossary.length && (
             <Button variant="ghost" size="sm" onClick={onGlossary}>
               <BookOpenIcon data-icon="inline-start" />
               Glossary
