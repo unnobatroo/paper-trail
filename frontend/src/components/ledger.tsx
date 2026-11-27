@@ -55,7 +55,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
   if (!rows.length) return <p className="type-secondary p-6">Nothing matches these filters.</p>
 
   // the last column says what is left to do; it only exists when some row has something to say
-  const trailing = showStage || rows.some((r) => pending(r) || (onSearch && r.stage === "search"))
+  const trailing = showStage || rows.some((r) => pending(r) || (onSearch && !showStage && r.stage === "search"))
   const ids = rows.map((r) => r.id)
   const all = ids.every((id) => selected.has(id))
   const some = ids.some((id) => selected.has(id))
@@ -121,9 +121,17 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                 )}
               </TableCell>
               {trailing && (
-                <TableCell className="type-label hidden pr-5 text-right lg:table-cell" onClick={(e) => e.stopPropagation()}>
-                  {onSearch && r.stage === "search" ? (
-                    <Button size="xs" variant="outline" disabled={searchDisabled} onClick={() => onSearch(r)}>
+                <TableCell className="type-label hidden pr-5 text-right lg:table-cell">
+                  {onSearch && r.stage === "search" && !showStage ? (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={searchDisabled}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSearch(r)
+                      }}
+                    >
                       Find evidence
                     </Button>
                   ) : (

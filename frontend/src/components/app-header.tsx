@@ -40,7 +40,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
       </div>
 
       <Tabs value={stage} onValueChange={(v) => onStage(String(v))}>
-        <TabsList aria-label="Review stages">
+        <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto flex-wrap">
           {(["all", ...STAGES] as const).map((s) => (
             <TabsTrigger key={s} value={s} title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}>
               {s === "all" ? "All" : STAGE_INFO[s].label}{" "}

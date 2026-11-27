@@ -19,8 +19,8 @@ export function KindFilter({ counts, kind, onKind, children }: Props) {
     KIND_ORDER.filter((k) => counts[k]).map((k) => ({ value: k, label: KIND_SECTION[k], count: counts[k] })),
   )
 
-  // "All" plus a single kind is no choice at all
-  const choosable = facets.length > 2
+  // "All" plus a single kind is no choice at all; but a kind that is already chosen can always be undone
+  const choosable = facets.length > 2 || kind !== "all"
   if (!choosable && !children) return null
 
   return (

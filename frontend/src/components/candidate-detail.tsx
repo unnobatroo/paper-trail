@@ -53,6 +53,9 @@ export function CandidateDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {!open && (
+        <p className="type-label">{c.review_status === "accepted" ? "Confirmed as a commitment" : "Rejected"}</p>
+      )}
       {open && c.excerpt_on_page === false && (
         <p className="type-secondary text-destructive" role="note">
           We couldn't re-find this quote on the page. It's worth a closer look.

@@ -32,3 +32,10 @@ describe("KindFilter", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument()
   })
 })
+
+describe("KindFilter with a kind already chosen", () => {
+  it("stays, even if only one kind is left, so the choice can be undone", () => {
+    render(<KindFilter counts={{ objective: 4 }} kind="measure" onKind={vi.fn()} />)
+    expect(screen.getByRole("tab", { name: "All 4" })).toBeInTheDocument()
+  })
+})
