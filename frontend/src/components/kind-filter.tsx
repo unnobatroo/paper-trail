@@ -17,9 +17,9 @@ export function KindFilter({ counts, kind, onKind }: Props) {
 
   return (
     <Tabs value={kind} onValueChange={(v) => onKind(String(v))} className="px-4 pt-3 pb-1">
-      <TabsList className="h-auto flex-wrap rounded-full bg-foreground/5 p-1" aria-label="Filter by type">
+      <TabsList className="group-data-horizontal/tabs:h-auto flex-wrap rounded-full bg-foreground/5 p-1" aria-label="Filter by type">
         {facets.map((f) => (
-          <TabsTrigger key={f.value} value={f.value} className="flex-none rounded-full px-3 py-1 data-active:bg-background data-active:shadow-sm">
+          <TabsTrigger key={f.value} value={f.value} className="h-auto flex-none rounded-full px-3 py-1 data-active:bg-background data-active:shadow-sm dark:data-active:border-transparent dark:data-active:bg-background">
             {f.label}{" "}
             <span className="text-muted-foreground tabular-nums">{f.count}</span>
           </TabsTrigger>

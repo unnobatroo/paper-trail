@@ -54,7 +54,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
   const all = Object.entries(counts).reduce((n, [s, c]) => n + (s === "rejected" ? 0 : c), 0)
 
   return (
-    <header className="glass flex flex-col gap-3 px-5 py-3">
+    <header className="glass relative z-20 flex flex-col gap-3 px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <h1 className="text-lg leading-none font-semibold">Paper Trail</h1>
         {meta.data?.deployment && <span className="text-xs text-muted-foreground">{meta.data.deployment}</span>}
@@ -72,7 +72,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
               type="search"
               aria-label="Search commitments"
               placeholder="Search commitments"
-              className="h-9 w-64 rounded-full bg-background/60 pl-9"
+              className="h-9 w-64 rounded-full bg-background/60 pl-9 dark:bg-background/60"
               value={q}
               onChange={(e) => onQ(e.target.value)}
             />
@@ -95,7 +95,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
       </div>
 
       <Tabs value={stage} onValueChange={(v) => onStage(String(v))}>
-        <TabsList className="h-auto flex-wrap rounded-full bg-foreground/5 p-1" aria-label="Review stages">
+        <TabsList className="group-data-horizontal/tabs:h-auto flex-wrap rounded-full bg-foreground/5 p-1" aria-label="Review stages">
           {(["all", ...STAGES] as const).map((s) => {
             const Icon = STAGE_ICON[s]
             return (
@@ -103,7 +103,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
               key={s}
               value={s}
               title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}
-              className="flex-none rounded-full px-3 py-1.5 data-active:bg-background data-active:shadow-sm"
+              className="h-auto flex-none rounded-full px-3 py-1.5 data-active:bg-background data-active:shadow-sm dark:data-active:border-transparent dark:data-active:bg-background"
             >
               <Icon className="text-muted-foreground" aria-hidden="true" />
               {s === "all" ? "All" : STAGE_INFO[s].label}{" "}

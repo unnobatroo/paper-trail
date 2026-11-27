@@ -128,7 +128,6 @@
       radial-gradient(60rem 40rem at 5% -10%, oklch(0.86 0.09 250 / 0.55), transparent),
       radial-gradient(55rem 40rem at 100% 0%, oklch(0.88 0.08 310 / 0.45), transparent),
       radial-gradient(55rem 45rem at 55% 115%, oklch(0.9 0.07 190 / 0.45), transparent);
-    background-attachment: fixed;
     }
   .dark body {
     background-image:
@@ -144,4 +143,16 @@
 /* a frosted panel: translucent fill, hairline edge, blur of what is behind it */
 @utility glass {
   @apply rounded-2xl border border-white/40 bg-background/55 shadow-sm backdrop-blur-xl dark:border-white/10;
+}
+
+/* no blur available, or the user asked for less transparency: the panels go opaque */
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    @apply bg-background backdrop-blur-none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    @apply bg-background;
+  }
 }
