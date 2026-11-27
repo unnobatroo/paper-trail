@@ -129,7 +129,7 @@ describe("WorkspacePage", () => {
     const calls = stubApi({ ...META, review_required: true })
     renderPage()
     expect(await screen.findByText(/Read-only\. You can browse everything/)).toBeInTheDocument()
-    await userEvent.keyboard("j")
+    // the first row opens by itself, with its decision buttons switched off
     expect(await screen.findByRole("button", { name: "Confirm" })).toBeDisabled()
     expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled()
     await userEvent.keyboard("c")
