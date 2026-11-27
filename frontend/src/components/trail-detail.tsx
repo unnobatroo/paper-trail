@@ -2,6 +2,7 @@ import { toast } from "sonner"
 
 import type { Schemas, TrailRow } from "@/api/client"
 import { useReviewActions } from "@/api/hooks"
+import { useCanReview } from "@/lib/can-review"
 import { BudgetLine, EvidenceWarnings } from "@/components/evidence-bits"
 import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
@@ -41,6 +42,7 @@ function Group({ title, tone, children }: { title: string; tone: string; childre
 /** A commitment's paper trail: status, money, evidence grouped by relationship, findings and gaps. */
 export function TrailDetail({ t }: { t: TrailRow }) {
   const { setJurisdiction } = useReviewActions()
+  const canReview = useCanReview()
   const com = t.commitment
   const meta = [
     com.kind.toUpperCase(),
@@ -62,6 +64,7 @@ export function TrailDetail({ t }: { t: TrailRow }) {
         )}
         <SimpleSelect
           label="Asset owner"
+          disabled={!canReview}
           value={com.asset_owner_jurisdiction}
           onChange={(v) =>
             setJurisdiction.mutate(

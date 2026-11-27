@@ -20,7 +20,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 
 /** Stub fetch like the API: returns the rows for each stage and records every write. */
-function stubApi() {
+function stubApi(meta: object = META) {
   const rows = [
     row({ kind: "measure", group: [candidate({ id: 1, normalized_title: "Fák ültetése" })] }),
     row({ kind: "measure", stage: "search", group: [candidate({ id: 2, normalized_title: "Napelemek", review_status: "accepted" })] }),
@@ -29,7 +29,7 @@ function stubApi() {
   vi.stubGlobal("fetch", async (input: Request) => {
     const url = new URL(input.url)
     calls.push({ method: input.method, path: url.pathname, query: url.search })
-    if (url.pathname === "/api/meta") return json(META)
+    if (url.pathname === "/api/meta") return json(meta)
     if (url.pathname === "/api/jobs") return json([])
     if (url.pathname === "/api/workspace") {
       const stage = url.searchParams.get("stage") ?? "all"
@@ -99,6 +99,17 @@ describe("WorkspacePage", () => {
     box.focus()
     await userEvent.keyboard("jc")
     expect(box).toHaveValue("jc")
+    expect(calls.filter((c) => c.method === "POST")).toEqual([])
+  })
+
+  it("is read-only until the review key is saved, when the deployment asks for one", async () => {
+    const calls = stubApi({ ...META, review_required: true })
+    renderPage()
+    expect(await screen.findByText(/Read-only\. You can browse everything/)).toBeInTheDocument()
+    await userEvent.keyboard("j")
+    expect(await screen.findByRole("button", { name: "Confirm" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled()
+    await userEvent.keyboard("c")
     expect(calls.filter((c) => c.method === "POST")).toEqual([])
   })
 })

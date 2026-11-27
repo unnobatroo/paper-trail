@@ -1,0 +1,15 @@
+data
+tests
+deploy
+db
+scripts
+.venv
+.git
+.github
+frontend/node_modules
+frontend/dist
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.env.local
+.vercel

@@ -26,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useCanReview } from "@/lib/can-review"
 import { STAGES, STAGE_INFO, type Stage } from "@/lib/labels"
 
 const ICONS: Record<Stage | "all", LucideIcon> = {
@@ -50,6 +51,7 @@ type Props = {
 /** Navigation by review stage, with a count for each, and the app-level actions at the bottom. */
 export function AppSidebar({ stage, counts, ingesting, onStage, onIngest, onGlossary, onSettings }: Props) {
   const meta = useMeta()
+  const canReview = useCanReview()
   const all = Object.entries(counts).reduce((n, [s, c]) => n + (s === "rejected" ? 0 : c), 0)
   const items: { id: Stage | "all"; label: string; hint: string; count: number }[] = [
     { id: "all", label: "All", hint: "Everything except rejected", count: all },
@@ -92,7 +94,7 @@ export function AppSidebar({ stage, counts, ingesting, onStage, onIngest, onGlos
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Read a strategy PDF" onClick={onIngest} disabled={ingesting}>
+            <SidebarMenuButton tooltip="Read a strategy PDF" onClick={onIngest} disabled={!canReview || ingesting}>
               <UploadIcon />
               <span>{ingesting ? "Reading…" : "Ingest"}</span>
             </SidebarMenuButton>

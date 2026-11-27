@@ -88,6 +88,9 @@ class Settings(BaseSettings):
         default=2, ge=1, le=20, validation_alias="RERANK_BATCH")
     fixture_dir: Path = PROJECT_ROOT / "data" / "fixtures"
     seed_dir: Path = PROJECT_ROOT / "data" / "source_documents"
+    # seconds a cdn may cache GET /api responses. only for read-only deployments (a public demo):
+    # with reviewers working, 0 keeps every response fresh
+    api_cache_seconds: int = Field(default=0, ge=0, validation_alias="API_CACHE_SECONDS")
     # the built review app (`npm run build` in frontend/); served at / when it exists
     frontend_dir: Path = Field(
         default=PROJECT_ROOT / "frontend" / "dist", validation_alias="FRONTEND_DIR")

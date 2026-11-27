@@ -241,3 +241,15 @@ def test_without_a_frontend_build_the_api_still_runs(state, monkeypatch, tmp_pat
     assert client.get("/").status_code == 404
     assert client.get("/healthz").json() == {"ok": True}
 
+
+def test_api_responses_are_cacheable_only_when_the_deployment_asks(state, monkeypatch):
+    from paper_trail.api.app import create_app
+
+    default = TestClient(create_app())
+    assert "cache-control" not in default.get("/api/meta").headers
+    monkeypatch.setenv("API_CACHE_SECONDS", "120")
+    cached = TestClient(create_app())
+    assert "s-maxage=120" in cached.get("/api/meta").headers["cache-control"]
+    # a write is never cached, and neither are non-API paths
+    assert "cache-control" not in cached.get("/healthz").headers
+
