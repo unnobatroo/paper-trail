@@ -178,6 +178,16 @@ class LLMExtractor:
         self._max_tokens = max_tokens
         # ingest checkpoints are per extractor: another model reads every page again
         self.name = f"llm:{model}"
+        # what ingest counts unread runs by: a new max_tokens or window deserves a fresh try
+        self.miss_key = f"{self.name}/{max_tokens}/{self._window}"
+        # pages left unread by a failed request, not by an answer we couldn't use
+        self._api_failed: set[int] = set()
+
+    def drain_api_failures(self) -> set[int]:
+        """pages a request failed on since the last call (a server outage, not a bad page):
+        ingest doesn't count these toward giving a page up"""
+        failed, self._api_failed = self._api_failed, set()
+        return failed
 
     def _ask(self, pages: list[DocumentPage]) -> _Reply | None:
         return ask_json(self._client, self._model, extraction_prompt(self._profile, pages),
@@ -219,6 +229,7 @@ class LLMExtractor:
         try:
             return self._ask_page(half, depth)
         except openai.APIError as exc:
+            self._api_failed.add(half.page_number)
             log.warning("llm failed on half of page %s (%s), skipped", half.page_number, exc)
             return None
 

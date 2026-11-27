@@ -1,5 +1,6 @@
 """ingest checkpoints: a crashed job resumes after its last finished page, a lost lease stops it"""
 
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,7 @@ from paper_trail.jobs.postgres import PostgresJobRunner, PostgresWorker
 from paper_trail.maintenance import reset
 from paper_trail.ml.extraction import NoExtractor
 from paper_trail.repositories.store import PolicyRepository
-from paper_trail.services.ingestion_service import IngestionService
+from paper_trail.services.ingestion_service import MAX_PAGE_MISSES, IngestionService
 
 PAGES = [DocumentPage(page_number=n, text=f"Intro. Plant {n}00 trees by 2030.")
          for n in (1, 2, 3, 4)]
@@ -150,3 +151,69 @@ def test_checkpoints_from_before_content_versioning_still_count(policy):
     extractor = PageExtractor()
     IngestionService(policy, extractor, parser=PARSER).ingest(b"anything", "Strategy", "City")
     assert extractor.calls == [[3], [4]]
+
+
+class StubbornExtractor(PageExtractor):
+    """page 2 never comes back readable: it is left out of every window"""
+
+    def extract_windows(self, pages):
+        yield from super().extract_windows([p for p in pages if p.page_number != 2])
+        if any(p.page_number == 2 for p in pages):
+            self.calls.append([2])
+
+
+def test_a_page_that_never_reads_is_given_up_on_after_the_cap(policy):
+    seen = []
+    for _ in range(MAX_PAGE_MISSES + 2):
+        extractor = StubbornExtractor()
+        _ingest(policy, extractor)
+        seen.append([2] in extractor.calls)
+    # asked on the first MAX_PAGE_MISSES runs, then left alone
+    assert seen == [True] * MAX_PAGE_MISSES + [False] * 2
+    [doc] = policy.documents()
+    assert policy.ingested_pages(doc.id, "llm:stub") == {1, 3, 4}  # never checkpointed as read
+    # a different model starts clean
+    other = StubbornExtractor(name="llm:other")
+    _ingest(policy, other)
+    assert [2] in other.calls
+
+
+def test_a_server_outage_does_not_count_toward_giving_a_page_up(policy):
+    class Flaky(StubbornExtractor):
+        def drain_api_failures(self):
+            return {2}  # page 2 was left unread because requests failed, not its answer
+
+    for _ in range(MAX_PAGE_MISSES + 1):
+        extractor = Flaky()
+        _ingest(policy, extractor)
+        assert [2] in extractor.calls  # still asked every run
+
+
+def test_a_page_that_reads_again_starts_its_count_over(policy):
+    for _ in range(MAX_PAGE_MISSES - 1):
+        _ingest(policy, StubbornExtractor())
+    [doc] = policy.documents()
+    digest = hashlib.sha256(b"pdf").hexdigest()
+    assert policy.page_misses(doc.id, "llm:stub", digest) == {2: MAX_PAGE_MISSES - 1}
+    _ingest(policy, PageExtractor())  # page 2 reads this time
+    assert policy.page_misses(doc.id, "llm:stub", digest) == {}
+
+
+def test_misses_before_a_crash_are_still_counted(policy):
+    class Crashy(StubbornExtractor):
+        def extract_windows(self, pages):
+            yield from super().extract_windows(pages)
+            raise RuntimeError("server died")
+
+    with pytest.raises(RuntimeError):
+        _ingest(policy, Crashy())
+    [doc] = policy.documents()
+    assert policy.page_misses(doc.id, "llm:stub", hashlib.sha256(b"pdf").hexdigest()) == {2: 1}
+
+
+def test_giving_up_is_said_in_the_progress(policy):
+    for _ in range(MAX_PAGE_MISSES):
+        _ingest(policy, StubbornExtractor())
+    progress = []
+    _ingest(policy, StubbornExtractor(), on_progress=progress.append)
+    assert progress[-1] == "page 4/4, skipped unreadable pages [2]"
