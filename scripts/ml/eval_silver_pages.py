@@ -63,7 +63,7 @@ def main() -> None:
         d_ = [p for p in lab["negative"] if p not in kept]
         tp, fn, fp, tn = tp + len(a), fn + len(b), fp + len(c), tn + len(d_)
         per_doc[doc] = {"found": len(a), "missed": b, "false_alarm": c,
-                        "positives": len(lab["positive"]),
+                        "positives": len(lab["positive"]), "flagged": sorted(kept),
                         "uncertain_flagged": {p: p in kept for p in lab.get("uncertain", [])}}
         print(doc, json.dumps(per_doc[doc]), flush=True)
     report = {"model": args.model, "pages_scored": tp + fn + fp + tn,
