@@ -14,6 +14,8 @@ function renderTable(over: Partial<React.ComponentProps<typeof WorkspaceTable>> 
     ],
     cursor: null,
     selected: new Set<number>(),
+    collapsed: new Set<string>(),
+    onToggleKind: vi.fn(),
     onOpen: vi.fn(),
     onSelectMany: vi.fn(),
     ...over,
@@ -28,14 +30,20 @@ function renderTable(over: Partial<React.ComponentProps<typeof WorkspaceTable>> 
 
 describe("WorkspaceTable", () => {
   it("groups rows under one header, a collapsible group per kind in the usual order", async () => {
-    renderTable()
+    const props = renderTable()
     expect(screen.getAllByRole("table")).toHaveLength(1)
     expect(screen.getAllByRole("columnheader", { name: "Commitment" })).toHaveLength(1)
     const groups = screen.getAllByRole("button", { expanded: true }).map((b) => b.textContent)
     expect(groups).toEqual(["Objectives1", "Measures1"])
 
     await userEvent.click(screen.getByRole("button", { name: /Objectives/ }))
+    expect(props.onToggleKind).toHaveBeenCalledWith("objective", [2])
+  })
+
+  it("hides a folded group's rows and its select-all box", () => {
+    renderTable({ collapsed: new Set(["objective"]) })
     expect(screen.queryByRole("button", { name: "Zöld város" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("checkbox", { name: "Select all objectives" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Fák ültetése" })).toBeInTheDocument()
   })
 

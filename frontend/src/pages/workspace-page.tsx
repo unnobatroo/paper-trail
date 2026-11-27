@@ -52,11 +52,15 @@ export function WorkspacePage() {
   // counts stay whole while one kind is selected.
   const ws = useWorkspace({ stage, type: "all", q })
   const stageRows: WorkspaceRow[] = useMemo(() => ws.data?.rows ?? [], [ws.data])
-  const kindCounts = useMemo(
-    () => stageRows.reduce<Record<string, number>>((n, r) => ({ ...n, [r.kind]: (n[r.kind] ?? 0) + 1 }), {}),
-    [stageRows],
-  )
-  const rows = useMemo(() => (kind === "all" ? stageRows : stageRows.filter((r) => r.kind === kind)), [stageRows, kind])
+  const kindCounts = useMemo(() => {
+    const n: Record<string, number> = {}
+    for (const r of stageRows) n[r.kind] = (n[r.kind] ?? 0) + 1
+    return n
+  }, [stageRows])
+  const kindRows = useMemo(() => (kind === "all" ? stageRows : stageRows.filter((r) => r.kind === kind)), [stageRows, kind])
+  // Groups folded away in the table; their rows are out of reach of the keyboard and of bulk actions too.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const rows = useMemo(() => kindRows.filter((r) => !collapsed.has(r.kind)), [kindRows, collapsed])
   const counts = ws.data?.stage_counts ?? {}
   const current = rows.find((r) => r.id === cursor) ?? null
 
@@ -72,6 +76,14 @@ export function WorkspacePage() {
   const canReview = useCanReview()
 
   const open = useCallback((id: number | null) => setParam("row", id === null ? null : String(id)), [setParam])
+  const toggleKind = (k: string, ids: number[]) => {
+    setCollapsed((s) => {
+      const next = new Set(s)
+      if (!next.delete(k)) next.add(k)
+      return next
+    })
+    selectMany(ids, false)
+  }
   /** After a decision on a row, the next one (or the one before, at the end) takes its place. */
   const moveOnFrom = useCallback(
     (id: number) => {
@@ -106,6 +118,8 @@ export function WorkspacePage() {
   const confirmRow = useCallback(
     (row: WorkspaceRow) => {
       const c = shown(row)
+      // a second press while the first is still on its way would decide the same row twice
+      if (accept.isPending || reject.isPending) return
       if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
         accept.mutate(
           { id: c.id! },
@@ -117,11 +131,12 @@ export function WorkspacePage() {
           },
         )
     },
-    [accept, canReview, moveOnFrom],
+    [accept, reject.isPending, canReview, moveOnFrom],
   )
   const rejectRow = useCallback(
     (row: WorkspaceRow) => {
       const c = shown(row)
+      if (accept.isPending || reject.isPending) return
       if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
         reject.mutate(c.id!, {
           onSuccess: () => {
@@ -130,7 +145,7 @@ export function WorkspacePage() {
           },
         })
     },
-    [reject, canReview, moveOnFrom],
+    [reject, accept.isPending, canReview, moveOnFrom],
   )
 
   // A wide screen always has something in the detail pane: the first row, until one is picked.
@@ -164,7 +179,7 @@ export function WorkspacePage() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
-  const picked = rows.filter((r) => selected.has(r.id))
+  const picked = kindRows.filter((r) => selected.has(r.id) && !collapsed.has(r.kind))
   const byStage = (s: Stage) => picked.filter((r) => r.stage === s)
   const mentionIds = byStage("confirm").flatMap((r) => r.group.filter((c) => c.review_status === "unreviewed").map((c) => c.id!))
   const matchIds = byStage("review").flatMap((r) => r.pending.map((lv) => lv.link.id!))
@@ -233,7 +248,7 @@ export function WorkspacePage() {
           <p className="text-muted-foreground">Use Ingest in the sidebar to read a strategy PDF.</p>
         </div>
       ) : (
-        <WorkspaceTable rows={rows} cursor={cursor} selected={selected} onOpen={open} onSelectMany={selectMany} />
+        <WorkspaceTable rows={kindRows} collapsed={collapsed} onToggleKind={toggleKind} cursor={cursor} selected={selected} onOpen={open} onSelectMany={selectMany} />
       )}
     </div>
   )

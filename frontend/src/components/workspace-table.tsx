@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react"
 
 import type { WorkspaceRow } from "@/api/client"
@@ -13,6 +12,9 @@ import { cn } from "@/lib/utils"
 
 type Props = {
   rows: WorkspaceRow[]
+  /** Kinds whose group is folded away; the page owns this so keyboard moves skip those rows. */
+  collapsed: Set<string>
+  onToggleKind: (kind: string, ids: number[]) => void
   cursor: number | null
   selected: Set<number>
   onOpen: (id: number) => void
@@ -23,19 +25,11 @@ type Props = {
 const HEAD = "sticky top-0 z-10 h-9 bg-secondary text-xs font-semibold tracking-wide text-secondary-foreground uppercase"
 
 /** The commitments in one table: a single sticky header, with a collapsible group per kind. */
-export function WorkspaceTable({ rows, cursor, selected, onOpen, onSelectMany }: Props) {
+export function WorkspaceTable({ rows, collapsed, onToggleKind, cursor, selected, onOpen, onSelectMany }: Props) {
   const { lang, density } = usePrefs()
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const sections = KIND_ORDER.map((kind) => ({ kind, rows: rows.filter((r) => r.kind === kind) })).filter((s) => s.rows.length)
 
   if (!sections.length) return <p className="p-6 text-muted-foreground">Nothing matches these filters.</p>
-
-  const toggle = (kind: string) =>
-    setCollapsed((s) => {
-      const next = new Set(s)
-      if (!next.delete(kind)) next.add(kind)
-      return next
-    })
 
   return (
     // overflow-visible: the page's scroll area is what the sticky header sticks to
@@ -61,12 +55,15 @@ export function WorkspaceTable({ rows, cursor, selected, onOpen, onSelectMany }:
           <TableBody key={kind}>
             <TableRow className="bg-muted/60 hover:bg-muted/60">
               <TableCell>
-                <Checkbox
-                  aria-label={`Select all ${KIND_SECTION[kind].toLowerCase()}`}
-                  checked={all}
-                  indeterminate={some && !all}
-                  onCheckedChange={(on) => onSelectMany(ids, on)}
-                />
+                {/* not while folded: a selection must never reach rows you can't see */}
+                {!isCollapsed && (
+                  <Checkbox
+                    aria-label={`Select all ${KIND_SECTION[kind].toLowerCase()}`}
+                    checked={all}
+                    indeterminate={some && !all}
+                    onCheckedChange={(on) => onSelectMany(ids, on)}
+                  />
+                )}
               </TableCell>
               <TableCell colSpan={5} className="py-1">
                 <Button
@@ -74,7 +71,7 @@ export function WorkspaceTable({ rows, cursor, selected, onOpen, onSelectMany }:
                   size="sm"
                   className="-ml-2 gap-1.5 font-semibold"
                   aria-expanded={!isCollapsed}
-                  onClick={() => toggle(kind)}
+                  onClick={() => onToggleKind(kind, ids)}
                 >
                   {isCollapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
                   {KIND_SECTION[kind]}
