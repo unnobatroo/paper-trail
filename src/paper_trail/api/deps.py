@@ -33,7 +33,8 @@ def _handlers():
         if pdf is None:
             raise LookupError(f"{payload['name']} is not in the document store")
         doc_id, n = state.ingestion.ingest(
-            pdf, payload["title"], payload["publisher"], payload.get("url", "")
+            pdf, payload["title"], payload["publisher"], payload.get("url", ""),
+            on_progress=progress,
         )
         result: dict = {"document_id": doc_id, "candidates": n}
         if n == 0:

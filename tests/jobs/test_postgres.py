@@ -2,6 +2,8 @@
 
 from concurrent.futures import ThreadPoolExecutor
 
+import httpx
+import openai
 import psycopg
 
 from paper_trail.jobs.postgres import PostgresJobRunner, PostgresWorker
@@ -68,6 +70,32 @@ def test_network_errors_retry_everything_else_fails(dsn):
     assert queue.get(retry.id).error == "TimeoutError: temporary network timeout"
     assert (queue.get(fail.id).status, queue.get(fail.id).error) == (
         "failed", "ValueError: bad payload")
+
+
+def test_model_server_timeouts_back_off_bad_requests_fail(dsn):
+    queue = PostgresJobRunner(dsn)
+    request = httpx.Request("POST", "https://goethe:8443/v1/chat/completions")
+
+    def llm_timeout(payload, progress):
+        raise openai.APITimeoutError(request=request)
+
+    def bad_request(payload, progress):
+        raise openai.BadRequestError("schema rejected", response=httpx.Response(
+            400, request=request), body=None)
+
+    handlers = {"llm_timeout": llm_timeout, "bad_request": bad_request}
+    retry, fail = queue.submit("llm_timeout"), queue.submit("bad_request")
+    PostgresWorker(dsn, handlers).run_once()
+    PostgresWorker(dsn, handlers).run_once()
+    with psycopg.connect(dsn) as conn:
+        status, attempts, backoff = conn.execute(
+            "SELECT status, attempts, extract(epoch FROM available_at - now())::int"
+            " FROM jobs WHERE id=%s",
+            (retry.id,)).fetchone()
+    # back in the queue, runnable again after the first 15 s backoff step
+    assert (status, attempts) == ("queued", 1) and 10 <= backoff <= 15
+    assert queue.get(fail.id).status == "failed"
+    assert queue.get(fail.id).error.startswith("BadRequestError")
 
 
 def test_progress_after_losing_the_lease_aborts_the_job(dsn):

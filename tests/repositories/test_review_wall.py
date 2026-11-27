@@ -1,7 +1,6 @@
 """the db keeps the worker off reviewed rows, whatever the python does"""
 
 import threading
-from urllib.parse import urlsplit, urlunsplit
 
 import psycopg
 import pytest
@@ -44,13 +43,10 @@ def test_worker_can_add_money_to_unreviewed_evidence(dsn, policy, evidence):
     assert b.amount_raw == "2,5 millió Ft"
 
 
-def test_store_skips_money_when_a_reviewer_got_there_first(dsn, policy, evidence):
+def test_store_skips_money_when_a_reviewer_got_there_first(worker_dsn, policy, evidence):
     # the race: worker checked "not reviewed", then a reviewer clicked before the money landed
     ev_id = _evidence(policy, evidence, "https://jozsefvaros.hu/rendelet", ReviewStatus.ACCEPTED)
-    # conftest gives both app roles the password test-only
-    as_worker = urlunsplit(urlsplit(dsn)._replace(
-        netloc=f"paper_trail_worker:test-only@{urlsplit(dsn).hostname}:{urlsplit(dsn).port}"))
-    worker = EvidenceRepository(as_worker)
+    worker = EvidenceRepository(worker_dsn)
     assert worker.add_budget(BudgetRecord(
         evidence_id=ev_id, kind=BudgetKind.ACTUAL_EXPENDITURE, amount_raw="1 millió Ft")) is None
     assert evidence.budgets_for_evidence(ev_id) == []
@@ -80,3 +76,12 @@ def test_raw_worker_insert_waits_for_a_click_in_flight(dsn, policy, evidence):
     t.join(timeout=10)
     assert [e.sqlstate for e in errors] == ["PTR01"]
     assert evidence.budgets_for_evidence(ev_id) == []
+
+
+def test_worker_reads_the_source_registry(worker_dsn, evidence):
+    """the worker's evidence search needs the registry: no RLS hiding rows from app roles"""
+    from paper_trail.domain.models import OfficialSource
+    evidence.upsert_official_source(OfficialSource(
+        url="https://jozsefvaros.hu", publisher="Józsefváros", title="Józsefváros"))
+    assert [s.url for s in EvidenceRepository(worker_dsn).official_sources()] == [
+        "https://jozsefvaros.hu"]

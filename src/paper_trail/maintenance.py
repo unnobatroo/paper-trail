@@ -78,6 +78,8 @@ GENERATED = [
     ("evidence", "DELETE FROM evidence e WHERE " + _gone("e.id")),
     ("candidates", "DELETE FROM candidates c WHERE c.review_status = 'unreviewed'"
                    " AND NOT EXISTS (SELECT 1 FROM commitments m WHERE m.candidate_id = c.id)"),
+    # the candidates went, so the next ingest has to read those pages again
+    ("document_ingest_pages", "DELETE FROM document_ingest_pages"),
     ("jobs", "DELETE FROM jobs WHERE status NOT IN ('queued', 'running')"),
     # notes have no fk (two subject tables), drop the ones whose item just went
     ("notes", "DELETE FROM notes n WHERE (n.subject_kind = 'candidate' AND NOT EXISTS"
@@ -88,7 +90,8 @@ GENERATED = [
 CACHE = [("chunks", "DELETE FROM chunks"), ("pages", "DELETE FROM pages")]
 # children first, fks don't cascade
 EVERYTHING = ["notes", "budgets", "links", "artifact_evidence", "implementation_artifacts",
-              "evidence", "commitments", "candidates", "documents", "chunks", "pages",
+              "evidence", "commitments", "candidates", "document_ingest_pages", "documents",
+              "chunks", "pages",
               "official_sources", "jobs"]
 
 
@@ -121,7 +124,8 @@ def reset_cmd(
 @app.command()
 def rerun(ingest: Annotated[list[str], typer.Option(help="document to extract again")] = [],  # noqa: B006
           title: str = "", publisher: str = "", url: str = "") -> None:
-    """queue the pipeline for the worker: ingest documents again, then every evidence search"""
+    """queue the pipeline for the worker: ingest documents again, then every evidence search.
+    pages the same model already extracted are skipped, `reset` first to read them again"""
     if ingest and not (title and publisher):
         raise typer.BadParameter("--ingest needs --title and --publisher")
     dsn = _owner_dsn()

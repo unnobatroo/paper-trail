@@ -30,7 +30,7 @@ flowchart LR
   ([#35](https://github.com/unnobatroo/paper-trail/pull/35)). It turned out reviewer
   accepts agreed with blind grading only 58% of the time, so they're no longer used as labels
 - **Runs on one 8 GB GPU**: a 4-bit AWQ Qwen3-4B
-  ([on Hugging Face](https://huggingface.co/unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq)),
+  ([on Hugging Face](https://huggingface.co/jismailov/paper-trail-extract-4b)),
   an embedder and a reranker, all self-hosted, no paid AI APIs. Search also runs CPU-only
   (model2vec), extraction needs an OpenAI-compatible LLM server
 

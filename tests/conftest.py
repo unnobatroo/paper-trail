@@ -58,6 +58,13 @@ def dsn(template_db):
 
 
 @pytest.fixture
+def worker_dsn(dsn) -> str:
+    """the same database as the restricted worker login: prod's grants and triggers apply"""
+    u = urlsplit(dsn)
+    return urlunsplit(u._replace(netloc=f"paper_trail_worker:test-only@{u.hostname}:{u.port}"))
+
+
+@pytest.fixture
 def policy(dsn) -> PolicyRepository:
     return PolicyRepository(dsn)
 

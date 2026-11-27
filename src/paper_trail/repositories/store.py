@@ -95,27 +95,52 @@ class PolicyRepository(Repo):
 
     def add_candidate(self, cand: PolicyCandidate) -> int:
         with self._engine.begin() as conn:
-            # same (doc, page, text) = same candidate, re-ingest keeps its review status
-            self._lock(conn, f"candidate:{cand.document_id}:{cand.source_page}:{cand.text}")
-            found = conn.execute(text(
-                "SELECT id FROM candidates WHERE document_id=:d AND source_page=:p AND text=:t"),
-                {"d": cand.document_id, "p": cand.source_page, "t": cand.text}).scalar()
-            if found:
-                return found
-            return conn.execute(text(
-                "INSERT INTO candidates(document_id, suggested_type, text, normalized_title,"
-                " source_page, source_excerpt, code, excerpt_on_page, responsible_org,"
-                " timeframe, deadline_year, unit, target_value)"
-                " VALUES (:document_id, :suggested_type, :text, :normalized_title, :source_page,"
-                " :source_excerpt, :code, :excerpt_on_page, :responsible_org, :timeframe,"
-                " :deadline_year, :unit, :target_value) RETURNING id"),
-                {**cand.model_dump(include={
-                    "document_id", "text", "normalized_title", "source_page", "source_excerpt",
-                    "code", "responsible_org", "timeframe", "deadline_year", "unit",
-                    "target_value"}),
-                 "suggested_type": cand.suggested_type.value,
-                 "excerpt_on_page": None if cand.excerpt_on_page is None
-                 else bool(cand.excerpt_on_page)}).scalar_one()
+            return self._insert_candidate(conn, cand)
+
+    def ingested_pages(self, document_id: int, extractor: str) -> set[int]:
+        """pages this extractor already finished for the document"""
+        return {r["page_number"] for r in self._all(
+            "SELECT page_number FROM document_ingest_pages WHERE document_id=:d"
+            " AND extractor=:x", d=document_id, x=extractor)}
+
+    def add_page_candidates(self, document_id: int, extractor: str, pages: list[int],
+                            cands: list[PolicyCandidate]) -> None:
+        """a batch of pages + their candidates, all or nothing: a crash mid-batch leaves
+        neither, so the retry redoes exactly the pages that didn't land"""
+        with self._engine.begin() as conn:
+            for cand in cands:
+                self._insert_candidate(conn, cand)
+            conn.execute(text(
+                "INSERT INTO document_ingest_pages(document_id, extractor, page_number)"
+                " VALUES (:d, :x, :p) ON CONFLICT DO NOTHING"),
+                [{"d": document_id, "x": extractor, "p": p} for p in pages])
+
+    def _insert_candidate(self, conn: Connection, cand: PolicyCandidate) -> int:
+        # same (doc, page, receipt) = same candidate however the model words it, so a
+        # re-ingest keeps its review status. whitespace doesn't count (015's index)
+        receipt = "".join(cand.source_excerpt.split())
+        self._lock(conn, f"candidate:{cand.document_id}:{cand.source_page}:{receipt}")
+        found = conn.execute(text(
+            "SELECT id FROM candidates WHERE document_id=:d AND source_page=:p"
+            " AND md5(regexp_replace(source_excerpt, '\\s', '', 'g'))"
+            " = md5(regexp_replace(:e, '\\s', '', 'g'))"),
+            {"d": cand.document_id, "p": cand.source_page, "e": cand.source_excerpt}).scalar()
+        if found:
+            return found
+        return conn.execute(text(
+            "INSERT INTO candidates(document_id, suggested_type, text, normalized_title,"
+            " source_page, source_excerpt, code, excerpt_on_page, responsible_org,"
+            " timeframe, deadline_year, unit, target_value)"
+            " VALUES (:document_id, :suggested_type, :text, :normalized_title, :source_page,"
+            " :source_excerpt, :code, :excerpt_on_page, :responsible_org, :timeframe,"
+            " :deadline_year, :unit, :target_value) RETURNING id"),
+            {**cand.model_dump(include={
+                "document_id", "text", "normalized_title", "source_page", "source_excerpt",
+                "code", "responsible_org", "timeframe", "deadline_year", "unit",
+                "target_value"}),
+             "suggested_type": cand.suggested_type.value,
+             "excerpt_on_page": None if cand.excerpt_on_page is None
+             else bool(cand.excerpt_on_page)}).scalar_one()
 
     def candidates(self, status: ReviewStatus | None = None) -> list[PolicyCandidate]:
         where = " WHERE review_status=:s" if status else ""

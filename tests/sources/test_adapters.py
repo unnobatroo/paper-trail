@@ -147,3 +147,32 @@ def test_eur_receipts_preserve_cents_without_huf_conversion():
     assert [(r.currency, r.amount_native, r.amount_huf) for r in rows] == [
         ("EUR", "10.50", None), ("HUF", "10000", 10000)]
     assert extract_money("A költségvetés 20 €.", HU)[0].currency == "EUR"
+
+
+def test_docling_pages_only_ocrs_the_pages_without_a_text_layer(monkeypatch):
+    """ingestion reads page text, so docling's layout/table models run only where pypdf
+    found nothing, and a born-digital pdf never loads them"""
+    from types import SimpleNamespace
+
+    from paper_trail.domain.models import DocumentPage
+    from paper_trail.sources import pdf
+    from paper_trail.sources.parsers import DoclingDocumentParser
+    texts = {1: "text", 2: "", 3: " ", 4: "more"}
+    monkeypatch.setattr(pdf, "read_pages", lambda _: [
+        DocumentPage(page_number=n, text=t) for n, t in texts.items()])
+    ranges = []
+
+    def convert(_content, page_range):
+        ranges.append(page_range)
+        items = [SimpleNamespace(text=f"ocr {n}", prov=[SimpleNamespace(page_no=n)])
+                 for n in range(page_range[0], page_range[1] + 1)]
+        return SimpleNamespace(iterate_items=lambda: [(i, 0) for i in items])
+    monkeypatch.setattr(DoclingDocumentParser, "_convert", staticmethod(convert))
+
+    pages = DoclingDocumentParser().pages(b"pdf")
+    assert ranges == [(2, 3)]
+    assert [p.text for p in pages] == ["text", "ocr 2", "ocr 3", "more"]
+
+    texts.update({2: "now", 3: "text"})
+    DoclingDocumentParser().pages(b"pdf")
+    assert ranges == [(2, 3)]  # nothing blank, docling never ran

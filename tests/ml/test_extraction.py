@@ -53,7 +53,8 @@ def test_lead_code_comes_off_the_title():
 def test_profile_roundtrips_and_no_llm_finds_nothing():
     from paper_trail.ml.lang import LanguageProfile
     assert LanguageProfile.from_dict(HU.to_dict()) == HU
-    assert NoExtractor().extract([DocumentPage(page_number=1, text="M1.2 Zöld középületek")]) == []
+    page = DocumentPage(page_number=1, text="M1.2 Zöld középületek")
+    assert list(NoExtractor().extract_windows([page])) == [([page], [])]
 
 
 def test_dense_page_that_blows_the_token_budget_gets_asked_in_halves():
@@ -161,3 +162,4 @@ def test_a_failed_half_page_retry_skips_that_half_only():
     ex = LLMExtractor(None, "fake", HU, window=1)
     ex._ask = ask
     assert [c.source_excerpt for c in ex.extract([page])] == ["Napelemek az iskolákon"]
+

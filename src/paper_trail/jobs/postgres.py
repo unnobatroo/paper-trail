@@ -6,9 +6,9 @@ import os
 import socket
 import threading
 import uuid
-from datetime import timedelta
 
 import httpx
+import openai
 import requests
 from sqlalchemy import text
 
@@ -17,9 +17,12 @@ from . import Job, dedupe_key
 
 log = logging.getLogger(__name__)
 
-# network hiccups get another go, anything else is a real failure
+# network hiccups get another go, anything else is a real failure. the openai sdk wraps
+# httpx errors in its own classes (APITimeoutError subclasses APIConnectionError); a busy
+# or restarting model server answers 429/5xx. 400/401/422 stay failures, retrying won't fix them
 _RETRYABLE = (TimeoutError, ConnectionError, httpx.TimeoutException, httpx.NetworkError,
-              requests.Timeout, requests.ConnectionError)
+              requests.Timeout, requests.ConnectionError,
+              openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError)
 
 
 def _job(row) -> Job:
@@ -62,6 +65,9 @@ class PostgresWorker(Repo):
     HEARTBEAT_SECONDS = 15
     LEASE_SECONDS = 120
     MAX_ATTEMPTS = 5
+    # retries wait 15, 30, 60, 120 s: ~4 minutes outlasts a model server restart or a gpu
+    # phase swap, where 2^n s gave up after 30 s. same formula for crashes and errors
+    BACKOFF = "now() + make_interval(secs => least(300, 15 * power(2, attempts - 1)))"
 
     def __init__(self, database_url, handlers):
         super().__init__(database_url)
@@ -72,8 +78,7 @@ class PostgresWorker(Repo):
     def recover(self):
         self._exec(
             "UPDATE jobs SET status=CASE WHEN attempts >= :max THEN 'failed' ELSE 'queued' END,"
-            " error='worker lease expired',"
-            " available_at=now() + make_interval(secs => least(300, power(2, attempts)::integer)),"
+            f" error='worker lease expired', available_at={self.BACKOFF},"
             " worker_id=NULL, lease_token=NULL, claimed_by=NULL, updated_at=now()"
             " WHERE status='running' AND coalesce(heartbeat_at, locked_at, updated_at)"
             " < now() - make_interval(secs => :lease)",
@@ -124,11 +129,10 @@ class PostgresWorker(Repo):
         except Exception as exc:
             retry = isinstance(exc, _RETRYABLE) and row["attempts"] < self.MAX_ATTEMPTS
             self._owned(row, "UPDATE jobs SET status=:status, error=:error, updated_at=now(),"
-                             " available_at=now() + :delay,"
+                             f" available_at={self.BACKOFF},"
                              " worker_id=NULL, lease_token=NULL, claimed_by=NULL",
                         status="queued" if retry else "failed",
-                        error=f"{type(exc).__name__}: {exc}",
-                        delay=timedelta(seconds=min(300, 2 ** row["attempts"])))
+                        error=f"{type(exc).__name__}: {exc}")
             log.exception("job execution failed", extra={"job_id": row["id"]})
         finally:
             done.set()

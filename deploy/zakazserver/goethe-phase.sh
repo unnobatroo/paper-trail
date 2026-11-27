@@ -5,7 +5,7 @@ set -eu
 PATH="$HOME/.local/bin:$PATH"
 EMBED=${EMBED_ID:-Qwen/Qwen3-Embedding-0.6B}
 RERANK=${RERANK_ID:-paper-trail/bge-reranker-v2-m3-bf16}
-LLM=${LLM_ID:-unnobatroo/paper-trail-qwen3-4b-instruct-hu-awq}
+LLM=${LLM_ID:-jismailov/paper-trail-extract-4b}
 case "${1:-}" in
   retrieval)
     goethe unload --all
