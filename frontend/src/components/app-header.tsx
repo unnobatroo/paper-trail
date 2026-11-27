@@ -1,33 +1,12 @@
 import type { Ref } from "react"
-import {
-  BanIcon,
-  BookOpenIcon,
-  CircleCheckIcon,
-  ClipboardCheckIcon,
-  InboxIcon,
-  ListIcon,
-  Loader2Icon,
-  SearchIcon,
-  Settings2Icon,
-  UploadIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { BookOpenIcon, Loader2Icon, SearchIcon, Settings2Icon } from "lucide-react"
 
 import { useMeta } from "@/api/hooks"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCanReview } from "@/lib/can-review"
-import { STAGE_INFO, STAGES, type Stage } from "@/lib/labels"
-
-const STAGE_ICON: Record<Stage | "all", LucideIcon> = {
-  all: ListIcon,
-  confirm: ClipboardCheckIcon,
-  search: SearchIcon,
-  review: InboxIcon,
-  done: CircleCheckIcon,
-  rejected: BanIcon,
-}
+import { STAGE_INFO, STAGES } from "@/lib/labels"
 
 type Props = {
   stage: string
@@ -54,65 +33,54 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
   const all = Object.entries(counts).reduce((n, [s, c]) => n + (s === "rejected" ? 0 : c), 0)
 
   return (
-    <header className="glass relative z-20 flex flex-col gap-3 px-5 py-3">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <h1 className="text-lg leading-none font-semibold">Paper Trail</h1>
-        {meta.data?.deployment && <span className="text-xs text-muted-foreground">{meta.data.deployment}</span>}
-        {progress && (
-          <p role="status" className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2Icon className="size-3.5 animate-spin" aria-hidden="true" />
-            {progress}
-          </p>
-        )}
-        <div className="ml-auto flex items-center gap-1">
-          <div className="relative mr-2">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input
-              ref={searchRef}
-              type="search"
-              aria-label="Search commitments"
-              placeholder="Search commitments"
-              className="h-9 w-64 rounded-full bg-background/60 pl-9 dark:bg-background/60"
-              value={q}
-              onChange={(e) => onQ(e.target.value)}
-            />
-          </div>
-          <Button variant="ghost" size="sm" onClick={onIngest} disabled={!canReview || ingesting}>
-            <UploadIcon data-icon="inline-start" />
-            {ingesting ? "Reading…" : "Ingest"}
-          </Button>
-          {!!meta.data?.glossary.length && (
-            <Button variant="ghost" size="sm" onClick={onGlossary}>
-              <BookOpenIcon data-icon="inline-start" />
-              Glossary
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={onSettings}>
-            <Settings2Icon data-icon="inline-start" />
-            Settings
-          </Button>
-        </div>
+    <header className="layer-panel relative z-20 flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3">
+      <div className="flex items-baseline gap-2">
+        <h1 className="type-title">Paper Trail</h1>
+        {meta.data?.deployment && <span className="type-label">{meta.data.deployment}</span>}
       </div>
 
       <Tabs value={stage} onValueChange={(v) => onStage(String(v))}>
-        <TabsList className="group-data-horizontal/tabs:h-auto flex-wrap rounded-full bg-foreground/5 p-1" aria-label="Review stages">
-          {(["all", ...STAGES] as const).map((s) => {
-            const Icon = STAGE_ICON[s]
-            return (
-            <TabsTrigger
-              key={s}
-              value={s}
-              title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}
-              className="h-auto flex-none rounded-full px-3 py-1.5 data-active:bg-background data-active:shadow-sm dark:data-active:border-transparent dark:data-active:bg-background"
-            >
-              <Icon className="text-muted-foreground" aria-hidden="true" />
+        <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto flex-wrap">
+          {(["all", ...STAGES] as const).map((s) => (
+            <TabsTrigger key={s} value={s} title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}>
               {s === "all" ? "All" : STAGE_INFO[s].label}{" "}
-              <span className="ml-1 text-muted-foreground tabular-nums">{s === "all" ? all : (counts[s] ?? 0)}</span>
+              <span className="type-num text-muted-foreground in-data-active:text-brand-ink">{s === "all" ? all : (counts[s] ?? 0)}</span>
             </TabsTrigger>
-            )
-          })}
+          ))}
         </TabsList>
       </Tabs>
+
+      <div className="ml-auto flex items-center gap-1">
+        {progress && (
+          <p role="status" className="type-label mr-2 flex items-center gap-1.5">
+            <Loader2Icon className="size-3.5 animate-spin text-brand-ink" aria-hidden="true" />
+            {progress}
+          </p>
+        )}
+        <div className="relative mr-1">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            ref={searchRef}
+            type="search"
+            aria-label="Search commitments"
+            placeholder="Search commitments"
+            className="layer-raised h-9 w-60 rounded-full border-0 pl-9"
+            value={q}
+            onChange={(e) => onQ(e.target.value)}
+          />
+        </div>
+        <Button variant="ghost" size="sm" onClick={onIngest} disabled={!canReview || ingesting}>
+          {ingesting ? "Reading…" : "Ingest"}
+        </Button>
+        {!!meta.data?.glossary.length && (
+          <Button variant="ghost" size="icon-sm" aria-label="Glossary" title="Glossary" onClick={onGlossary}>
+            <BookOpenIcon />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon-sm" aria-label="Settings" title="Settings" onClick={onSettings}>
+          <Settings2Icon />
+        </Button>
+      </div>
     </header>
   )
 }

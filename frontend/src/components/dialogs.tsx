@@ -55,7 +55,7 @@ export function SettingsDialog({ open, onOpenChange }: DialogProps) {
               }}
             >
               <Label htmlFor="review-key">Review key</Label>
-              <p id="review-key-hint" className="text-sm text-muted-foreground">
+              <p id="review-key-hint" className="type-secondary">
                 This deployment requires a key to confirm or reject items.
               </p>
               <div className="flex gap-2">
@@ -73,7 +73,7 @@ export function SettingsDialog({ open, onOpenChange }: DialogProps) {
           )}
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium">Reading language</legend>
+            <legend className="mb-1 type-body font-medium">Reading language</legend>
             <RadioGroup value={lang} onValueChange={(v) => setLang(v === "orig" ? "orig" : "en")}>
               <Choice value="en" id="lang-en">English reading aid, with the original underneath</Choice>
               <Choice value="orig" id="lang-orig">{meta.data?.language_name || "Original language"} only</Choice>
@@ -81,7 +81,7 @@ export function SettingsDialog({ open, onOpenChange }: DialogProps) {
           </fieldset>
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium">Colour scheme</legend>
+            <legend className="mb-1 type-body font-medium">Colour scheme</legend>
             <RadioGroup value={theme} onValueChange={(v) => setTheme(String(v))}>
               <Choice value="system" id="theme-system">Follow my device</Choice>
               <Choice value="light" id="theme-light">Light</Choice>
@@ -171,7 +171,7 @@ export function GlossaryDialog({ open, onOpenChange }: DialogProps) {
           <DialogTitle>Glossary</DialogTitle>
           <DialogDescription>Words and codes you will meet in the strategy.</DialogDescription>
         </DialogHeader>
-        <dl className="grid max-h-[60vh] grid-cols-[6rem_1fr] gap-x-3 gap-y-2 overflow-y-auto text-sm">
+        <dl className="grid max-h-[60vh] grid-cols-[6rem_1fr] gap-x-3 gap-y-2 overflow-y-auto type-body">
           {meta.data?.glossary.map((g) => (
             <div key={g.term} className="contents">
               <dt className="font-mono">{g.term}</dt>

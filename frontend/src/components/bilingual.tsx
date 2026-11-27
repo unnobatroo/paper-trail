@@ -1,8 +1,6 @@
 import type { Schemas } from "@/api/client"
 import { ToneBadge } from "@/components/tone-badge"
-import { Card, CardContent } from "@/components/ui/card"
 import { usePrefs } from "@/lib/prefs"
-import { cn } from "@/lib/utils"
 
 /** The original text and its plain-English reading aid, the English always labelled as AI-written. */
 export function Bilingual({ text, en, className }: { text: string; en?: string | null; className?: string }) {
@@ -12,7 +10,7 @@ export function Bilingual({ text, en, className }: { text: string; en?: string |
     return (
       <span className="flex flex-col">
         <span className={className}>{text}</span>
-        <span className="text-xs text-muted-foreground">not translated yet</span>
+        <span className="type-label font-normal">not translated yet</span>
       </span>
     )
   }
@@ -22,31 +20,25 @@ export function Bilingual({ text, en, className }: { text: string; en?: string |
         <span className={className}>{en}</span>
         <ToneBadge title="Written by the model, a reading aid">AI</ToneBadge>
       </span>
-      <span className="text-xs text-muted-foreground">
+      <span className="type-secondary font-normal">
         <span className="sr-only">Original: </span>
-        <span aria-hidden="true">ORIGINAL </span>
         {text}
       </span>
     </span>
   )
 }
 
-const SUGGESTION_TONE = { accept: "green", reject: "red", unsure: "amber" } as const
-
 /** The model's plain-English take on an item. It only suggests; the reviewer decides. */
 export function NoteCard({ note }: { note?: Schemas["Note"] | null }) {
   if (!note) return null
   return (
-    <Card size="sm" className={cn("rounded-none bg-muted/60 ring-0")}>
-      <CardContent className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">In plain English</h3>
-        <p className="text-sm">{note.summary_en}</p>
-        <div>
-          <ToneBadge tone={SUGGESTION_TONE[note.suggestion]}>AI suggests: {note.suggestion}</ToneBadge>
-        </div>
-        {note.reason_en && <p className="text-sm">{note.reason_en}</p>}
-        <p className="text-xs text-muted-foreground">Written by {note.author}. A suggestion only, you decide.</p>
-      </CardContent>
-    </Card>
+    <div className="layer-surface flex flex-col gap-1.5 p-3">
+      <h3 className="type-label" title={`Written by ${note.author}. A suggestion only, you decide.`}>
+        AI suggests: {note.suggestion}
+        <span className="sr-only">. Written by {note.author}. A suggestion only, you decide.</span>
+      </h3>
+      <p className="type-body">{note.summary_en}</p>
+      {note.reason_en && <p className="type-secondary">{note.reason_en}</p>}
+    </div>
   )
 }

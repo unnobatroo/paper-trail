@@ -39,6 +39,15 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-line: var(--brand-line);
+    --color-brand-ink: var(--brand-ink);
+    --color-surface: var(--surface);
+    --color-raised: var(--raised);
+    --shadow-panel: var(--panel-hl), var(--panel-drop);
+    --shadow-raised: var(--raised-drop);
+    --shadow-overlay: var(--panel-hl), var(--overlay-drop);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -49,30 +58,30 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    --background: oklch(0.99 0.004 270);
+    --foreground: oklch(0.18 0.02 270);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
+    --popover: oklch(0.99 0.004 270 / 0.9);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-foreground);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.45 0.02 270);
+    --accent: oklch(0.18 0.02 270 / 6%);
     --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
+    --destructive: oklch(0.514 0.222 16.94);
+    --border: oklch(0.18 0.02 270 / 10%);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --ring: var(--brand-line);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --radius: 1rem;
+    --radius: 0.75rem;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.205 0 0);
@@ -81,27 +90,39 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    --brand: oklch(0.36 0.09 258);
+    --brand-foreground: oklch(0.985 0.003 258);
+    --brand-line: oklch(0.5 0.1 258);
+    --brand-ink: oklch(0.36 0.09 258);
+    --panel: oklch(1 0 0 / 0.6);
+    --panel-edge: oklch(1 0 0 / 0.55);
+    --panel-hl: inset 0 1px 0 oklch(1 0 0 / 0.7);
+    --panel-drop: 0 1px 2px oklch(0.3 0.05 270 / 0.06), 0 8px 24px -8px oklch(0.3 0.05 270 / 0.14);
+    --surface: oklch(0.18 0.02 270 / 0.04);
+    --raised: oklch(1 0 0 / 0.92);
+    --raised-drop: 0 0 0 1px oklch(0.18 0.02 270 / 0.06), 0 1px 3px oklch(0.3 0.05 270 / 0.12);
+    --overlay-drop: 0 24px 64px -16px oklch(0.3 0.05 270 / 0.3);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
+    --background: oklch(0.16 0.015 270);
+    --foreground: oklch(0.97 0.005 270);
     --card: oklch(0.205 0 0);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: oklch(0.2 0.015 270 / 0.88);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-foreground);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.74 0.015 270);
+    --accent: oklch(1 0 0 / 6%);
     --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
+    --destructive: oklch(0.712 0.194 13.43);
+    --border: oklch(1 0 0 / 9%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --ring: var(--brand-line);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -115,6 +136,18 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    --brand: oklch(0.76 0.09 252);
+    --brand-foreground: oklch(0.18 0.03 258);
+    --brand-line: oklch(0.68 0.1 252);
+    --brand-ink: oklch(0.82 0.07 252);
+    --panel: oklch(0.2 0.015 270 / 0.55);
+    --panel-edge: oklch(1 0 0 / 0.08);
+    --panel-hl: inset 0 1px 0 oklch(1 0 0 / 0.06);
+    --panel-drop: 0 8px 32px -8px oklch(0 0 0 / 0.5);
+    --surface: oklch(1 0 0 / 0.04);
+    --raised: oklch(0.3 0.015 270 / 0.85);
+    --raised-drop: 0 0 0 1px oklch(1 0 0 / 0.08), 0 2px 8px oklch(0 0 0 / 0.35);
+    --overlay-drop: 0 24px 64px -12px oklch(0 0 0 / 0.6);
 }
 
 @layer base {
@@ -125,34 +158,64 @@
     @apply bg-background text-foreground;
     /* soft colour behind the translucent panels, so the frosted glass has something to frost */
     background-image:
-      radial-gradient(60rem 40rem at 5% -10%, oklch(0.86 0.09 250 / 0.55), transparent),
-      radial-gradient(55rem 40rem at 100% 0%, oklch(0.88 0.08 310 / 0.45), transparent),
-      radial-gradient(55rem 45rem at 55% 115%, oklch(0.9 0.07 190 / 0.45), transparent);
+      radial-gradient(60rem 40rem at 5% -10%, oklch(0.9 0.03 250 / 0.7), transparent),
+      radial-gradient(55rem 40rem at 100% 0%, oklch(0.92 0.02 280 / 0.6), transparent),
+      radial-gradient(55rem 45rem at 55% 115%, oklch(0.92 0.025 220 / 0.6), transparent);
     }
   .dark body {
     background-image:
-      radial-gradient(60rem 40rem at 5% -10%, oklch(0.35 0.12 260 / 0.55), transparent),
-      radial-gradient(55rem 40rem at 100% 0%, oklch(0.33 0.11 310 / 0.45), transparent),
-      radial-gradient(55rem 45rem at 55% 115%, oklch(0.32 0.09 190 / 0.4), transparent);
+      radial-gradient(60rem 40rem at 5% -10%, oklch(0.3 0.05 255 / 0.55), transparent),
+      radial-gradient(55rem 40rem at 100% 0%, oklch(0.27 0.03 280 / 0.5), transparent),
+      radial-gradient(55rem 45rem at 55% 115%, oklch(0.27 0.035 225 / 0.5), transparent);
     }
   html {
     @apply font-sans;
     }
 }
 
-/* a frosted panel: translucent fill, hairline edge, blur of what is behind it */
-@utility glass {
-  @apply rounded-2xl border border-white/40 bg-background/55 shadow-sm backdrop-blur-xl dark:border-white/10;
+/*
+ * Layers, back to front. Only the panels and the overlays blur; everything else is a plain fill.
+ *   canvas  the body and its colour wash
+ *   panel   header and the two panes: frosted glass
+ *   surface a quiet inset inside a panel (tab tracks, quotes, notes, the PDF frame)
+ *   raised  what lifts off a surface (the active tab, the cursor row, search, outline buttons)
+ *   overlay dialogs and popups
+ */
+@utility layer-panel {
+  @apply rounded-2xl border border-(--panel-edge) bg-(--panel) shadow-panel backdrop-blur-xl backdrop-saturate-150;
+  @media (prefers-reduced-transparency: reduce) {
+    @apply bg-background backdrop-blur-none;
+  }
+  @supports not (backdrop-filter: blur(1px)) {
+    @apply bg-background;
+  }
 }
-
-/* no blur available, or the user asked for less transparency: the panels go opaque */
-@media (prefers-reduced-transparency: reduce) {
-  .glass {
+@utility layer-surface {
+  @apply rounded-xl bg-surface;
+}
+@utility layer-raised {
+  @apply bg-raised shadow-raised;
+}
+@utility layer-overlay {
+  @apply rounded-2xl border border-(--panel-edge) bg-popover shadow-overlay backdrop-blur-2xl;
+  @media (prefers-reduced-transparency: reduce) {
     @apply bg-background backdrop-blur-none;
   }
 }
-@supports not (backdrop-filter: blur(1px)) {
-  .glass {
-    @apply bg-background;
-  }
+
+/* Five type roles; nothing in the app sets its own size. Named type-*, not text-*, so tailwind-merge keeps them. */
+@utility type-title {
+  @apply text-lg/snug font-semibold tracking-tight;
+}
+@utility type-body {
+  @apply text-sm/6;
+}
+@utility type-secondary {
+  @apply text-sm/6 text-muted-foreground;
+}
+@utility type-label {
+  @apply text-xs/5 font-medium text-muted-foreground;
+}
+@utility type-num {
+  @apply font-medium tabular-nums;
 }

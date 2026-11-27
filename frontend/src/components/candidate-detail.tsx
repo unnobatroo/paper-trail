@@ -1,12 +1,10 @@
 import { useState } from "react"
-import { CheckIcon, PencilIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Candidate, Commitment, Schemas } from "@/api/client"
 import { useReviewActions } from "@/api/hooks"
 import { NoteCard } from "@/components/bilingual"
 import { SimpleSelect } from "@/components/simple-select"
-import { ToneBadge } from "@/components/tone-badge"
 import { Button } from "@/components/ui/button"
 import { SourceFrame } from "@/components/source-frame"
 import { Receipt } from "@/components/receipt"
@@ -55,27 +53,21 @@ export function CandidateDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {c.review_status === "accepted" && <ToneBadge tone="green">Confirmed</ToneBadge>}
-      {c.review_status === "rejected" && <ToneBadge tone="red">Rejected</ToneBadge>}
-      {open && c.excerpt_on_page === false && (
-        <>
-          <ToneBadge>Unclear</ToneBadge>
-          <p className="text-sm text-amber-900 dark:text-amber-300" role="note">
-            We couldn't re-find this quote on the page. It's worth a closer look.
-          </p>
-        </>
+      {!open && (
+        <p className="type-label">{c.review_status === "accepted" ? "Confirmed as a commitment" : "Rejected"}</p>
       )}
-      {open && c.excerpt_on_page !== false && <ToneBadge tone="amber">Needs review</ToneBadge>}
+      {open && c.excerpt_on_page === false && (
+        <p className="type-secondary text-destructive" role="note">
+          We couldn't re-find this quote on the page. It's worth a closer look.
+        </p>
+      )}
 
-      <NoteCard note={c.note} />
-
-      <Receipt caption={`The strategy says · page ${c.source_page}`} className="text-base">{c.source_excerpt}</Receipt>
+      <Receipt>{c.source_excerpt}</Receipt>
 
       {open && (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" title="Confirm (c)" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
-              <CheckIcon data-icon="inline-start" />
               Confirm
             </Button>
             <Button
@@ -93,18 +85,16 @@ export function CandidateDetail({
                 })
               }
             >
-              <XIcon data-icon="inline-start" />
               Reject
             </Button>
             <Button size="sm" variant="ghost" disabled={!canReview} aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
-              <PencilIcon data-icon="inline-start" />
-              Edit before confirming
+              Edit
             </Button>
           </div>
 
           {editing && (
             <form
-              className="flex flex-col gap-3 rounded-lg border p-3"
+              className="layer-surface flex flex-col gap-3 p-3"
               onSubmit={(e) => {
                 e.preventDefault()
                 if (title.trim()) confirm()
@@ -147,6 +137,8 @@ export function CandidateDetail({
           )}
         </>
       )}
+
+      <NoteCard note={c.note} />
 
       {pdfUrl && <SourceFrame url={pdfUrl} page={c.source_page} />}
     </div>
