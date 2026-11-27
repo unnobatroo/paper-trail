@@ -52,10 +52,12 @@ an OpenAI-compatible SGLang gateway, Docker Compose + Caddy.
 ## Run it
 
 ```sh
-make setup && make dev     # api + review ui on :8000, fully offline by default
+make setup && make frontend-build && make dev   # api + review app on :8000, fully offline by default
 ```
 
 Live instance (Józsefváros, Budapest District VIII): https://paper-trail.jismailov.com
+
+Read-only public demo: https://paper-trail-demo.vercel.app
 
 All documentation lives in the **[wiki](https://github.com/unnobatroo/paper-trail/wiki)**:
 start with [Home](https://github.com/unnobatroo/paper-trail/wiki), then
