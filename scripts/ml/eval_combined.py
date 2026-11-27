@@ -37,8 +37,7 @@ def main() -> None:
     y = np.array([r["label"] for r in rows], bool)
     town = np.array([r["doc"] for r in rows])
     pages = []
-    for sample_file, label_file in RANDOM + STRAT:
-        sample = json.loads((SILVER / f"{sample_file}.json").read_text(encoding="utf-8"))
+    for _, label_file in RANDOM + STRAT:
         labels = json.loads((SILVER / f"{label_file}.json").read_text(encoding="utf-8"))
         for doc, lab in labels.items():
             if isinstance(lab, dict) and "positive" in lab:
