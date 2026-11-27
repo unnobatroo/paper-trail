@@ -67,16 +67,16 @@ describe("WorkspacePage", () => {
     renderPage()
     expect(await screen.findByRole("button", { name: "Fák ültetése" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Napelemek" })).toBeInTheDocument()
-    // the sidebar lists every stage with its count
-    expect(screen.getByRole("button", { name: "To confirm" }).closest("li")).toHaveTextContent("1")
-    expect(screen.getByRole("button", { name: "To search" }).closest("li")).toHaveTextContent("1")
+    // the stages run along the top, each with its count
+    expect(screen.getByRole("tab", { name: "To confirm 1" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "To search 1" })).toBeInTheDocument()
   })
 
   it("asks the server for the stage you pick, because filtering lives on the server", async () => {
     const calls = stubApi()
     renderPage()
     await screen.findByRole("button", { name: "Fák ültetése" })
-    await userEvent.click(screen.getByRole("button", { name: /^To search/ }))
+    await userEvent.click(screen.getByRole("tab", { name: /^To search/ }))
     await waitFor(() => expect(screen.queryByRole("button", { name: "Fák ültetése" })).not.toBeInTheDocument())
     expect(calls.some((c) => c.path === "/api/workspace" && c.query.includes("stage=search"))).toBe(true)
   })
@@ -108,7 +108,7 @@ describe("WorkspacePage", () => {
     const calls = stubApi()
     renderPage()
     await screen.findByRole("button", { name: "Fák ültetése" })
-    await userEvent.click(screen.getByRole("button", { name: "Measures 2" }))
+    await userEvent.click(screen.getByRole("tab", { name: "Measures 2" }))
     expect(screen.getByRole("button", { name: "Fák ültetése" })).toBeInTheDocument()
     // the kind never goes to the server: it asks for every kind and filters here
     expect(calls.filter((c) => c.path === "/api/workspace").every((c) => c.query.includes("type=all"))).toBe(true)

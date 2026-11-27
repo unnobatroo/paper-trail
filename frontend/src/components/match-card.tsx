@@ -33,8 +33,8 @@ export function MatchCard({ linkId, preview }: { linkId: number; preview: LinkVi
     )
 
   return (
-    <Card size="sm">
-      <CardContent className="flex flex-col gap-2">
+    <Card size="sm" className="rounded-none bg-transparent px-0 ring-0 [&:not(:first-child)]:border-t">
+      <CardContent className="flex flex-col gap-2 px-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <ToneBadge title="Match score">{link.score.toFixed(2)}</ToneBadge>
           <ToneBadge tone={REL_TONE[link.suggested_relationship]}>{REL_LABEL[link.suggested_relationship]}</ToneBadge>

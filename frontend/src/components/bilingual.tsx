@@ -37,7 +37,7 @@ const SUGGESTION_TONE = { accept: "green", reject: "red", unsure: "amber" } as c
 export function NoteCard({ note }: { note?: Schemas["Note"] | null }) {
   if (!note) return null
   return (
-    <Card size="sm" className={cn("bg-muted/40")}>
+    <Card size="sm" className={cn("rounded-none bg-muted/60 ring-0")}>
       <CardContent className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">In plain English</h3>
         <p className="text-sm">{note.summary_en}</p>

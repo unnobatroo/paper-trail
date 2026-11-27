@@ -10,7 +10,7 @@ import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
 import { TrailDetail } from "@/components/trail-detail"
 import { Button } from "@/components/ui/button"
-import { KIND_LABEL, KIND_TONE, STAGE_INFO, displayTitle, pageLink } from "@/lib/labels"
+import { KIND_LABEL, STAGE_INFO, displayTitle, pageLink } from "@/lib/labels"
 import { useCanReview } from "@/lib/can-review"
 import { parseCode, shown } from "@/lib/rows"
 
@@ -38,23 +38,22 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
   const searchedBefore = row.pending.length > 0 || row.evidence > 0
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <ToneBadge tone={KIND_TONE[row.kind]}>{KIND_LABEL[row.kind]}</ToneBadge>
-        <ToneBadge tone={stage.tone} title={stage.hint}>
-          {stage.label}
-        </ToneBadge>
+    <div className="flex min-h-full flex-col gap-3 p-5">
+      <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
+        <span>{KIND_LABEL[row.kind]}</span>
+        {c.code && <span className="normal-case">{c.code}</span>}
+        <ToneBadge tone={stage.tone} title={stage.hint}>{stage.label}</ToneBadge>
         {page.href ? (
-          <a href={page.href} target="_blank" rel="noreferrer" className="text-sm underline-offset-4 hover:underline">
+          <a href={page.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
             {page.text}
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
         ) : (
-          <span className="text-sm">{page.text}</span>
+          <span>{page.text}</span>
         )}
-      </div>
+      </p>
 
-      <h2 className="text-base font-medium">
+      <h2 className="text-lg leading-snug font-semibold">
         <Bilingual text={displayTitle(row.title)} en={c.note?.title_en} />
       </h2>
       {code && meaning && (
@@ -76,7 +75,7 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
       )}
 
       {row.stage === "confirm" ? (
-        <CandidateDetail key={c.id} c={c} commitments={commitments} onDecided={onDecided} />
+        <CandidateDetail key={c.id} c={c} commitments={commitments} pdfUrl={documents[String(c.document_id)]} onDecided={onDecided} />
       ) : (
         <>
           {searchable && (

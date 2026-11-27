@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { CheckIcon, XIcon } from "lucide-react"
+import { CheckIcon, PencilIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Candidate, Commitment, Schemas } from "@/api/client"
@@ -8,7 +8,7 @@ import { NoteCard } from "@/components/bilingual"
 import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
 import { Button } from "@/components/ui/button"
-import { Kbd } from "@/components/kbd"
+import { SourceFrame } from "@/components/source-frame"
 import { Receipt } from "@/components/receipt"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,10 +21,13 @@ type Kind = Schemas["CandidateType"]
 export function CandidateDetail({
   c,
   commitments,
+  pdfUrl,
   onDecided,
 }: {
   c: Candidate
   commitments: Commitment[]
+  /** The strategy PDF this mention was read from, shown at its page next to the decision. */
+  pdfUrl?: string
   /** Called once a confirm or reject has gone through, so the workspace can move on to the next row. */
   onDecided?: () => void
 }) {
@@ -51,7 +54,7 @@ export function CandidateDetail({
     )
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {c.review_status === "accepted" && <ToneBadge tone="green">Confirmed</ToneBadge>}
       {c.review_status === "rejected" && <ToneBadge tone="red">Rejected</ToneBadge>}
       {open && c.excerpt_on_page === false && (
@@ -66,17 +69,20 @@ export function CandidateDetail({
 
       <NoteCard note={c.note} />
 
-      <Receipt caption={`The strategy says · page ${c.source_page}`} className="xl:text-lg">{c.source_excerpt}</Receipt>
+      <Receipt caption={`The strategy says · page ${c.source_page}`} className="text-base">{c.source_excerpt}</Receipt>
 
       {open && (
         <>
-          <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
-            <Button size="sm" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
-              <CheckIcon data-icon="inline-start" /> Confirm <Kbd aria-hidden="true" className="border-primary-foreground/30 bg-transparent text-primary-foreground">c</Kbd>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" title="Confirm (c)" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
+              <CheckIcon data-icon="inline-start" />
+              Confirm
             </Button>
             <Button
               size="sm"
               variant="outline"
+              title="Reject (r)"
+              aria-keyshortcuts="r"
               disabled={!canReview || reject.isPending}
               onClick={() =>
                 reject.mutate(c.id!, {
@@ -87,9 +93,11 @@ export function CandidateDetail({
                 })
               }
             >
-              <XIcon data-icon="inline-start" /> Reject <Kbd aria-hidden="true">r</Kbd>
+              <XIcon data-icon="inline-start" />
+              Reject
             </Button>
             <Button size="sm" variant="ghost" disabled={!canReview} aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+              <PencilIcon data-icon="inline-start" />
               Edit before confirming
             </Button>
           </div>
@@ -139,6 +147,8 @@ export function CandidateDetail({
           )}
         </>
       )}
+
+      {pdfUrl && <SourceFrame url={pdfUrl} page={c.source_page} />}
     </div>
   )
 }
