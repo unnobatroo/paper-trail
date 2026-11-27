@@ -54,7 +54,7 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
   const all = Object.entries(counts).reduce((n, [s, c]) => n + (s === "rejected" ? 0 : c), 0)
 
   return (
-    <header className="sticky top-0 z-20 flex flex-col gap-2 border-b bg-background/60 px-5 pt-3 backdrop-blur-md">
+    <header className="glass flex flex-col gap-3 px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <h1 className="text-lg leading-none font-semibold">Paper Trail</h1>
         {meta.data?.deployment && <span className="text-xs text-muted-foreground">{meta.data.deployment}</span>}
@@ -66,13 +66,13 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
         )}
         <div className="ml-auto flex items-center gap-1">
           <div className="relative mr-2">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
               ref={searchRef}
               type="search"
               aria-label="Search commitments"
               placeholder="Search commitments"
-              className="h-8 w-64 pl-8"
+              className="h-9 w-64 rounded-full bg-background/60 pl-9"
               value={q}
               onChange={(e) => onQ(e.target.value)}
             />
@@ -95,15 +95,15 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
       </div>
 
       <Tabs value={stage} onValueChange={(v) => onStage(String(v))}>
-        <TabsList variant="line" className="h-9 gap-5 p-0" aria-label="Review stages">
-          {(["all", ...STAGES] as const).map((s, i) => {
+        <TabsList className="h-auto flex-wrap rounded-full bg-foreground/5 p-1" aria-label="Review stages">
+          {(["all", ...STAGES] as const).map((s) => {
             const Icon = STAGE_ICON[s]
             return (
             <TabsTrigger
               key={s}
               value={s}
               title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}
-              className={i === 1 ? "ml-3 flex-none px-0" : "flex-none px-0"}
+              className="flex-none rounded-full px-3 py-1.5 data-active:bg-background data-active:shadow-sm"
             >
               <Icon className="text-muted-foreground" aria-hidden="true" />
               {s === "all" ? "All" : STAGE_INFO[s].label}{" "}

@@ -18,7 +18,7 @@ export function SourceFrame({ url, page }: { url: string; page: number }) {
         src={src}
         loading="lazy"
         referrerPolicy="no-referrer"
-        className="min-h-96 w-full flex-1 border bg-muted"
+        className="min-h-96 w-full flex-1 rounded-xl border bg-muted"
       />
     </section>
   )
