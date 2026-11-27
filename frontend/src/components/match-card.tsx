@@ -11,6 +11,7 @@ import { ToneBadge } from "@/components/tone-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useCanReview } from "@/lib/can-review"
 import { FLAG_HELP, FLAG_LABEL, REL_HELP, REL_LABEL, REL_TONE, STATUS_SENTENCE, evidenceKind } from "@/lib/labels"
 
 /** One suggested match: its evidence, why it matched, and the confirm and reject buttons. */
@@ -18,6 +19,7 @@ export function MatchCard({ linkId, preview }: { linkId: number; preview: LinkVi
   const detail = useLinkDetail(linkId)
   const lv = detail.data ?? preview
   const { decideLink } = useReviewActions()
+  const canReview = useCanReview()
   const link = lv.link
   const ev = lv.evidence
   const [relationship, setRelationship] = useState<string>(link.suggested_relationship)
@@ -91,10 +93,10 @@ export function MatchCard({ linkId, preview }: { linkId: number; preview: LinkVi
         )}
 
         <div className="flex gap-2">
-          <Button size="sm" onClick={() => decide("accept")} disabled={decideLink.isPending}>
+          <Button size="sm" onClick={() => decide("accept")} disabled={!canReview || decideLink.isPending}>
             <CheckIcon data-icon="inline-start" /> Confirm
           </Button>
-          <Button size="sm" variant="outline" onClick={() => decide("reject")} disabled={decideLink.isPending}>
+          <Button size="sm" variant="outline" onClick={() => decide("reject")} disabled={!canReview || decideLink.isPending}>
             <XIcon data-icon="inline-start" /> Reject
           </Button>
         </div>

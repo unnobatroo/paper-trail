@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 
 from sqlalchemy import bindparam, create_engine, text
@@ -41,8 +42,14 @@ def engine(dsn: str) -> Engine:
     """postgres, url or libpq conninfo ("host=.. user=..") alike"""
     import psycopg
     # creator takes both forms, sqlalchemy's own url parser only does urls
-    return create_engine("postgresql+psycopg://", creator=lambda: psycopg.connect(dsn),
-                         pool_pre_ping=True, pool_size=5, max_overflow=5)
+    # a transaction-mode pooler (supabase's port 6543) can't keep prepared statements across
+    # requests, so DB_TRANSACTION_POOLER=1 turns psycopg's automatic preparing off
+    prepare = None if os.environ.get("DB_TRANSACTION_POOLER") else 5
+    # a serverless deployment runs many small instances, so it sets the pool low (DB_POOL_SIZE=1)
+    return create_engine("postgresql+psycopg://",
+                         creator=lambda: psycopg.connect(dsn, prepare_threshold=prepare),
+                         pool_pre_ping=True, pool_size=int(os.environ.get("DB_POOL_SIZE", "5")),
+                         max_overflow=int(os.environ.get("DB_MAX_OVERFLOW", "5")))
 
 
 def _json(value) -> str:

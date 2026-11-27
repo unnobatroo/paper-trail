@@ -11,6 +11,7 @@ import { ToneBadge } from "@/components/tone-badge"
 import { TrailDetail } from "@/components/trail-detail"
 import { Button } from "@/components/ui/button"
 import { KIND_LABEL, KIND_TONE, STAGE_INFO, displayTitle, pageLink } from "@/lib/labels"
+import { useCanReview } from "@/lib/can-review"
 import { parseCode, shown } from "@/lib/rows"
 
 type Props = {
@@ -25,6 +26,7 @@ type Props = {
 export function DetailPane({ row, documents, commitments, searching, onSearch }: Props) {
   const [picked, setPicked] = useState<number | undefined>()
   const meta = useMeta()
+  const canReview = useCanReview()
   const c = shown(row, picked)
   const stage = STAGE_INFO[row.stage]
   const page = pageLink(documents[String(c.document_id)], c.source_page)
@@ -80,7 +82,7 @@ export function DetailPane({ row, documents, commitments, searching, onSearch }:
               size="sm"
               variant="outline"
               className="self-start"
-              disabled={searching}
+              disabled={!canReview || searching}
               onClick={() => onSearch(row.commitments.map((m) => m.id!))}
             >
               <SearchIcon data-icon="inline-start" />

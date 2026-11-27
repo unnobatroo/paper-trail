@@ -38,3 +38,5 @@ data/
 # private agent notes
 .agent-vault/
 .nicegui/
+
+.vercel/

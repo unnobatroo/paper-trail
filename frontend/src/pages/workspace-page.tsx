@@ -13,7 +13,9 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { WorkspaceTable } from "@/components/workspace-table"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useCanReview } from "@/lib/can-review"
 import { STAGE_INFO, displayTitle, type Stage } from "@/lib/labels"
 import { shown } from "@/lib/rows"
 
@@ -58,6 +60,7 @@ export function WorkspacePage() {
   const [dialog, setDialog] = useState<"settings" | "ingest" | "glossary" | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
+  const canReview = useCanReview()
 
   const open = (id: number | null) => setParam("row", id === null ? null : String(id))
   const selectMany = (ids: number[], on: boolean) =>
@@ -86,18 +89,18 @@ export function WorkspacePage() {
   const confirmRow = useCallback(
     (row: WorkspaceRow) => {
       const c = shown(row)
-      if (row.stage === "confirm" && c.review_status === "unreviewed")
+      if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
         accept.mutate({ id: c.id! }, { onSuccess: () => toast.success("Confirmed as a commitment.") })
     },
-    [accept],
+    [accept, canReview],
   )
   const rejectRow = useCallback(
     (row: WorkspaceRow) => {
       const c = shown(row)
-      if (row.stage === "confirm" && c.review_status === "unreviewed")
+      if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
         reject.mutate(c.id!, { onSuccess: () => toast.success("Rejected.") })
     },
-    [reject],
+    [reject, canReview],
   )
 
   // Keyboard shortcuts, off while typing or while a dialog is open.
@@ -119,7 +122,7 @@ export function WorkspacePage() {
         if (e.key === "x") selectMany([current.id], !selected.has(current.id))
         else if (e.key === "c") confirmRow(current)
         else if (e.key === "r") rejectRow(current)
-        else if (e.key === "s" && current.stage === "search" && !searching) void startSearch(current.commitments.map((m) => m.id!))
+        else if (e.key === "s" && canReview && current.stage === "search" && !searching) void startSearch(current.commitments.map((m) => m.id!))
       }
     }
     window.addEventListener("keydown", onKey)
@@ -141,6 +144,13 @@ export function WorkspacePage() {
 
   const table = (
     <div className="flex flex-col gap-4 p-4">
+      {ws.data && !canReview && (
+        <Alert>
+          <AlertDescription>
+            Read-only. You can browse everything; confirming, rejecting and searching need the review key, which you add in Settings.
+          </AlertDescription>
+        </Alert>
+      )}
       <p className="text-xs text-muted-foreground">
         <kbd>j</kbd> <kbd>k</kbd> move · <kbd>x</kbd> select · <kbd>c</kbd> confirm · <kbd>r</kbd> reject · <kbd>s</kbd> search ·{" "}
         <kbd>/</kbd> find
@@ -151,25 +161,25 @@ export function WorkspacePage() {
           <span className="text-sm">{selected.size} selected</span>
           {mentionIds.length > 0 && (
             <>
-              <Button size="sm" onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
+              <Button size="sm" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
                 Confirm {byStage("confirm").length}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
+              <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
                 Reject
               </Button>
             </>
           )}
           {searchIds.length > 0 && (
-            <Button size="sm" onClick={async () => { if (await startSearch(searchIds)) clear() }}>
+            <Button size="sm" disabled={!canReview} onClick={async () => { if (await startSearch(searchIds)) clear() }}>
               Find evidence {byStage("search").length}
             </Button>
           )}
           {matchIds.length > 0 && (
             <>
-              <Button size="sm" onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
+              <Button size="sm" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
                 Confirm matches
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
+              <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
                 Reject
               </Button>
             </>
