@@ -8,6 +8,7 @@ file. Training and serving share `features`, which keeps them from drifting apar
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -21,7 +22,10 @@ class PagePrefilter:
     """scores a page's text; `keep` is true for pages the extractor should read"""
 
     def __init__(self, spec: dict):
-        self.name = spec["name"]
+        # the name keys ingest checkpoints, so it has to change with anything that changes
+        # which pages are kept: a digest of the whole spec, not just its label
+        digest = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:8]
+        self.name = f"{spec['name']}-{digest}"
         self.threshold = float(spec["threshold"])
         self._fields = [re.compile(p, re.I) for p in spec["fields"]]
         self._counts = [re.compile(p, re.I) for p in spec["counts"].values()]

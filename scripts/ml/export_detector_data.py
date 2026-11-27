@@ -54,6 +54,7 @@ def write(name: str, rows: list[dict]) -> None:
 
 
 def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
     d = pd.read_parquet("data/eval_ext/cpr-targets/data/train-00000-of-00001.parquet")
     d["label"] = (d[list(LABELS)].sum(axis=1) > 0).astype(int)
     # same coin as eval_cpr_targets.in_test(seed=13)

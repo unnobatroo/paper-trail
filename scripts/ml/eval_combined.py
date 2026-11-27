@@ -6,7 +6,7 @@ no page is scored by a prefilter that trained on it. A page counts as found when
 prefilter keeps it AND the extractor flags it. Józsefváros has no PDF here and no
 prefilter score, so it is left out. Only the random samples give honest precision.
 
-  uv run --with scikit-learn python scripts/ml/eval_combined.py report1.json:sample1:labels1 ...
+  uv run --with scikit-learn python scripts/ml/eval_combined.py report1.json report2.json ...
 """
 
 import json
@@ -48,7 +48,10 @@ def main() -> None:
         test = town == t
         scaler, clf = fit(x[~test], y[~test])
         score[test] = clf.predict_proba(scaler.transform(x[test]))[:, 1]
-    flagged = np.array([p in flags.get(d, set()) for d, p in pages])
+    missing = sorted(set(town) - set(flags))
+    if missing:  # a document the reports don't cover would count as all-negative
+        raise SystemExit(f"reports do not cover: {missing}")
+    flagged = np.array([p in flags[d] for d, p in pages])
     for name, mask in (("random pages", kind == "random"), ("stratified pages", kind == "strat")):
         print(name, int(mask.sum()), "pages,", int(y[mask].sum()), "positive")
         for label, cut in (("extractor alone", 0.0), ("prefilter 0.3 + extractor", 0.3),

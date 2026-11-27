@@ -98,7 +98,7 @@ def main() -> None:
     print("random pages, leave-one-town-out")
     print("  layout rule ", prf(y_r, rule_r))
     print("  threshold   precision recall  f1   pages kept")
-    chosen = 0.5
+    chosen = 0.0  # keep every page if no threshold reaches the recall target
     for t in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
         m = prf(y_r, score_r >= t)
         kept = float((score_r >= t).mean())
@@ -107,6 +107,8 @@ def main() -> None:
     for t in np.arange(0.05, 0.96, 0.05):
         if prf(y_r, score_r >= t)["recall"] >= args.recall:
             chosen = round(float(t), 2)
+    if chosen == 0.0:
+        print(f"no threshold reaches recall {args.recall}; the prefilter would keep every page")
     print(f"threshold for recall >= {args.recall}: {chosen}")
     pred = score_r >= chosen
     rng = np.random.default_rng(13)

@@ -90,7 +90,9 @@ def main() -> None:
         vs = scores(model, tok, val, args.maxlen, device)
         gold = [r["label"] for r in val]
         # best threshold on val for this epoch
-        cand = max(((t / 20, prf(gold, [int(s >= t / 20) for s in vs])) for t in range(2, 19)),
+        # the grid plus every score, so a threshold can sit exactly between two close scores
+        cand = max(((t, prf(gold, [int(s >= t) for s in vs]))
+                    for t in sorted({i / 20 for i in range(2, 19)} | set(vs))),
                    key=lambda x: x[1]["f1"])
         print(f"epoch {epoch + 1} loss {loss.item():.3f} val F1 {cand[1]['f1']} @ {cand[0]}",
               flush=True)
