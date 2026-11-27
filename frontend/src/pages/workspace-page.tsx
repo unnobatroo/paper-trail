@@ -255,7 +255,7 @@ export function WorkspacePage() {
   )
 
   return (
-    <div className="flex h-svh flex-col">
+    <div className="flex h-svh flex-col gap-2 p-2 md:gap-3 md:p-3">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"
@@ -277,7 +277,7 @@ export function WorkspacePage() {
       />
       {isMobile ? (
         <>
-          <div id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto outline-none">{table}</div>
+          <div id="main" tabIndex={-1} className="glass min-h-0 flex-1 overflow-y-auto outline-none">{table}</div>
           <Sheet open={!!detail} onOpenChange={(o) => !o && open(null)}>
             <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
               <SheetHeader>
@@ -292,11 +292,11 @@ export function WorkspacePage() {
         <>
           <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
             <ResizablePanel defaultSize="55%" minSize="30%">
-              <div id="main" tabIndex={-1} className="h-full overflow-y-auto outline-none">{table}</div>
+              <div id="main" tabIndex={-1} className="glass h-full overflow-y-auto outline-none">{table}</div>
             </ResizablePanel>
-            <ResizableHandle />
+            <ResizableHandle className="mx-1 w-2 rounded-full bg-transparent transition-colors hover:bg-foreground/10 focus-visible:bg-foreground/10" />
             <ResizablePanel defaultSize="45%" minSize="28%">
-              <aside aria-label="Details" className="h-full overflow-y-auto bg-card/50 backdrop-blur-md">
+              <aside aria-label="Details" className="glass h-full overflow-y-auto">
                 {detail ?? <p className="p-6 text-muted-foreground">Select a commitment to see its detail.</p>}
               </aside>
             </ResizablePanel>

@@ -18,7 +18,7 @@ type Props = {
 }
 
 // One header for the whole ledger, kept on screen while the rows scroll under it.
-const HEAD = "sticky top-0 z-10 h-9 border-b bg-background/90 font-semibold text-foreground backdrop-blur-md"
+const HEAD = "sticky top-0 z-10 h-9 border-b bg-background/70 font-semibold text-foreground backdrop-blur-xl"
 
 /** The strategy's page numbers of a row, as it would be cited: "p. 6", or "p. 6, 138" for a repeated passage. */
 export function folio(row: WorkspaceRow): string {
@@ -87,8 +87,8 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
               data-cursor={isCursor ? "" : undefined}
               onClick={() => onOpen(r.id)}
               className={cn(
-                "group/row scroll-mt-9 cursor-pointer [&>td]:border-b [&>td]:py-2 [&>td]:align-top",
-                isCursor ? "bg-primary/10 hover:bg-primary/10" : "hover:bg-foreground/5",
+                "group/row scroll-mt-9 cursor-pointer transition-colors [&>td]:border-b [&>td]:py-2 [&>td]:align-top",
+                isCursor ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-foreground/5",
               )}
             >
               <TableCell className="pl-5" onClick={(e) => e.stopPropagation()}>

@@ -72,7 +72,7 @@
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
+    --radius: 1rem;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.205 0 0);
@@ -123,11 +123,36 @@
     }
   body {
     @apply bg-background text-foreground;
-    /* a soft wash behind the translucent surfaces, so the glass has something to show */
-    background-image: linear-gradient(135deg, var(--background) 0%, var(--muted) 100%);
-    background-attachment: fixed;
+    /* soft colour behind the translucent panels, so the frosted glass has something to frost */
+    background-image:
+      radial-gradient(60rem 40rem at 5% -10%, oklch(0.86 0.09 250 / 0.55), transparent),
+      radial-gradient(55rem 40rem at 100% 0%, oklch(0.88 0.08 310 / 0.45), transparent),
+      radial-gradient(55rem 45rem at 55% 115%, oklch(0.9 0.07 190 / 0.45), transparent);
+    }
+  .dark body {
+    background-image:
+      radial-gradient(60rem 40rem at 5% -10%, oklch(0.35 0.12 260 / 0.55), transparent),
+      radial-gradient(55rem 40rem at 100% 0%, oklch(0.33 0.11 310 / 0.45), transparent),
+      radial-gradient(55rem 45rem at 55% 115%, oklch(0.32 0.09 190 / 0.4), transparent);
     }
   html {
     @apply font-sans;
     }
+}
+
+/* a frosted panel: translucent fill, hairline edge, blur of what is behind it */
+@utility glass {
+  @apply rounded-2xl border border-white/40 bg-background/55 shadow-sm backdrop-blur-xl dark:border-white/10;
+}
+
+/* no blur available, or the user asked for less transparency: the panels go opaque */
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    @apply bg-background backdrop-blur-none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    @apply bg-background;
+  }
 }
