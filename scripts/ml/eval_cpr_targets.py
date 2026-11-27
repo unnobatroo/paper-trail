@@ -87,7 +87,7 @@ def report(name: str, frame: pd.DataFrame, col: str) -> dict:
             "ci95": bootstrap(gold, pred)}
 
 
-def predict(d: pd.DataFrame, args) -> dict[int, bool]:
+def predict(d: pd.DataFrame, args) -> dict[int, bool | None]:
     """one extractor call per passage; answers are cached so a crash resumes. an answer is
     reused only for the same model and the same passage text, so another model or a changed
     dataset never reads a stale one"""
@@ -114,9 +114,10 @@ def predict(d: pd.DataFrame, args) -> dict[int, bool]:
                     finished |= {p.page_number for p in done}
                     kept |= {c.source_page for c in cands}
                 for i in chunk.id:
-                    cache[int(i)] = (int(i) + 1) in kept
                     if (int(i) + 1) not in finished:
-                        continue  # unreadable answer: scored as not kept now, asked again next run
+                        cache[int(i)] = None  # unreadable answer: not scored, asked again next run
+                        continue
+                    cache[int(i)] = (int(i) + 1) in kept
                     row = {"id": int(i), "kept": cache[int(i)], "stamp": stamp[int(i)]}
                     f.write(json.dumps(row) + "\n")
                 f.flush()
@@ -147,10 +148,16 @@ def main() -> None:
         d = d.head(args.limit)
     d = d.copy()
     preds = predict(d, args)
-    d["model"] = d.id.map(preds)
+    # a passage the model never answered is left out for both systems, not scored as a miss
+    unread = int(sum(preds[int(i)] is None for i in d.id))
+    if unread:
+        print(f"{unread} passages had no usable answer and are excluded; run again to retry")
+    d = d[[preds[int(i)] is not None for i in d.id]].copy()
+    d["model"] = [preds[int(i)] for i in d.id]
     d["regex"] = [baseline(t) for t in d.text]
 
     results = {"split": args.split, "seed": args.seed, "model": args.model,
+               "unread_passages_excluded": unread,
                "geographies": int(d.geography.nunique()),
                "overall": [report("model", d, "model"), report("regex baseline", d, "regex")],
                "translated": {str(flag): report("model", sub, "model")
