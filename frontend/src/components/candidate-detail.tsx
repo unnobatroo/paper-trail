@@ -8,7 +8,8 @@ import { NoteCard } from "@/components/bilingual"
 import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Kbd } from "@/components/kbd"
+import { Receipt } from "@/components/receipt"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useCanReview } from "@/lib/can-review"
@@ -17,7 +18,16 @@ import { KIND_LABEL, KIND_ORDER, displayTitle } from "@/lib/labels"
 type Kind = Schemas["CandidateType"]
 
 /** One source mention of a commitment: its status, the quote, and the confirm, reject and edit controls. */
-export function CandidateDetail({ c, commitments }: { c: Candidate; commitments: Commitment[] }) {
+export function CandidateDetail({
+  c,
+  commitments,
+  onDecided,
+}: {
+  c: Candidate
+  commitments: Commitment[]
+  /** Called once a confirm or reject has gone through, so the workspace can move on to the next row. */
+  onDecided?: () => void
+}) {
   const { accept, reject } = useReviewActions()
   const canReview = useCanReview()
   const [editing, setEditing] = useState(false)
@@ -32,7 +42,12 @@ export function CandidateDetail({ c, commitments }: { c: Candidate; commitments:
       editing
         ? { id: c.id!, kind: kind as Kind, title: title.trim() || undefined, parentId: Number(parent) || undefined }
         : { id: c.id! },
-      { onSuccess: () => toast.success(editing ? "Saved as a commitment." : "Confirmed as a commitment.") },
+      {
+        onSuccess: () => {
+          toast.success(editing ? "Saved as a commitment." : "Confirmed as a commitment.")
+          onDecided?.()
+        },
+      },
     )
 
   return (
@@ -51,26 +66,28 @@ export function CandidateDetail({ c, commitments }: { c: Candidate; commitments:
 
       <NoteCard note={c.note} />
 
-      <Card size="sm">
-        <CardContent className="flex flex-col gap-1">
-          <h3 className="text-xs text-muted-foreground">The strategy says</h3>
-          <blockquote className="italic">“{c.source_excerpt}”</blockquote>
-        </CardContent>
-      </Card>
+      <Receipt caption={`The strategy says · page ${c.source_page}`} className="xl:text-lg">{c.source_excerpt}</Receipt>
 
       {open && (
         <>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={confirm} disabled={!canReview || accept.isPending}>
-              <CheckIcon data-icon="inline-start" /> Confirm
+          <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur">
+            <Button size="sm" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
+              <CheckIcon data-icon="inline-start" /> Confirm <Kbd aria-hidden="true" className="border-primary-foreground/30 bg-transparent text-primary-foreground">c</Kbd>
             </Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!canReview || reject.isPending}
-              onClick={() => reject.mutate(c.id!, { onSuccess: () => toast.success("Rejected.") })}
+              onClick={() =>
+                reject.mutate(c.id!, {
+                  onSuccess: () => {
+                    toast.success("Rejected.")
+                    onDecided?.()
+                  },
+                })
+              }
             >
-              <XIcon data-icon="inline-start" /> Reject
+              <XIcon data-icon="inline-start" /> Reject <Kbd aria-hidden="true">r</Kbd>
             </Button>
             <Button size="sm" variant="ghost" disabled={!canReview} aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
               Edit before confirming

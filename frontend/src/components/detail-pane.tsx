@@ -20,10 +20,12 @@ type Props = {
   commitments: Commitment[]
   searching: boolean
   onSearch: (commitmentIds: number[]) => void
+  /** A mention was confirmed or rejected here; the workspace moves on to the next row. */
+  onDecided?: () => void
 }
 
 /** Everything about one commitment: where it came from, what's left to do, and its paper trail. */
-export function DetailPane({ row, documents, commitments, searching, onSearch }: Props) {
+export function DetailPane({ row, documents, commitments, searching, onSearch, onDecided }: Props) {
   const [picked, setPicked] = useState<number | undefined>()
   const meta = useMeta()
   const canReview = useCanReview()
@@ -74,7 +76,7 @@ export function DetailPane({ row, documents, commitments, searching, onSearch }:
       )}
 
       {row.stage === "confirm" ? (
-        <CandidateDetail key={c.id} c={c} commitments={commitments} />
+        <CandidateDetail key={c.id} c={c} commitments={commitments} onDecided={onDecided} />
       ) : (
         <>
           {searchable && (

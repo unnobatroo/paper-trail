@@ -5,6 +5,7 @@ import {
   ClipboardCheckIcon,
   InboxIcon,
   ListIcon,
+  ScrollTextIcon,
   SearchIcon,
   Settings2Icon,
   UploadIcon,
@@ -13,6 +14,7 @@ import {
 
 import { useMeta } from "@/api/hooks"
 import { ToneBadge } from "@/components/tone-badge"
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress"
 import {
   Sidebar,
   SidebarContent,
@@ -53,6 +55,7 @@ export function AppSidebar({ stage, counts, ingesting, onStage, onIngest, onGlos
   const meta = useMeta()
   const canReview = useCanReview()
   const all = Object.entries(counts).reduce((n, [s, c]) => n + (s === "rejected" ? 0 : c), 0)
+  const done = counts.done ?? 0
   const items: { id: Stage | "all"; label: string; hint: string; count: number }[] = [
     { id: "all", label: "All", hint: "Everything except rejected", count: all },
     ...STAGES.map((s) => ({ id: s, label: STAGE_INFO[s].label, hint: STAGE_INFO[s].hint, count: counts[s] ?? 0 })),
@@ -62,11 +65,14 @@ export function AppSidebar({ stage, counts, ingesting, onStage, onIngest, onGlos
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">Paper Trail</span>
-          {meta.data?.deployment && (
-            <ToneBadge className="group-data-[collapsible=icon]:hidden">{meta.data.deployment}</ToneBadge>
-          )}
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+            <ScrollTextIcon className="size-4" aria-hidden="true" />
+          </span>
+          <span className="text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">Paper Trail</span>
         </div>
+        {meta.data?.deployment && (
+          <ToneBadge className="mx-2 w-fit group-data-[collapsible=icon]:hidden">{meta.data.deployment}</ToneBadge>
+        )}
       </SidebarHeader>
 
       <SidebarContent>
@@ -87,6 +93,18 @@ export function AppSidebar({ stage, counts, ingesting, onStage, onIngest, onGlos
                 )
               })}
             </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <SidebarGroupLabel>Trail progress</SidebarGroupLabel>
+          <SidebarGroupContent className="px-2">
+            <Progress value={all ? Math.round((done / all) * 100) : 0} aria-label="Commitments with a finished paper trail">
+              <ProgressLabel className="text-xs font-normal text-muted-foreground">
+                {done} of {all} traced
+              </ProgressLabel>
+              <ProgressValue />
+            </Progress>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

@@ -4,6 +4,7 @@ import type { Schemas, TrailRow } from "@/api/client"
 import { useReviewActions } from "@/api/hooks"
 import { useCanReview } from "@/lib/can-review"
 import { BudgetLine, EvidenceWarnings } from "@/components/evidence-bits"
+import { Receipt } from "@/components/receipt"
 import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -86,7 +87,7 @@ export function TrailDetail({ t }: { t: TrailRow }) {
 
       {BUCKET_ORDER.filter((name) => buckets[name].length > 0 || (name === "Budget" && t.budgets.length > 0)).map((name) => (
         <Group key={name} title={name} tone={BUCKET_TONE[name]}>
-          {name === "Implementation" && t.status_excerpt && <blockquote className="text-sm italic">“{t.status_excerpt}”</blockquote>}
+          {name === "Implementation" && t.status_excerpt && <Receipt caption="The source says" className="text-sm">{t.status_excerpt}</Receipt>}
           {buckets[name].map((ev) => (
             <div key={ev.id} className="flex flex-col gap-1">
               <a href={ev.url} target="_blank" rel="noreferrer" className="text-sm underline-offset-4 hover:underline">
