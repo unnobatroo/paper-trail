@@ -1,0 +1,2354 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Paper Trail",
+    "description": "From policy text to implementation evidence \u2014 climate commitments under human review.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Healthz Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readyz",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Readyz Readyz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meta": {
+      "get": {
+        "summary": "Meta",
+        "operationId": "meta_api_meta_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Documents",
+        "operationId": "documents_api_documents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceDocument"
+                  },
+                  "type": "array",
+                  "title": "Response Documents Api Documents Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/available": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Available",
+        "description": "files you can ingest",
+        "operationId": "available_api_documents_available_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response Available Api Documents Available Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/ingest": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Ingest",
+        "operationId": "ingest_api_documents_ingest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates": {
+      "get": {
+        "tags": [
+          "candidates"
+        ],
+        "summary": "Candidates",
+        "operationId": "candidates_api_candidates_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ReviewStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateView"
+                  },
+                  "title": "Response Candidates Api Candidates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/{candidate_id}/accept": {
+      "post": {
+        "tags": [
+          "candidates"
+        ],
+        "summary": "Accept",
+        "operationId": "accept_api_candidates__candidate_id__accept_post",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AcceptCandidateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Accept Api Candidates  Candidate Id  Accept Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/{candidate_id}/reject": {
+      "post": {
+        "tags": [
+          "candidates"
+        ],
+        "summary": "Reject",
+        "operationId": "reject_api_candidates__candidate_id__reject_post",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reject Api Candidates  Candidate Id  Reject Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/bulk": {
+      "post": {
+        "tags": [
+          "candidates"
+        ],
+        "summary": "Bulk",
+        "operationId": "bulk_api_candidates_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCandidatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Bulk Api Candidates Bulk Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commitments": {
+      "get": {
+        "tags": [
+          "commitments"
+        ],
+        "summary": "Commitments",
+        "operationId": "commitments_api_commitments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Commitment"
+                  },
+                  "type": "array",
+                  "title": "Response Commitments Api Commitments Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commitments/{commitment_id}/find-evidence": {
+      "post": {
+        "tags": [
+          "commitments"
+        ],
+        "summary": "Find Evidence",
+        "operationId": "find_evidence_api_commitments__commitment_id__find_evidence_post",
+        "parameters": [
+          {
+            "name": "commitment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Commitment Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commitments/{commitment_id}/jurisdiction": {
+      "post": {
+        "tags": [
+          "commitments"
+        ],
+        "summary": "Set Jurisdiction",
+        "description": "reviewer picks the asset owner, next search follows it",
+        "operationId": "set_jurisdiction_api_commitments__commitment_id__jurisdiction_post",
+        "parameters": [
+          {
+            "name": "commitment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Commitment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JurisdictionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Commitment"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/links": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Links",
+        "operationId": "links_api_links_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ReviewStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "commitment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Commitment Id"
+            }
+          },
+          {
+            "name": "lite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Lite"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LinkView"
+                  },
+                  "title": "Response Links Api Links Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/links/{link_id}": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Link",
+        "operationId": "link_api_links__link_id__get",
+        "parameters": [
+          {
+            "name": "link_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Link Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/links/{link_id}/decide": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_api_links__link_id__decide_post",
+        "parameters": [
+          {
+            "name": "link_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Link Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Decide Api Links  Link Id  Decide Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/links/bulk": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Bulk",
+        "operationId": "bulk_api_links_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkLinksRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Bulk Api Links Bulk Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trail": {
+      "get": {
+        "tags": [
+          "trail"
+        ],
+        "summary": "Trail",
+        "operationId": "trail_api_trail_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrailRow"
+                  },
+                  "type": "array",
+                  "title": "Response Trail Api Trail Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Active Jobs",
+        "operationId": "active_jobs_api_jobs_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobOut"
+                  },
+                  "title": "Response Active Jobs Api Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job",
+        "operationId": "job_api_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/translate": {
+      "post": {
+        "tags": [
+          "translate"
+        ],
+        "summary": "Translate",
+        "operationId": "translate_api_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Translate Api Translate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspace": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Workspace",
+        "description": "Return the commitments that match the stage, type and search filters.\n\n`stage_counts` covers every commitment, so the stage buttons keep their numbers while\nyou filter.",
+        "operationId": "workspace_api_workspace_get",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "title": "Stage"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "title": "Type"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AcceptCandidateRequest": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "title": "AcceptCandidateRequest"
+      },
+      "BudgetKind": {
+        "type": "string",
+        "enum": [
+          "estimated_cost",
+          "initial_appropriation",
+          "amended_appropriation",
+          "contracted_price",
+          "actual_expenditure",
+          "reported_expenditure"
+        ],
+        "title": "BudgetKind",
+        "description": "money along the budget cycle, never merged or summed across kinds\n\nestimate -> decree -> amended decree -> contract -> final accounts (z\u00e1rsz\u00e1mad\u00e1s).\nREPORTED_EXPENDITURE = a report says it was spent, which isn't the audited final account"
+      },
+      "BudgetRecord": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/BudgetKind"
+          },
+          "amount_huf": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Huf"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "HUF"
+          },
+          "amount_native": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Native"
+          },
+          "amount_raw": {
+            "type": "string",
+            "title": "Amount Raw",
+            "default": ""
+          },
+          "fiscal_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Year"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "evidence_id",
+          "kind",
+          "amount_huf",
+          "currency",
+          "amount_native",
+          "amount_raw",
+          "fiscal_year",
+          "description",
+          "source_url"
+        ],
+        "title": "BudgetRecord",
+        "description": "money quoted verbatim, raw wording kept, kind never guessed"
+      },
+      "BulkCandidatesRequest": {
+        "properties": {
+          "accept": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Accept"
+          },
+          "reject": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Reject"
+          },
+          "reject_rest": {
+            "type": "boolean",
+            "title": "Reject Rest",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "BulkCandidatesRequest"
+      },
+      "BulkLinksRequest": {
+        "properties": {
+          "accept": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Accept"
+          },
+          "relationships": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelationshipType"
+            },
+            "type": "object",
+            "title": "Relationships"
+          },
+          "reject": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Reject"
+          }
+        },
+        "type": "object",
+        "title": "BulkLinksRequest"
+      },
+      "CandidateType": {
+        "type": "string",
+        "enum": [
+          "objective",
+          "measure",
+          "target",
+          "indicator",
+          "background",
+          "unclear"
+        ],
+        "title": "CandidateType"
+      },
+      "CandidateView": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "document_id": {
+            "type": "integer",
+            "title": "Document Id"
+          },
+          "suggested_type": {
+            "$ref": "#/components/schemas/CandidateType",
+            "default": "unclear"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "normalized_title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Normalized Title"
+          },
+          "source_page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Page"
+          },
+          "source_excerpt": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Excerpt"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "excerpt_on_page": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt On Page"
+          },
+          "responsible_org": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Org"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          },
+          "deadline_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Year"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "review_status": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "default": "unreviewed"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Note"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "suggested_type",
+          "text",
+          "normalized_title",
+          "source_page",
+          "source_excerpt",
+          "code",
+          "excerpt_on_page",
+          "responsible_org",
+          "timeframe",
+          "deadline_year",
+          "unit",
+          "target_value",
+          "review_status",
+          "note"
+        ],
+        "title": "CandidateView",
+        "description": "a candidate plus its plain-english note, if someone wrote one"
+      },
+      "Commitment": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CandidateType"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "responsible_org": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Org"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          },
+          "deadline_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Year"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "source_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page"
+          },
+          "asset_owner_jurisdiction": {
+            "$ref": "#/components/schemas/Jurisdiction",
+            "default": "district_municipality"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "candidate_id",
+          "parent_id",
+          "kind",
+          "title",
+          "summary",
+          "code",
+          "responsible_org",
+          "timeframe",
+          "deadline_year",
+          "unit",
+          "target_value",
+          "source_page",
+          "asset_owner_jurisdiction"
+        ],
+        "title": "Commitment",
+        "description": "accepted objective/measure/target, parent_id is the whole hierarchy"
+      },
+      "EvidenceFlag": {
+        "type": "string",
+        "enum": [
+          "regression_warning",
+          "maintenance_only_suspect"
+        ],
+        "title": "EvidenceFlag",
+        "description": "warnings for the reviewer, they never decide anything"
+      },
+      "EvidenceItem": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "commitment_id": {
+            "type": "integer",
+            "title": "Commitment Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "publisher": {
+            "type": "string",
+            "title": "Publisher",
+            "default": ""
+          },
+          "published_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published On"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet",
+            "default": ""
+          },
+          "organisations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Organisations"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          },
+          "dates_mentioned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dates Mentioned"
+          },
+          "status_hint": {
+            "$ref": "#/components/schemas/Status",
+            "default": "unknown"
+          },
+          "status_excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Excerpt"
+          },
+          "polarity": {
+            "$ref": "#/components/schemas/EvidencePolarity",
+            "default": "affirmative"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceFlag"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "procurement_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Procurement Ids"
+          },
+          "parcels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Parcels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "commitment_id",
+          "url",
+          "title",
+          "publisher",
+          "published_on",
+          "snippet",
+          "organisations",
+          "locations",
+          "dates_mentioned",
+          "status_hint",
+          "status_excerpt",
+          "polarity",
+          "flags",
+          "procurement_ids",
+          "parcels"
+        ],
+        "title": "EvidenceItem",
+        "description": "passage from an allowlisted official source"
+      },
+      "EvidenceLink": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "commitment_id": {
+            "type": "integer",
+            "title": "Commitment Id"
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "features": {
+            "$ref": "#/components/schemas/MatchFeatures"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "default": 0.0
+          },
+          "suggested_relationship": {
+            "$ref": "#/components/schemas/RelationshipType",
+            "default": "related_but_indirect"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelationshipType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "review_status": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "default": "unreviewed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "commitment_id",
+          "evidence_id",
+          "features",
+          "score",
+          "suggested_relationship",
+          "reasons",
+          "relationship",
+          "review_status"
+        ],
+        "title": "EvidenceLink",
+        "description": "suggested commitment <-> evidence link, waiting for a person"
+      },
+      "EvidencePolarity": {
+        "type": "string",
+        "enum": [
+          "affirmative",
+          "amendment",
+          "termination"
+        ],
+        "title": "EvidencePolarity",
+        "description": "what a passage does to the work. a cancellation is evidence too"
+      },
+      "GlossaryTerm": {
+        "properties": {
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "meaning": {
+            "type": "string",
+            "title": "Meaning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term",
+          "meaning"
+        ],
+        "title": "GlossaryTerm"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IngestRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "filename in the document store"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "publisher": {
+            "type": "string",
+            "title": "Publisher"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "title",
+          "publisher"
+        ],
+        "title": "IngestRequest"
+      },
+      "JobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "progress": {
+            "type": "string",
+            "title": "Progress"
+          },
+          "result": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "progress",
+          "result",
+          "error",
+          "created_at"
+        ],
+        "title": "JobOut"
+      },
+      "Jurisdiction": {
+        "type": "string",
+        "enum": [
+          "district_municipality",
+          "metropolitan_municipality",
+          "public_utility_water",
+          "public_utility_heating",
+          "national_government"
+        ],
+        "title": "Jurisdiction",
+        "description": "who owns the asset, i.e. whose sites the evidence lives on"
+      },
+      "JurisdictionRequest": {
+        "properties": {
+          "jurisdiction": {
+            "$ref": "#/components/schemas/Jurisdiction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jurisdiction"
+        ],
+        "title": "JurisdictionRequest"
+      },
+      "LinkDecisionRequest": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "pattern": "^(accept|reject)$",
+            "title": "Decision"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelationshipType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "LinkDecisionRequest"
+      },
+      "LinkView": {
+        "properties": {
+          "link": {
+            "$ref": "#/components/schemas/EvidenceLink"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "budgets": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetRecord"
+            },
+            "type": "array",
+            "title": "Budgets"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Note"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "link",
+          "evidence",
+          "budgets",
+          "note"
+        ],
+        "title": "LinkView",
+        "description": "link + everything you need to review it"
+      },
+      "MatchFeatures": {
+        "properties": {
+          "semantic_similarity": {
+            "type": "number",
+            "title": "Semantic Similarity",
+            "default": 0.0
+          },
+          "shared_organisations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Organisations"
+          },
+          "shared_locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Locations"
+          },
+          "shared_dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Dates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "semantic_similarity",
+          "shared_organisations",
+          "shared_locations",
+          "shared_dates"
+        ],
+        "title": "MatchFeatures",
+        "description": "what went into a suggested link"
+      },
+      "MetaOut": {
+        "properties": {
+          "deployment": {
+            "type": "string",
+            "title": "Deployment"
+          },
+          "storage": {
+            "type": "string",
+            "const": "postgres",
+            "title": "Storage"
+          },
+          "embed_model": {
+            "type": "string",
+            "title": "Embed Model"
+          },
+          "reranker": {
+            "type": "string",
+            "title": "Reranker"
+          },
+          "search_provider": {
+            "type": "string",
+            "title": "Search Provider"
+          },
+          "llm_extraction": {
+            "type": "boolean",
+            "title": "Llm Extraction"
+          },
+          "review_required": {
+            "type": "boolean",
+            "title": "Review Required"
+          },
+          "translation": {
+            "type": "boolean",
+            "title": "Translation"
+          },
+          "language_profile_loaded": {
+            "type": "boolean",
+            "title": "Language Profile Loaded"
+          },
+          "language_name": {
+            "type": "string",
+            "title": "Language Name",
+            "default": ""
+          },
+          "glossary": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTerm"
+            },
+            "type": "array",
+            "title": "Glossary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deployment",
+          "storage",
+          "embed_model",
+          "reranker",
+          "search_provider",
+          "llm_extraction",
+          "review_required",
+          "translation",
+          "language_profile_loaded",
+          "language_name",
+          "glossary"
+        ],
+        "title": "MetaOut",
+        "description": "what this deployment runs"
+      },
+      "Note": {
+        "properties": {
+          "subject_kind": {
+            "type": "string",
+            "enum": [
+              "candidate",
+              "link"
+            ],
+            "title": "Subject Kind"
+          },
+          "subject_id": {
+            "type": "integer",
+            "title": "Subject Id"
+          },
+          "title_en": {
+            "type": "string",
+            "title": "Title En"
+          },
+          "summary_en": {
+            "type": "string",
+            "title": "Summary En"
+          },
+          "suggestion": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject",
+              "unsure"
+            ],
+            "title": "Suggestion"
+          },
+          "reason_en": {
+            "type": "string",
+            "title": "Reason En",
+            "default": ""
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_kind",
+          "subject_id",
+          "title_en",
+          "summary_en",
+          "suggestion",
+          "reason_en",
+          "author"
+        ],
+        "title": "Note",
+        "description": "plain-english take on a queue item + what the ai would decide. never decides itself"
+      },
+      "RelationshipType": {
+        "type": "string",
+        "enum": [
+          "direct_implementation",
+          "supporting",
+          "budget",
+          "related_but_indirect",
+          "probably_unrelated"
+        ],
+        "title": "RelationshipType",
+        "description": "how a source relates to a commitment"
+      },
+      "ReviewStatus": {
+        "type": "string",
+        "enum": [
+          "unreviewed",
+          "accepted",
+          "rejected"
+        ],
+        "title": "ReviewStatus"
+      },
+      "SourceDocument": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "publisher": {
+            "type": "string",
+            "title": "Publisher"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "publisher",
+          "url"
+        ],
+        "title": "SourceDocument",
+        "description": "an ingested official document"
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "announced",
+          "planned",
+          "in_preparation",
+          "in_implementation",
+          "completed",
+          "budget_evidence",
+          "background_only",
+          "unknown"
+        ],
+        "title": "Status",
+        "description": "what the source says, never what we guess about the commitment"
+      },
+      "TrailRow": {
+        "properties": {
+          "commitment": {
+            "$ref": "#/components/schemas/Commitment"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipType"
+            },
+            "type": "array",
+            "title": "Relationships"
+          },
+          "budgets": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetRecord"
+            },
+            "type": "array",
+            "title": "Budgets"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status",
+            "default": "unknown"
+          },
+          "status_excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Excerpt"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "financial_states": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetKind"
+            },
+            "type": "array",
+            "title": "Financial States"
+          },
+          "financially_executed": {
+            "type": "boolean",
+            "title": "Financially Executed",
+            "default": false
+          },
+          "findings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Findings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "commitment",
+          "evidence",
+          "relationships",
+          "budgets",
+          "status",
+          "status_excerpt",
+          "gaps",
+          "financial_states",
+          "financially_executed",
+          "findings"
+        ],
+        "title": "TrailRow",
+        "description": "a commitment + everything verified about it, the api returns it as is"
+      },
+      "TranslateRequest": {
+        "properties": {
+          "texts": {
+            "items": {
+              "type": "string",
+              "maxLength": 4000
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Texts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texts"
+        ],
+        "title": "TranslateRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkspaceOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "stage_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Stage Counts"
+          },
+          "commitments": {
+            "items": {
+              "$ref": "#/components/schemas/Commitment"
+            },
+            "type": "array",
+            "title": "Commitments"
+          },
+          "documents": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "stage_counts",
+          "commitments",
+          "documents"
+        ],
+        "title": "WorkspaceOut",
+        "description": "The rows that pass the filters, plus what the page needs around them."
+      },
+      "WorkspaceRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "confirm",
+              "search",
+              "review",
+              "done",
+              "rejected"
+            ],
+            "title": "Stage"
+          },
+          "group": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateView"
+            },
+            "type": "array",
+            "title": "Group"
+          },
+          "commitments": {
+            "items": {
+              "$ref": "#/components/schemas/Commitment"
+            },
+            "type": "array",
+            "title": "Commitments"
+          },
+          "trail": {
+            "items": {
+              "$ref": "#/components/schemas/TrailRow"
+            },
+            "type": "array",
+            "title": "Trail"
+          },
+          "pending": {
+            "items": {
+              "$ref": "#/components/schemas/LinkView"
+            },
+            "type": "array",
+            "title": "Pending"
+          },
+          "evidence": {
+            "type": "integer",
+            "title": "Evidence"
+          },
+          "searchable": {
+            "type": "boolean",
+            "title": "Searchable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "stage",
+          "group",
+          "commitments",
+          "trail",
+          "pending",
+          "evidence",
+          "searchable"
+        ],
+        "title": "WorkspaceRow",
+        "description": "One commitment across the pipeline, as the review workspace shows it."
+      }
+    }
+  }
+}

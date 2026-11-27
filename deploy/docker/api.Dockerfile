@@ -1,12 +1,16 @@
 # api + worker images, context = repo root (see the compose file)
+FROM node:22-slim AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend ./
+RUN npm run build
+
 FROM ghcr.io/astral-sh/uv:0.11.2 AS uv
 FROM python:3.12-slim AS base
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_CACHE=1 PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 \
-    NICEGUI_STORAGE_PATH=/app/data/.nicegui
-# ^ the ui's per-browser storage (review key, language). /app isn't writable for the app
-# user, the data volume is and survives restarts; dotfile so the document list skips it
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_CACHE=1 PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1
 RUN groupadd --gid 10001 papertrail && useradd --uid 10001 --gid 10001 --create-home papertrail
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
@@ -15,11 +19,13 @@ COPY README.md LICENSE ./
 RUN uv sync --frozen --no-dev && mkdir -p /app/data /app/model-cache && chown -R papertrail:papertrail /app/data /app/model-cache
 USER papertrail
 EXPOSE 8000
-# one worker: the ui keeps page state in-process, slow work runs in the job worker
-CMD ["uvicorn", "paper_trail.ui.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips=*"]
+# one worker: slow work runs in the job worker, the api only serves requests
+CMD ["uvicorn", "paper_trail.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips=*"]
 
 FROM base AS api
 COPY db ./db
+# the built review app; the api serves it at / (FRONTEND_DIR defaults to /app/frontend/dist)
+COPY --from=frontend /frontend/dist ./frontend/dist
 # ops tools for the migrate service: import, gazetteer seed, checks
 COPY scripts ./scripts
 

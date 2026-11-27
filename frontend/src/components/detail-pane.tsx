@@ -1,0 +1,116 @@
+import { useState } from "react"
+import { SearchIcon } from "lucide-react"
+
+import type { Commitment, WorkspaceRow } from "@/api/client"
+import { useMeta } from "@/api/hooks"
+import { Bilingual } from "@/components/bilingual"
+import { CandidateDetail } from "@/components/candidate-detail"
+import { MatchCard } from "@/components/match-card"
+import { SimpleSelect } from "@/components/simple-select"
+import { ToneBadge } from "@/components/tone-badge"
+import { TrailDetail } from "@/components/trail-detail"
+import { Button } from "@/components/ui/button"
+import { KIND_LABEL, KIND_TONE, STAGE_INFO, displayTitle, pageLink } from "@/lib/labels"
+import { parseCode, shown } from "@/lib/rows"
+
+type Props = {
+  row: WorkspaceRow
+  documents: Record<string, string>
+  commitments: Commitment[]
+  searching: boolean
+  onSearch: (commitmentIds: number[]) => void
+}
+
+/** Everything about one commitment: where it came from, what's left to do, and its paper trail. */
+export function DetailPane({ row, documents, commitments, searching, onSearch }: Props) {
+  const [picked, setPicked] = useState<number | undefined>()
+  const meta = useMeta()
+  const c = shown(row, picked)
+  const stage = STAGE_INFO[row.stage]
+  const page = pageLink(documents[String(c.document_id)], c.source_page)
+  const code = parseCode(c.code)
+  const meaning = code && meta.data?.glossary.find((g) => g.term === code.letters)?.meaning
+  const searchable = row.searchable && row.commitments.length > 0
+  const searchedBefore = row.pending.length > 0 || row.evidence > 0
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <ToneBadge tone={KIND_TONE[row.kind]}>{KIND_LABEL[row.kind]}</ToneBadge>
+        <ToneBadge tone={stage.tone} title={stage.hint}>
+          {stage.label}
+        </ToneBadge>
+        {page.href ? (
+          <a href={page.href} target="_blank" rel="noreferrer" className="text-sm underline-offset-4 hover:underline">
+            {page.text}
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        ) : (
+          <span className="text-sm">{page.text}</span>
+        )}
+      </div>
+
+      <h2 className="text-base font-medium">
+        <Bilingual text={displayTitle(row.title)} en={c.note?.title_en} />
+      </h2>
+      {code && meaning && (
+        <p className="text-xs text-muted-foreground">
+          {c.code}: {code.letters} = {meaning}. {code.depth} {code.depth === 1 ? "level" : "levels"} deep in the plan.
+        </p>
+      )}
+
+      {row.group.length > 1 && (
+        <SimpleSelect
+          label="Source mention"
+          value={String(c.id)}
+          onChange={(v) => setPicked(Number(v))}
+          options={row.group.map((m) => ({
+            value: String(m.id),
+            label: `p.${m.source_page} · ${m.review_status === "accepted" ? "confirmed" : m.review_status === "rejected" ? "rejected" : "needs review"} · mention ${m.id}`,
+          }))}
+        />
+      )}
+
+      {row.stage === "confirm" ? (
+        <CandidateDetail key={c.id} c={c} commitments={commitments} />
+      ) : (
+        <>
+          {searchable && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              disabled={searching}
+              onClick={() => onSearch(row.commitments.map((m) => m.id!))}
+            >
+              <SearchIcon data-icon="inline-start" />
+              {searchedBefore ? "Search again" : "Find evidence"}
+            </Button>
+          )}
+          {row.pending.length > 0 && (
+            <section aria-labelledby="matches-heading" className="flex flex-col gap-2">
+              <h3 id="matches-heading" className="text-sm font-medium">
+                Matches to review
+              </h3>
+              {[...row.pending]
+                .sort((a, b) => b.link.score - a.link.score)
+                .map((lv) => (
+                  <MatchCard key={lv.link.id} linkId={lv.link.id!} preview={lv} />
+                ))}
+            </section>
+          )}
+          <section aria-labelledby="trail-heading" className="flex flex-col gap-3">
+            <h3 id="trail-heading" className="text-sm font-medium">
+              Paper trail ({row.evidence})
+            </h3>
+            {row.trail.length ? (
+              row.trail.map((t) => <TrailDetail key={t.commitment.id} t={t} />)
+            ) : (
+              <p className="text-muted-foreground">Nothing recorded for this commitment.</p>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  )
+}

@@ -88,6 +88,9 @@ class Settings(BaseSettings):
         default=2, ge=1, le=20, validation_alias="RERANK_BATCH")
     fixture_dir: Path = PROJECT_ROOT / "data" / "fixtures"
     seed_dir: Path = PROJECT_ROOT / "data" / "source_documents"
+    # the built review app (`npm run build` in frontend/); served at / when it exists
+    frontend_dir: Path = Field(
+        default=PROJECT_ROOT / "frontend" / "dist", validation_alias="FRONTEND_DIR")
     # fastembed defaults to $TMPDIR, macos wipes it and the model breaks
     model_cache: Path = Field(
         default=PROJECT_ROOT / "data" / "models",

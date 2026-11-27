@@ -38,7 +38,7 @@
 		reverse_proxy api:8000
 	}
 	handle {
-		# the nicegui ui, websocket included
+		# the review app (static files from the api)
 		reverse_proxy api:8000
 	}
 }

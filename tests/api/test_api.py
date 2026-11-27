@@ -192,3 +192,52 @@ def test_notes_ride_along_but_never_decide(client, state, tmp_path):
 def test_meta_glossary_comes_from_the_profile(client):
     glossary = client.get("/api/meta").json()["glossary"]
     assert {"term": "M", "meaning": "mitigation: cutting greenhouse gas emissions"} in glossary
+
+
+def test_workspace_lists_rows_with_stage_counts_and_filters(client, state):
+    from paper_trail.domain.enums import CandidateType, ReviewStatus
+    from paper_trail.domain.models import PolicyCandidate, SourceDocument
+
+    doc = state.policy.add_document(SourceDocument(title="S", publisher="P", url="https://x/s.pdf"))
+    for title, status in (("Fák ültetése", ReviewStatus.UNREVIEWED),
+                          ("Napelemek", ReviewStatus.REJECTED)):
+        cid = state.policy.add_candidate(PolicyCandidate(
+            document_id=doc, suggested_type=CandidateType.MEASURE, text=title,
+            normalized_title=title, source_page=3, source_excerpt=title))
+        state.policy.set_candidate_status(cid, status)
+
+    body = client.get("/api/workspace").json()
+    assert [r["title"] for r in body["rows"]] == ["Fák ültetése"]
+    assert body["rows"][0]["stage"] == "confirm"
+    assert body["stage_counts"]["rejected"] == 1
+    assert body["documents"] == {str(doc): "https://x/s.pdf"}
+
+    rejected = client.get("/api/workspace", params={"stage": "rejected"}).json()
+    assert [r["title"] for r in rejected["rows"]] == ["Napelemek"]
+    assert client.get("/api/workspace", params={"q": "nincs"}).json()["rows"] == []
+
+
+def test_serves_the_built_frontend_and_keeps_api_errors(state, monkeypatch, tmp_path):
+    from paper_trail.api.app import create_app
+
+    (tmp_path / "index.html").write_text("<!doctype html><title>Paper Trail</title>")
+    monkeypatch.setenv("FRONTEND_DIR", str(tmp_path))
+    client = TestClient(create_app())
+    assert "<title>Paper Trail</title>" in client.get("/").text
+    assert client.get("/api/meta").json()["storage"] == "postgres"
+    # A mistyped API path is a 404, never the app's HTML.
+    missing = client.get("/api/nope")
+    assert missing.status_code == 404 and "<html" not in missing.text.lower()
+    # The old app's bookmarks still land in the right stage.
+    old = client.get("/commitments", follow_redirects=False)
+    assert old.headers["location"] == "/?stage=confirm"
+
+
+def test_without_a_frontend_build_the_api_still_runs(state, monkeypatch, tmp_path):
+    from paper_trail.api.app import create_app
+
+    monkeypatch.setenv("FRONTEND_DIR", str(tmp_path / "missing"))
+    client = TestClient(create_app())
+    assert client.get("/").status_code == 404
+    assert client.get("/healthz").json() == {"ok": True}
+
