@@ -10,6 +10,11 @@ export function shown(row: WorkspaceRow, picked?: number): Candidate {
   )
 }
 
+/** The lowest page any mention of the row sits on: where the row belongs in the strategy's order. */
+export function firstPage(row: WorkspaceRow): number {
+  return Math.min(...row.group.map((m) => m.source_page))
+}
+
 /** The title a row shows in the table: the English reading aid first when the reader wants English. */
 export function rowTitle(row: WorkspaceRow, english: boolean): string {
   const title = displayTitle(row.title)

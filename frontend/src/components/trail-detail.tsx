@@ -31,7 +31,7 @@ const BORDER: Record<string, string> = {
 
 function Group({ title, tone, children }: { title: string; tone: string; children: React.ReactNode }) {
   return (
-    <Card size="sm" className={`border-l-4 ${BORDER[tone]}`}>
+    <Card size="sm" className={`rounded-none border-l-2 ring-0 ${BORDER[tone]}`}>
       <CardContent className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">{title}</h4>
         {children}
