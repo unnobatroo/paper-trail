@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useCanReview } from "@/lib/can-review"
 import { KIND_LABEL, KIND_ORDER, displayTitle } from "@/lib/labels"
 
 type Kind = Schemas["CandidateType"]
@@ -18,6 +19,7 @@ type Kind = Schemas["CandidateType"]
 /** One source mention of a commitment: its status, the quote, and the confirm, reject and edit controls. */
 export function CandidateDetail({ c, commitments }: { c: Candidate; commitments: Commitment[] }) {
   const { accept, reject } = useReviewActions()
+  const canReview = useCanReview()
   const [editing, setEditing] = useState(false)
   const [kind, setKind] = useState<string>(c.suggested_type)
   const [title, setTitle] = useState(displayTitle(c.normalized_title))
@@ -59,18 +61,18 @@ export function CandidateDetail({ c, commitments }: { c: Candidate; commitments:
       {open && (
         <>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={confirm} disabled={accept.isPending}>
+            <Button size="sm" onClick={confirm} disabled={!canReview || accept.isPending}>
               <CheckIcon data-icon="inline-start" /> Confirm
             </Button>
             <Button
               size="sm"
               variant="outline"
-              disabled={reject.isPending}
+              disabled={!canReview || reject.isPending}
               onClick={() => reject.mutate(c.id!, { onSuccess: () => toast.success("Rejected.") })}
             >
               <XIcon data-icon="inline-start" /> Reject
             </Button>
-            <Button size="sm" variant="ghost" aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+            <Button size="sm" variant="ghost" disabled={!canReview} aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
               Edit before confirming
             </Button>
           </div>

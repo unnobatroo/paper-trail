@@ -64,6 +64,17 @@ def create_app() -> FastAPI:
         }))
         return response
 
+    @app.middleware("http")
+    async def cache_reads(request, call_next):
+        """let a cdn cache successful GET /api responses, when the deployment is read-only"""
+        response = await call_next(request)
+        if (settings.api_cache_seconds and request.method == "GET"
+                and request.url.path.startswith("/api/") and response.status_code == 200):
+            ttl = settings.api_cache_seconds
+            response.headers["cache-control"] = (
+                f"public, s-maxage={ttl}, stale-while-revalidate={ttl * 10}")
+        return response
+
     # X-Request-ID in and out, added last so it wraps the log middleware
     app.add_middleware(CorrelationIdMiddleware)
     # load() only, building AppState here would drag the embedder in at import
