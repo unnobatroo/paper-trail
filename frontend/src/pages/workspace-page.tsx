@@ -7,12 +7,14 @@ import { useActiveJobs, useReviewActions, useWorkspace } from "@/api/hooks"
 import { AppSidebar } from "@/components/app-sidebar"
 import { DetailPane } from "@/components/detail-pane"
 import { GlossaryDialog, IngestDialog, SettingsDialog } from "@/components/dialogs"
+import { Kbd } from "@/components/kbd"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { WorkspaceTable } from "@/components/workspace-table"
+import { WorkspaceToolbar } from "@/components/workspace-toolbar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCanReview } from "@/lib/can-review"
@@ -25,7 +27,7 @@ const TYPING = /^(INPUT|TEXTAREA|SELECT)$/
 export function WorkspacePage() {
   const [params, setParams] = useSearchParams()
   const stage = params.get("stage") ?? "all"
-  const type = params.get("type") ?? "all"
+  const kind = params.get("type") ?? "all"
   const q = params.get("q") ?? ""
   const cursor = params.get("row") ? Number(params.get("row")) : null
 
@@ -46,8 +48,15 @@ export function WorkspacePage() {
     return () => clearTimeout(t)
   }, [text, setParam])
 
-  const ws = useWorkspace({ stage, type, q })
-  const rows: WorkspaceRow[] = useMemo(() => ws.data?.rows ?? [], [ws.data])
+  // The server filters by stage and search; the kind filter is applied here, so the kind
+  // counts stay whole while one kind is selected.
+  const ws = useWorkspace({ stage, type: "all", q })
+  const stageRows: WorkspaceRow[] = useMemo(() => ws.data?.rows ?? [], [ws.data])
+  const kindCounts = useMemo(
+    () => stageRows.reduce<Record<string, number>>((n, r) => ({ ...n, [r.kind]: (n[r.kind] ?? 0) + 1 }), {}),
+    [stageRows],
+  )
+  const rows = useMemo(() => (kind === "all" ? stageRows : stageRows.filter((r) => r.kind === kind)), [stageRows, kind])
   const counts = ws.data?.stage_counts ?? {}
   const current = rows.find((r) => r.id === cursor) ?? null
 
@@ -62,7 +71,15 @@ export function WorkspacePage() {
   const isMobile = useIsMobile()
   const canReview = useCanReview()
 
-  const open = (id: number | null) => setParam("row", id === null ? null : String(id))
+  const open = useCallback((id: number | null) => setParam("row", id === null ? null : String(id)), [setParam])
+  /** After a decision on a row, the next one (or the one before, at the end) takes its place. */
+  const moveOnFrom = useCallback(
+    (id: number) => {
+      const i = rows.findIndex((r) => r.id === id)
+      open((rows[i + 1] ?? rows[i - 1])?.id ?? null)
+    },
+    [rows, open],
+  )
   const selectMany = (ids: number[], on: boolean) =>
     setSelected((s) => {
       const next = new Set(s)
@@ -90,18 +107,36 @@ export function WorkspacePage() {
     (row: WorkspaceRow) => {
       const c = shown(row)
       if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
-        accept.mutate({ id: c.id! }, { onSuccess: () => toast.success("Confirmed as a commitment.") })
+        accept.mutate(
+          { id: c.id! },
+          {
+            onSuccess: () => {
+              toast.success("Confirmed as a commitment.")
+              moveOnFrom(row.id)
+            },
+          },
+        )
     },
-    [accept, canReview],
+    [accept, canReview, moveOnFrom],
   )
   const rejectRow = useCallback(
     (row: WorkspaceRow) => {
       const c = shown(row)
       if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
-        reject.mutate(c.id!, { onSuccess: () => toast.success("Rejected.") })
+        reject.mutate(c.id!, {
+          onSuccess: () => {
+            toast.success("Rejected.")
+            moveOnFrom(row.id)
+          },
+        })
     },
-    [reject, canReview],
+    [reject, canReview, moveOnFrom],
   )
+
+  // A wide screen always has something in the detail pane: the first row, until one is picked.
+  useEffect(() => {
+    if (!isMobile && ws.data && !current && rows.length) open(rows[0].id)
+  }, [isMobile, ws.data, current, rows, open])
 
   // Keyboard shortcuts, off while typing or while a dialog is open.
   useEffect(() => {
@@ -143,7 +178,7 @@ export function WorkspacePage() {
       : null
 
   const table = (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-3 p-4">
       {ws.data && !canReview && (
         <Alert>
           <AlertDescription>
@@ -151,9 +186,9 @@ export function WorkspacePage() {
           </AlertDescription>
         </Alert>
       )}
-      <p className="text-xs text-muted-foreground">
-        <kbd>j</kbd> <kbd>k</kbd> move · <kbd>x</kbd> select · <kbd>c</kbd> confirm · <kbd>r</kbd> reject · <kbd>s</kbd> search ·{" "}
-        <kbd>/</kbd> find
+      <WorkspaceToolbar counts={kindCounts} kind={kind} onKind={(k) => setParam("type", k, "all")} />
+      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+        <Kbd>j</Kbd> <Kbd>k</Kbd> move · <Kbd>x</Kbd> select · <Kbd>c</Kbd> confirm · <Kbd>r</Kbd> reject · <Kbd>s</Kbd> search · <Kbd>/</Kbd> find
       </p>
 
       {selected.size > 0 && (
@@ -211,6 +246,7 @@ export function WorkspacePage() {
       commitments={ws.data.commitments}
       searching={searching}
       onSearch={(ids) => void startSearch(ids)}
+      onDecided={() => moveOnFrom(current.id)}
     />
   )
 
@@ -236,8 +272,6 @@ export function WorkspacePage() {
           title={stage in STAGE_INFO ? STAGE_INFO[stage as Stage].label : "All commitments"}
           q={text}
           onQ={setText}
-          type={type}
-          onType={(t) => setParam("type", t, "all")}
           searchRef={searchRef}
           progress={progress}
         />
@@ -256,11 +290,11 @@ export function WorkspacePage() {
           </>
         ) : (
           <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-            <ResizablePanel defaultSize="62%" minSize="30%">
+            <ResizablePanel defaultSize="58%" minSize="30%">
               <div id="main" tabIndex={-1} className="h-full overflow-y-auto outline-none">{table}</div>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize="38%" minSize="25%">
+            <ResizablePanel defaultSize="42%" minSize="25%">
               <aside aria-label="Details" className="h-full overflow-y-auto">
                 {detail ?? <p className="p-6 text-muted-foreground">Select a commitment to see its detail.</p>}
               </aside>

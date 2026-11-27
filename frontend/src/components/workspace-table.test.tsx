@@ -27,11 +27,16 @@ function renderTable(over: Partial<React.ComponentProps<typeof WorkspaceTable>> 
 }
 
 describe("WorkspaceTable", () => {
-  it("groups rows into one titled table per kind, in the usual order", () => {
+  it("groups rows under one header, a collapsible group per kind in the usual order", async () => {
     renderTable()
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(["Objectives (1)", "Measures (1)"])
-    expect(screen.getAllByRole("table")).toHaveLength(2)
+    expect(screen.getAllByRole("table")).toHaveLength(1)
+    expect(screen.getAllByRole("columnheader", { name: "Commitment" })).toHaveLength(1)
+    const groups = screen.getAllByRole("button", { expanded: true }).map((b) => b.textContent)
+    expect(groups).toEqual(["Objectives1", "Measures1"])
+
+    await userEvent.click(screen.getByRole("button", { name: /Objectives/ }))
+    expect(screen.queryByRole("button", { name: "Zöld város" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Fák ültetése" })).toBeInTheDocument()
   })
 
   it("opens a row from its title button, which a keyboard user can reach", async () => {

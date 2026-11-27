@@ -81,14 +81,37 @@ describe("WorkspacePage", () => {
     expect(calls.some((c) => c.path === "/api/workspace" && c.query.includes("stage=search"))).toBe(true)
   })
 
-  it("moves with j and confirms with c, posting to the accept endpoint", async () => {
+  it("opens the first row by itself, so the detail pane is never empty", async () => {
+    stubApi()
+    renderPage()
+    expect(await screen.findByRole("heading", { name: /Fák ültetése/ })).toBeInTheDocument()
+  })
+
+  it("confirms with c, posting to the accept endpoint, then moves on to the next row", async () => {
     const calls = stubApi()
     renderPage()
-    await screen.findByRole("button", { name: "Fák ültetése" })
-    await userEvent.keyboard("j")
     expect(await screen.findByRole("heading", { name: /Fák ültetése/ })).toBeInTheDocument()
     await userEvent.keyboard("c")
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path === "/api/candidates/1/accept")).toBe(true))
+    expect(await screen.findByRole("heading", { name: /Napelemek/ })).toBeInTheDocument()
+  })
+
+  it("moves down with j", async () => {
+    stubApi()
+    renderPage()
+    await screen.findByRole("heading", { name: /Fák ültetése/ })
+    await userEvent.keyboard("j")
+    expect(await screen.findByRole("heading", { name: /Napelemek/ })).toBeInTheDocument()
+  })
+
+  it("filters by kind on the client, leaving the other kinds' counts whole", async () => {
+    const calls = stubApi()
+    renderPage()
+    await screen.findByRole("button", { name: "Fák ültetése" })
+    await userEvent.click(screen.getByRole("button", { name: "Measures 2" }))
+    expect(screen.getByRole("button", { name: "Fák ültetése" })).toBeInTheDocument()
+    // the kind never goes to the server: it asks for every kind and filters here
+    expect(calls.filter((c) => c.path === "/api/workspace").every((c) => c.query.includes("type=all"))).toBe(true)
   })
 
   it("ignores shortcuts while typing in the search box", async () => {

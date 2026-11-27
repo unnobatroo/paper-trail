@@ -6,6 +6,7 @@ import type { LinkView, Schemas } from "@/api/client"
 import { useLinkDetail, useReviewActions } from "@/api/hooks"
 import { NoteCard } from "@/components/bilingual"
 import { BudgetLine, EvidenceWarnings } from "@/components/evidence-bits"
+import { Receipt } from "@/components/receipt"
 import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
 import { Button } from "@/components/ui/button"
@@ -52,7 +53,7 @@ export function MatchCard({ linkId, preview }: { linkId: number; preview: LinkVi
             <EvidenceWarnings ev={ev} />
             <p className="text-sm">{STATUS_SENTENCE[ev.status_hint]}</p>
             {(ev.status_excerpt || ev.snippet) && (
-              <blockquote className="text-sm italic">“{ev.status_excerpt || ev.snippet}”</blockquote>
+              <Receipt caption="The source says" className="text-sm">{ev.status_excerpt || ev.snippet}</Receipt>
             )}
           </>
         ) : (
