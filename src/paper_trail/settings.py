@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     # calls in flight, match the model server's max-conc
     llm_concurrency: int = Field(
         default=1, ge=1, le=8, validation_alias="LLM_CONCURRENCY")
+    # model file of a page prefilter (src/paper_trail/ml/models/); unset = read every page
+    page_prefilter: Path | None = Field(default=None, validation_alias="PAGE_PREFILTER")
     # passages per /rerank call, a gpu box eats the whole top-k at once
     rerank_batch: int = Field(
         default=2, ge=1, le=20, validation_alias="RERANK_BATCH")

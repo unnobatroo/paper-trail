@@ -11,6 +11,7 @@ from .ml.embeddings import get_provider
 from .ml.extraction import get_extractor
 from .ml.lang import LanguageProfile
 from .ml.ner import get_ner
+from .ml.prefilter import PagePrefilter, PrefilteredExtractor
 from .ml.rerank import get_reranker
 from .repositories.index import PostgresPageStore, PostgresVectorIndex
 from .repositories.store import EvidenceRepository, PolicyRepository
@@ -91,6 +92,8 @@ def build_state(settings: Settings | None = None) -> AppState:
                             settings.embed_api_key, str(settings.model_cache))
     extractor = get_extractor(settings.llm_base_url, settings.llm_api_key, settings.llm_model,
                               profile, settings.llm_window_pages, settings.llm_concurrency)
+    if settings.page_prefilter and settings.llm_configured:
+        extractor = PrefilteredExtractor(extractor, PagePrefilter.load(settings.page_prefilter))
     search = get_search_provider(settings.search_provider, settings.fixture_dir,
                                  settings.searxng_url, settings.allowed_domains)
     reranker = get_reranker(settings.reranker_model, settings.rerank_base_url,
