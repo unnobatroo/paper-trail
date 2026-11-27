@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import (
     ArtifactStatus,
@@ -24,6 +24,10 @@ from .enums import (
 
 class DomainModel(BaseModel):
     """base for everything the api returns"""
+
+    # Responses always carry every field, so the schema should say so: clients then see
+    # `flags: string[]` and not `flags?: string[]`.
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
 class SourceDocument(DomainModel):

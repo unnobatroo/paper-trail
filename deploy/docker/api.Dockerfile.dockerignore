@@ -20,6 +20,10 @@ experiments/checkpoints/
 # private agent notes
 .agent-vault/
 
+# the frontend stage runs npm ci itself; host copies would overwrite it
+frontend/node_modules/
+frontend/dist/
+
 # not needed at runtime
 tests/
 docs/

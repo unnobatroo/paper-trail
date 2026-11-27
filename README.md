@@ -46,7 +46,7 @@ Caveats (pooled gold, small test set) are on the [Models](https://github.com/unn
 - **Audit rules** catch cancelled contracts, money that was budgeted but never spent, and
   work owned by a different public body ([Accountability Rules](https://github.com/unnobatroo/paper-trail/wiki/Accountability-Rules))
 
-Stack: Python, FastAPI + NiceGUI, PostgreSQL + pgvector (also the job queue), Qwen3 behind
+Stack: Python, FastAPI + a React review app (shadcn/ui), PostgreSQL + pgvector (also the job queue), Qwen3 behind
 an OpenAI-compatible SGLang gateway, Docker Compose + Caddy.
 
 ## Run it

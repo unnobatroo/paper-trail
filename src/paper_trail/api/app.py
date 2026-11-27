@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 from asgi_correlation_id import CorrelationIdMiddleware, correlation_id
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from ..settings import load
 from .routers import (
@@ -21,6 +23,7 @@ from .routers import (
     meta,
     trail,
     translate,
+    workspace,
 )
 
 
@@ -31,6 +34,13 @@ async def _lifespan(_app: FastAPI):
     jobs = get_jobs()
     yield
     jobs.shutdown()
+
+
+def _redirect_to(stage: str):
+    # a factory, not a default argument: fastapi would expose that as a query parameter
+    def redirect() -> RedirectResponse:
+        return RedirectResponse(f"/?stage={stage}")
+    return redirect
 
 
 def create_app() -> FastAPI:
@@ -57,16 +67,24 @@ def create_app() -> FastAPI:
     # X-Request-ID in and out, added last so it wraps the log middleware
     app.add_middleware(CorrelationIdMiddleware)
     # load() only, building AppState here would drag the embedder in at import
+    settings = load()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=load().api_origins,
+        allow_origins=settings.api_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     for r in (meta.router, documents.router, candidates.router,
               commitments.router, links.router, trail.router,
-              jobs.router, translate.router):
+              jobs.router, translate.router, workspace.router):
         app.include_router(r)
+    # The old app's bookmarks still land in the right stage.
+    for old_path, stage in (("commitments", "confirm"), ("evidence", "review"), ("trail", "done")):
+        app.add_api_route(f"/{old_path}", _redirect_to(stage), include_in_schema=False)
+    # The review app is a single page, so a plain static mount covers it. Mounted last, so
+    # the API routes win.
+    if (settings.frontend_dir / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=settings.frontend_dir, html=True), name="frontend")
     return app
 
 

@@ -9,12 +9,14 @@ from pydantic import BaseModel, Field, StringConstraints
 from ..domain.enums import CandidateType, Jurisdiction, RelationshipType
 from ..domain.models import (
     BudgetRecord,
+    Commitment,
     DomainModel,
     EvidenceItem,
     EvidenceLink,
     Note,
     PolicyCandidate,
 )
+from ..services.metrics_service import TrailRow
 
 
 class IngestRequest(BaseModel):
@@ -99,3 +101,27 @@ class JobOut(DomainModel):
     result: object | None = None
     error: str | None = None
     created_at: str
+
+
+class WorkspaceRow(DomainModel):
+    """One commitment across the pipeline, as the review workspace shows it."""
+
+    id: int
+    title: str
+    kind: str
+    stage: Literal["confirm", "search", "review", "done", "rejected"]
+    group: list[CandidateView]
+    commitments: list[Commitment]
+    trail: list[TrailRow]
+    pending: list[LinkView]
+    evidence: int
+    searchable: bool
+
+
+class WorkspaceOut(DomainModel):
+    """The rows that pass the filters, plus what the page needs around them."""
+
+    rows: list[WorkspaceRow]
+    stage_counts: dict[str, int]
+    commitments: list[Commitment]
+    documents: dict[int, str]

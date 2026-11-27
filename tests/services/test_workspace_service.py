@@ -2,7 +2,12 @@ from types import SimpleNamespace
 
 from paper_trail.domain.enums import CandidateType, ReviewStatus
 from paper_trail.domain.models import Commitment, PolicyCandidate
-from paper_trail.ui.workspace import build_rows, display_title, goal, matches_filter, shown
+from paper_trail.services.workspace_service import (
+    build_rows,
+    display_title,
+    matches_filter,
+    stage_counts,
+)
 
 
 def cand(id, title="Fák ültetése", kind=CandidateType.MEASURE, status=ReviewStatus.UNREVIEWED,
@@ -38,7 +43,7 @@ def test_stage_follows_the_pipeline():
                       [trail_row(14, 2)])
     assert {r.title: r.stage for r in rows} == {
         "a": "confirm", "b": "rejected", "c": "review", "d": "done", "e": "search",
-        # indicators aren't searched, so confirmed = done
+        # Indicators aren't searched, so confirmed means done.
         "f": "done"}
 
 
@@ -52,14 +57,11 @@ def test_filters_hide_rejected_by_default_and_search_text_and_codes():
     assert keep(stage="all", kind="objective", q="") == []
 
 
-def test_panel_shows_the_picked_mention_else_the_first_open_one():
-    [row] = build_rows([cand(1, status=ReviewStatus.ACCEPTED), cand(2)], [], [], [])
-    assert shown(row).id == 2 and shown(row, 1).id == 1 and shown(row, 99).id == 2
+def test_stage_counts_cover_every_row_whatever_the_filter():
+    rows = build_rows([cand(1, "a"), cand(2, "b", status=ReviewStatus.REJECTED)], [], [], [])
+    assert stage_counts(rows) == {"confirm": 1, "search": 0, "review": 0, "done": 0, "rejected": 1}
 
 
-def test_wording_helpers():
+def test_display_title_strips_markdown_and_edge_punctuation():
     assert display_title("  **– Fák ültetése:** ") == "Fák ültetése"
-    c = cand(1)
-    assert goal(c) == "–"
-    c.target_value, c.unit, c.deadline_year = 100, "fa", 2027
-    assert goal(c) == "100 fa by 2027"
+    assert display_title(None) == ""
