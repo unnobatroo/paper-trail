@@ -111,6 +111,25 @@ class PolicyRepository(Repo):
             " AND extractor=:x AND content_sha IN (:c, '')",
             d=document_id, x=extractor, c=content_sha)}
 
+    def page_misses(self, document_id: int, extractor: str, content_sha: str) -> dict[int, int]:
+        """how many runs each page of these bytes came back unread from this extractor"""
+        return {r["page_number"]: r["misses"] for r in self._all(
+            "SELECT page_number, misses FROM document_ingest_misses WHERE document_id=:d"
+            " AND extractor=:x AND content_sha=:c", d=document_id, x=extractor, c=content_sha)}
+
+    def add_page_misses(self, document_id: int, extractor: str, content_sha: str,
+                        pages: list[int]) -> None:
+        """one more unread run for each of these pages"""
+        if not pages:
+            return
+        with self._engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO document_ingest_misses(document_id, extractor, content_sha,"
+                " page_number) VALUES (:d, :x, :c, :p) ON CONFLICT (document_id, extractor,"
+                " content_sha, page_number) DO UPDATE SET misses = document_ingest_misses.misses"
+                " + 1"),
+                [{"d": document_id, "x": extractor, "c": content_sha, "p": p} for p in pages])
+
     def add_page_candidates(self, document_id: int, extractor: str, content_sha: str,
                             pages: list[int], cands: list[PolicyCandidate]) -> int:
         """a batch of pages + their candidates, all or nothing: a crash mid-batch leaves

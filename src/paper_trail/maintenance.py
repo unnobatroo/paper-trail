@@ -80,6 +80,7 @@ GENERATED = [
                    " AND NOT EXISTS (SELECT 1 FROM commitments m WHERE m.candidate_id = c.id)"),
     # the candidates went, so the next ingest has to read those pages again
     ("document_ingest_pages", "DELETE FROM document_ingest_pages"),
+    ("document_ingest_misses", "DELETE FROM document_ingest_misses"),
     ("jobs", "DELETE FROM jobs WHERE status NOT IN ('queued', 'running')"),
     # notes have no fk (two subject tables), drop the ones whose item just went
     ("notes", "DELETE FROM notes n WHERE (n.subject_kind = 'candidate' AND NOT EXISTS"
@@ -90,8 +91,8 @@ GENERATED = [
 CACHE = [("chunks", "DELETE FROM chunks"), ("pages", "DELETE FROM pages")]
 # children first, fks don't cascade
 EVERYTHING = ["notes", "budgets", "links", "artifact_evidence", "implementation_artifacts",
-              "evidence", "commitments", "candidates", "document_ingest_pages", "documents",
-              "chunks", "pages",
+              "evidence", "commitments", "candidates", "document_ingest_pages",
+              "document_ingest_misses", "documents", "chunks", "pages",
               "official_sources", "jobs"]
 
 

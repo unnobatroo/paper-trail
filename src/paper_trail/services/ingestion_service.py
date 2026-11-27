@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
@@ -11,6 +12,11 @@ from ..domain.models import SourceDocument
 from ..ml.extraction import LLMExtractor, NoExtractor
 from ..repositories.store import PolicyRepository
 from ..sources.parsers import PypdfDocumentParser
+
+log = logging.getLogger(__name__)
+
+# runs a page may come back unread before ingest stops asking for it
+MAX_PAGE_MISSES = 3
 
 
 class IngestionService:
@@ -39,9 +45,17 @@ class IngestionService:
         done = self._repo.ingested_pages(doc_id, key, digest)
         # a page with no text is never sent or checkpointed: if its ocr failed, a later run
         # with working ocr must still be able to read it, and checking a blank costs nothing
+        misses = self._repo.page_misses(doc_id, key, digest)
         todo = [p for p in pages if p.page_number not in done and p.text.strip()]
+        # a page that came back unread MAX_PAGE_MISSES times is given up on, not retried forever
+        given_up = [p for p in todo if misses.get(p.page_number, 0) >= MAX_PAGE_MISSES]
+        if given_up:
+            log.warning("giving up on pages %s of %r: unread in %d runs",
+                        [p.page_number for p in given_up], title, MAX_PAGE_MISSES)
+        todo = [p for p in todo if p not in given_up]
         say = on_progress or (lambda _msg: None)
         finished = len(pages) - len(todo)
+        asked = {p.page_number for p in todo}
         say(f"page {finished}/{len(pages)}")
         n = 0
         # closing: a raise here (lost lease) cancels the windows not yet sent to the model
@@ -59,5 +73,8 @@ class IngestionService:
                 n += self._repo.add_page_candidates(doc_id, key, digest, list(page_text),
                                                       kept)
                 finished += len(window)
+                asked -= set(page_text)
                 say(f"page {finished}/{len(pages)}")
+        # asked but never finished: the model left them unread, count the miss
+        self._repo.add_page_misses(doc_id, key, digest, sorted(asked))
         return doc_id, n
