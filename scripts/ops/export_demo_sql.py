@@ -37,8 +37,14 @@ def dump(pg_dump: str, source: str, *flags: str) -> str:
 
 
 def to_demo_schema(sql: str) -> str:
-    """Move the objects into the `demo` schema."""
+    """Move the table definitions into the `demo` schema. Definitions only: no row text in it."""
     return sql.replace("public.", "demo.")
+
+
+def to_demo_data(sql: str) -> str:
+    """Point the inserts and sequence resets at `demo`. Only the statements pg_dump writes
+    are touched, so a row's text that happens to say "public." stays as it was."""
+    return re.sub(r"(?m)^(INSERT INTO |SELECT pg_catalog\.setval\(')public\.", r"demo.", sql)
 
 
 def main() -> None:
@@ -60,7 +66,7 @@ def main() -> None:
     (args.out_dir / "demo_schema.sql").write_text(
         header + to_demo_schema("\n".join(kept)), encoding="utf-8", newline="\n")
     (args.out_dir / "demo_data.sql").write_text(
-        to_demo_schema(data), encoding="utf-8", newline="\n")
+        to_demo_data(data), encoding="utf-8", newline="\n")
     print(f"wrote demo_schema.sql and demo_data.sql to {args.out_dir}")
 
 

@@ -161,25 +161,25 @@ export function WorkspacePage() {
           <span className="text-sm">{selected.size} selected</span>
           {mentionIds.length > 0 && (
             <>
-              <Button size="sm" onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
+              <Button size="sm" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
                 Confirm {byStage("confirm").length}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
+              <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
                 Reject
               </Button>
             </>
           )}
           {searchIds.length > 0 && (
-            <Button size="sm" onClick={async () => { if (await startSearch(searchIds)) clear() }}>
+            <Button size="sm" disabled={!canReview} onClick={async () => { if (await startSearch(searchIds)) clear() }}>
               Find evidence {byStage("search").length}
             </Button>
           )}
           {matchIds.length > 0 && (
             <>
-              <Button size="sm" onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
+              <Button size="sm" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
                 Confirm matches
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
+              <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
                 Reject
               </Button>
             </>

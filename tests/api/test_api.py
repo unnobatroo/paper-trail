@@ -252,4 +252,6 @@ def test_api_responses_are_cacheable_only_when_the_deployment_asks(state, monkey
     assert "s-maxage=120" in cached.get("/api/meta").headers["cache-control"]
     # a write is never cached, and neither are non-API paths
     assert "cache-control" not in cached.get("/healthz").headers
+    assert "cache-control" not in cached.get("/api/nope").headers  # errors aren't cached
+    assert "cache-control" not in cached.post("/api/meta").headers  # nor are non-GETs
 
