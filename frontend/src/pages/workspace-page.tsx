@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { LockIcon } from "lucide-react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 
@@ -187,45 +186,39 @@ export function WorkspacePage() {
 
   const table = (
     <div className="flex flex-col">
-      {ws.data && !canReview && (
-        <p role="status" className="flex items-center gap-1.5 border-b bg-muted/50 px-5 py-1.5 text-sm text-muted-foreground">
-          <LockIcon className="size-3.5 shrink-0" aria-hidden="true" />
-          Read-only. You can browse everything; confirming, rejecting and searching need the review key, which you add in Settings.
-        </p>
-      )}
-      <KindFilter counts={kindCounts} kind={kind} onKind={(k) => setParam("type", k, "all")} />
-
-      {selected.size > 0 && (
-        <div role="region" aria-label="Bulk actions" className="flex flex-wrap items-center gap-2 border-b bg-accent px-5 py-2">
-          <span className="text-sm">{selected.size} selected</span>
-          {mentionIds.length > 0 && (
-            <>
-              <Button size="sm" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
-                Confirm {byStage("confirm").length}
+      <KindFilter counts={kindCounts} kind={kind} onKind={(k) => setParam("type", k, "all")}>
+        {selected.size > 0 && (
+          <div role="region" aria-label="Bulk actions" className="layer-surface flex flex-wrap items-center gap-2 px-2 py-1">
+            <span className="type-label px-1">{selected.size} selected</span>
+            {mentionIds.length > 0 && (
+              <>
+                <Button size="sm" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
+                  Confirm {byStage("confirm").length}
+                </Button>
+                <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
+                  Reject
+                </Button>
+              </>
+            )}
+            {searchIds.length > 0 && (
+              <Button size="sm" disabled={!canReview} onClick={async () => { if (await startSearch(searchIds)) clear() }}>
+                Find evidence {byStage("search").length}
               </Button>
-              <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
-                Reject
-              </Button>
-            </>
-          )}
-          {searchIds.length > 0 && (
-            <Button size="sm" disabled={!canReview} onClick={async () => { if (await startSearch(searchIds)) clear() }}>
-              Find evidence {byStage("search").length}
-            </Button>
-          )}
-          {matchIds.length > 0 && (
-            <>
-              <Button size="sm" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
-                Confirm matches
-              </Button>
-              <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
-                Reject
-              </Button>
-            </>
-          )}
-          <Button size="sm" variant="ghost" onClick={clear}>Clear</Button>
-        </div>
-      )}
+            )}
+            {matchIds.length > 0 && (
+              <>
+                <Button size="sm" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
+                  Confirm matches
+                </Button>
+                <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
+                  Reject
+                </Button>
+              </>
+            )}
+            <Button size="sm" variant="ghost" onClick={clear}>Clear</Button>
+          </div>
+        )}
+      </KindFilter>
 
       {ws.isError ? (
         <p role="alert" className="p-5 text-destructive">Could not load the workspace: {(ws.error as Error).message}</p>
@@ -233,11 +226,20 @@ export function WorkspacePage() {
         <p className="p-5 text-muted-foreground" role="status">Loading…</p>
       ) : (counts.confirm ?? 0) + (counts.search ?? 0) + (counts.review ?? 0) + (counts.done ?? 0) + (counts.rejected ?? 0) === 0 ? (
         <div className="flex flex-col items-center gap-2 p-12 text-center">
-          <p className="text-lg">Nothing extracted yet</p>
+          <p className="type-title">Nothing extracted yet</p>
           <p className="text-muted-foreground">Use Ingest at the top to read a strategy PDF.</p>
         </div>
       ) : (
-        <Ledger rows={rows} showStage={stage === "all" || stage === "rejected"} cursor={cursor} selected={selected} onOpen={open} onSelectMany={selectMany} />
+        <Ledger
+          rows={rows}
+          showStage={stage === "all" || stage === "rejected"}
+          cursor={cursor}
+          selected={selected}
+          onOpen={open}
+          onSelectMany={selectMany}
+          onSearch={(r) => void startSearch(r.commitments.map((m) => m.id!))}
+          searchDisabled={!canReview || searching}
+        />
       )}
     </div>
   )
@@ -277,7 +279,7 @@ export function WorkspacePage() {
       />
       {isMobile ? (
         <>
-          <div id="main" tabIndex={-1} className="glass min-h-0 flex-1 overflow-y-auto outline-none">{table}</div>
+          <div id="main" tabIndex={-1} className="layer-panel min-h-0 flex-1 overflow-y-auto outline-none">{table}</div>
           <Sheet open={!!detail} onOpenChange={(o) => !o && open(null)}>
             <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
               <SheetHeader>
@@ -292,11 +294,11 @@ export function WorkspacePage() {
         <>
           <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
             <ResizablePanel defaultSize="55%" minSize="30%">
-              <div id="main" tabIndex={-1} className="glass h-full overflow-y-auto outline-none">{table}</div>
+              <div id="main" tabIndex={-1} className="layer-panel h-full overflow-y-auto outline-none">{table}</div>
             </ResizablePanel>
             <ResizableHandle className="mx-1 w-2 rounded-full bg-transparent transition-colors hover:bg-foreground/10 focus-visible:bg-foreground/10" />
             <ResizablePanel defaultSize="45%" minSize="28%">
-              <aside aria-label="Details" className="glass h-full overflow-y-auto">
+              <aside aria-label="Details" className="layer-panel h-full overflow-y-auto">
                 {detail ?? <p className="p-6 text-muted-foreground">Select a commitment to see its detail.</p>}
               </aside>
             </ResizablePanel>

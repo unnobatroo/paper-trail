@@ -24,7 +24,7 @@ export function EvidenceWarnings({ ev }: { ev: Schemas["EvidenceItem"] }) {
 export function BudgetLine({ b }: { b: Schemas["BudgetRecord"] }) {
   const amount = b.currency === "HUF" ? huf(b.amount_huf) : b.amount_raw
   return (
-    <p className="text-sm">
+    <p className="type-body">
       {[BUDGET_LABEL[b.kind], amount, b.fiscal_year ? String(b.fiscal_year) : ""].filter(Boolean).join(" · ")}
     </p>
   )

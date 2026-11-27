@@ -104,13 +104,13 @@ describe("WorkspacePage", () => {
     expect(await screen.findByRole("heading", { name: /Napelemek/ })).toBeInTheDocument()
   })
 
-  it("filters by kind on the client, leaving the other kinds' counts whole", async () => {
+  it("asks the server for every kind, and offers no kind choice when there is only one", async () => {
     const calls = stubApi()
     renderPage()
     await screen.findByRole("button", { name: "Fák ültetése" })
-    await userEvent.click(screen.getByRole("tab", { name: "Measures 2" }))
-    expect(screen.getByRole("button", { name: "Fák ültetése" })).toBeInTheDocument()
-    // the kind never goes to the server: it asks for every kind and filters here
+    // both rows are measures: "All" plus one kind is no choice, so there is no kind filter
+    expect(screen.queryByRole("tablist", { name: "Filter by type" })).not.toBeInTheDocument()
+    // the kind filter lives in the client, so the server is always asked for all kinds
     expect(calls.filter((c) => c.path === "/api/workspace").every((c) => c.query.includes("type=all"))).toBe(true)
   })
 

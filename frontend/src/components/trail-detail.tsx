@@ -7,7 +7,6 @@ import { BudgetLine, EvidenceWarnings } from "@/components/evidence-bits"
 import { Receipt } from "@/components/receipt"
 import { SimpleSelect } from "@/components/simple-select"
 import { ToneBadge } from "@/components/tone-badge"
-import { Card, CardContent } from "@/components/ui/card"
 import {
   BUCKET,
   BUCKET_ORDER,
@@ -19,24 +18,17 @@ import {
   goal,
 } from "@/lib/labels"
 
-const BORDER: Record<string, string> = {
-  green: "border-l-green-500",
-  blue: "border-l-blue-500",
-  purple: "border-l-purple-500",
-  grey: "border-l-neutral-400",
-  red: "border-l-red-500",
-  amber: "border-l-amber-500",
-  teal: "border-l-teal-500",
-}
-
+/** One step of the trail: a node on the line, what it is, and what backs it. */
 function Group({ title, tone, children }: { title: string; tone: string; children: React.ReactNode }) {
   return (
-    <Card size="sm" className={`rounded-none border-l-2 ring-0 ${BORDER[tone]}`}>
-      <CardContent className="flex flex-col gap-2">
-        <h4 className="text-sm font-medium">{title}</h4>
-        {children}
-      </CardContent>
-    </Card>
+    <li className="relative flex flex-col gap-2 border-l pb-5 pl-5 last:border-l-transparent last:pb-0">
+      <span
+        aria-hidden="true"
+        className={`absolute top-1 -left-[5px] size-2.5 rounded-full bg-background ring-2 ${tone === "red" ? "ring-destructive" : "ring-brand-line"}`}
+      />
+      <h4 className="type-body font-medium">{title}</h4>
+      {children}
+    </li>
   )
 }
 
@@ -58,7 +50,7 @@ export function TrailDetail({ t }: { t: TrailRow }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-muted-foreground">{meta.join(" · ")}</p>
+      <p className="type-label">{meta.join(" · ")}</p>
       <div className="flex flex-wrap items-center gap-2">
         {t.status !== "unknown" && (
           <ToneBadge tone={STATUS_TONE[t.status] ?? "grey"}>Source says: {STATUS_LABEL[t.status]}</ToneBadge>
@@ -76,21 +68,22 @@ export function TrailDetail({ t }: { t: TrailRow }) {
           options={Object.entries(JURISDICTION_LABEL).map(([value, label]) => ({ value, label }))}
         />
       </div>
-      <p className="text-xs text-muted-foreground">Goal: {goal(com)}</p>
+      <p className="type-label">Goal: {goal(com)}</p>
 
       {t.financial_states.length > 0 && (
-        <p className="text-sm">
+        <p className="type-body">
           Money on record: {t.financial_states.map((s) => BUDGET_LABEL[s]).join(" → ")} ·{" "}
           {t.financially_executed ? "spending confirmed" : "spending not confirmed"}
         </p>
       )}
 
+      <ol className="flex flex-col">
       {BUCKET_ORDER.filter((name) => buckets[name].length > 0 || (name === "Budget" && t.budgets.length > 0)).map((name) => (
         <Group key={name} title={name} tone={BUCKET_TONE[name]}>
-          {name === "Implementation" && t.status_excerpt && <Receipt caption="The source says" className="text-sm">{t.status_excerpt}</Receipt>}
+          {name === "Implementation" && t.status_excerpt && <Receipt>{t.status_excerpt}</Receipt>}
           {buckets[name].map((ev) => (
             <div key={ev.id} className="flex flex-col gap-1">
-              <a href={ev.url} target="_blank" rel="noreferrer" className="text-sm underline-offset-4 hover:underline">
+              <a href={ev.url} target="_blank" rel="noreferrer" className="type-body underline-offset-4 hover:underline">
                 {ev.title || ev.url}
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
@@ -103,7 +96,7 @@ export function TrailDetail({ t }: { t: TrailRow }) {
                 <BudgetLine key={i} b={b} />
               ))}
               {t.budgets.length > 6 && (
-                <p className="text-xs text-muted-foreground">… and {t.budgets.length - 6} more figures in the sources</p>
+                <p className="type-label">… and {t.budgets.length - 6} more figures in the sources</p>
               )}
             </>
           )}
@@ -113,17 +106,18 @@ export function TrailDetail({ t }: { t: TrailRow }) {
       {t.findings.length > 0 && (
         <Group title="Audit findings" tone="red">
           {t.findings.map((x) => (
-            <p key={x} className="text-sm">{x}</p>
+            <p key={x} className="type-body">{x}</p>
           ))}
         </Group>
       )}
       {t.gaps.length > 0 && (
         <Group title="Still missing" tone="amber">
           {t.gaps.map((x) => (
-            <p key={x} className="text-sm">{x}</p>
+            <p key={x} className="type-body">{x}</p>
           ))}
         </Group>
       )}
+      </ol>
     </div>
   )
 }

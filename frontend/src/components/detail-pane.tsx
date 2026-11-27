@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { SearchIcon } from "lucide-react"
+import { LockIcon } from "lucide-react"
 
 import type { Commitment, WorkspaceRow } from "@/api/client"
 import { useMeta } from "@/api/hooks"
@@ -7,10 +7,9 @@ import { Bilingual } from "@/components/bilingual"
 import { CandidateDetail } from "@/components/candidate-detail"
 import { MatchCard } from "@/components/match-card"
 import { SimpleSelect } from "@/components/simple-select"
-import { ToneBadge } from "@/components/tone-badge"
 import { TrailDetail } from "@/components/trail-detail"
 import { Button } from "@/components/ui/button"
-import { KIND_LABEL, STAGE_INFO, displayTitle, pageLink } from "@/lib/labels"
+import { KIND_LABEL, displayTitle, pageLink } from "@/lib/labels"
 import { useCanReview } from "@/lib/can-review"
 import { parseCode, shown } from "@/lib/rows"
 
@@ -30,7 +29,6 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
   const meta = useMeta()
   const canReview = useCanReview()
   const c = shown(row, picked)
-  const stage = STAGE_INFO[row.stage]
   const page = pageLink(documents[String(c.document_id)], c.source_page)
   const code = parseCode(c.code)
   const meaning = code && meta.data?.glossary.find((g) => g.term === code.letters)?.meaning
@@ -39,12 +37,19 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
 
   return (
     <div className="flex min-h-full flex-col gap-3 p-5">
-      <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
+      <p className="type-label flex flex-wrap items-center gap-x-2">
         <span>{KIND_LABEL[row.kind]}</span>
-        {c.code && <span className="normal-case">{c.code}</span>}
-        <ToneBadge tone={stage.tone} title={stage.hint}>{stage.label}</ToneBadge>
+        {c.code && (
+          <>
+            <span aria-hidden="true">·</span>
+            <abbr title={code && meaning ? `${code.letters} = ${meaning}. ${code.depth} ${code.depth === 1 ? "level" : "levels"} deep in the plan.` : undefined}>
+              {c.code}
+            </abbr>
+          </>
+        )}
+        <span aria-hidden="true">·</span>
         {page.href ? (
-          <a href={page.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+          <a href={page.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-foreground hover:underline">
             {page.text}
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
@@ -53,12 +58,14 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
         )}
       </p>
 
-      <h2 className="text-lg leading-snug font-semibold">
+      <h2 className="type-title">
         <Bilingual text={displayTitle(row.title)} en={c.note?.title_en} />
       </h2>
-      {code && meaning && (
-        <p className="text-xs text-muted-foreground">
-          {c.code}: {code.letters} = {meaning}. {code.depth} {code.depth === 1 ? "level" : "levels"} deep in the plan.
+
+      {!canReview && (
+        <p role="note" className="type-secondary flex items-start gap-1.5">
+          <LockIcon className="mt-1 size-3.5 shrink-0" aria-hidden="true" />
+          Read-only. You can browse everything; deciding needs the review key, which you add in Settings.
         </p>
       )}
 
@@ -86,13 +93,12 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
               disabled={!canReview || searching}
               onClick={() => onSearch(row.commitments.map((m) => m.id!))}
             >
-              <SearchIcon data-icon="inline-start" />
               {searchedBefore ? "Search again" : "Find evidence"}
             </Button>
           )}
           {row.pending.length > 0 && (
             <section aria-labelledby="matches-heading" className="flex flex-col gap-2">
-              <h3 id="matches-heading" className="text-sm font-medium">
+              <h3 id="matches-heading" className="type-body font-medium">
                 Matches to review
               </h3>
               {[...row.pending]
@@ -103,7 +109,7 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
             </section>
           )}
           <section aria-labelledby="trail-heading" className="flex flex-col gap-3">
-            <h3 id="trail-heading" className="text-sm font-medium">
+            <h3 id="trail-heading" className="type-body font-medium">
               Paper trail ({row.evidence})
             </h3>
             {row.trail.length ? (

@@ -79,6 +79,26 @@ describe("Ledger", () => {
     renderLedger({ rows: [] })
     expect(screen.getByText("Nothing matches these filters.")).toBeInTheDocument()
   })
+
+  it("does not repeat a quote that is only the title again", () => {
+    renderLedger({
+      rows: [row({ id: 5, title: "Zöld város", group: [candidate({ id: 5, normalized_title: "Zöld város", source_excerpt: "Zöld város" })] })],
+    })
+    expect(screen.getAllByText("Zöld város")).toHaveLength(1)
+  })
+
+  it("starts the evidence search from a 'to search' row without opening it", async () => {
+    const onSearch = vi.fn()
+    const onOpen = vi.fn()
+    renderLedger({
+      rows: [row({ id: 7, stage: "search", group: [candidate({ id: 7, normalized_title: "Napelemek" })] })],
+      onSearch,
+      onOpen,
+    })
+    await userEvent.click(screen.getByRole("button", { name: "Find evidence" }))
+    expect(onSearch).toHaveBeenCalledOnce()
+    expect(onOpen).not.toHaveBeenCalled()
+  })
 })
 
 function renderedRow(id: number) {
