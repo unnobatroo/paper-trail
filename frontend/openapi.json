@@ -113,6 +113,7 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "minimum": 1,
               "title": "Page"
             }
           }
