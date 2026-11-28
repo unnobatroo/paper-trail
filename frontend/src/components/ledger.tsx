@@ -81,7 +81,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
               onCheckedChange={(on) => onSelectMany(ids, on)}
             />
           </TableHead>
-          <TableHead scope="col" className={cn(HEAD, "w-24")}>Page</TableHead>
+          <TableHead scope="col" className={cn(HEAD, "hidden w-24 sm:table-cell")}>Page</TableHead>
           <TableHead scope="col" className={HEAD}>Commitment</TableHead>
           {trailing && (
             <TableHead scope="col" className={cn(HEAD, "hidden w-32 pr-5 text-right lg:table-cell")}>
@@ -122,7 +122,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                   onCheckedChange={(on) => onSelectMany([r.id], on)}
                 />
               </TableCell>
-              <TableCell className="type-label type-num whitespace-normal">{folio(r)}</TableCell>
+              <TableCell className="type-label type-num hidden whitespace-normal sm:table-cell">{folio(r)}</TableCell>
               <TableCell className="whitespace-normal">
                 <button
                   type="button"
@@ -131,6 +131,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                 >
                   {rowTitle(r, lang === "en")}
                 </button>
+                <p className="type-label type-num sm:hidden">{folio(r)}</p>
                 {c.source_excerpt && plain(c.source_excerpt) !== plain(r.title) && (
                   <p className="type-secondary line-clamp-2">{c.source_excerpt.replace(/\s+/g, " ")}</p>
                 )}

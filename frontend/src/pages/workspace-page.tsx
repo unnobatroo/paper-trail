@@ -271,7 +271,7 @@ export function WorkspacePage() {
           <Sheet open={!!detail} onOpenChange={(o) => !o && open(null)}>
             <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
               <SheetHeader>
-                <SheetTitle>{current ? displayTitle(current.title) : "Details"}</SheetTitle>
+                <SheetTitle className="sr-only">{current ? displayTitle(current.title) : "Details"}</SheetTitle>
                 <SheetDescription className="sr-only">Details of the selected commitment</SheetDescription>
               </SheetHeader>
               {detail}

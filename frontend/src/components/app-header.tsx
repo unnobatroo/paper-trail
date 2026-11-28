@@ -75,13 +75,13 @@ export function AppHeader({
         {meta.data?.deployment && <span className="type-label">{meta.data.deployment}</span>}
       </div>
 
-      <Tabs value={stage} onValueChange={(v) => onStage(String(v))}>
-        <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto flex-wrap">
+      <Tabs value={stage} onValueChange={(v) => onStage(String(v))} className="max-md:w-full">
+        <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto md:flex-wrap max-md:w-full max-md:justify-start max-md:overflow-x-auto max-md:[scrollbar-width:none]">
           {(["all", ...STAGES] as const).map((s) => {
             const Icon = STAGE_ICON[s]
             return (
               <TabsTrigger key={s} value={s} title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}>
-                <Icon aria-hidden="true" />
+                <Icon aria-hidden="true" className="max-2xl:hidden" />
                 {s === "all" ? "All" : STAGE_INFO[s].label}{" "}
                 <span className="type-num text-muted-foreground in-data-active:text-brand-ink">{s === "all" ? all : (counts[s] ?? 0)}</span>
               </TabsTrigger>
@@ -90,21 +90,21 @@ export function AppHeader({
         </TabsList>
       </Tabs>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="flex items-center gap-1 max-md:w-full md:ml-auto">
         {progress && (
           <p role="status" className="type-label mr-2 flex items-center gap-1.5">
             <Loader2Icon className="size-3.5 animate-spin text-brand-ink" aria-hidden="true" />
             {progress}
           </p>
         )}
-        <div className="relative mr-1">
+        <div className="relative mr-1 max-md:flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             ref={searchRef}
             type="search"
             aria-label="Search commitments"
-            placeholder="Search commitments"
-            className="layer-raised h-9 w-60 rounded-full border-0 pl-9"
+            placeholder="Search…"
+            className="layer-raised h-9 w-full rounded-full border-0 pl-9 md:w-44 2xl:w-60"
             value={q}
             onChange={(e) => onQ(e.target.value)}
           />
