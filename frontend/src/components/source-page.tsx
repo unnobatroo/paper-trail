@@ -20,6 +20,7 @@ export function SourcePage({ candidateId, pdfUrl, page }: Props) {
   const highlight = useCandidateHighlight(candidateId)
   const scroller = useRef<HTMLDivElement>(null)
   const [drawn, setDrawn] = useState(false)
+  const [broken, setBroken] = useState(false)
 
   // once the page has its size, bring the marked words into view, a little below the top
   useEffect(() => {
@@ -28,7 +29,8 @@ export function SourcePage({ candidateId, pdfUrl, page }: Props) {
     if (drawn && first && el) el.scrollTo({ top: first.y * el.scrollHeight - el.clientHeight / 3, behavior: "smooth" })
   }, [drawn, highlight.data])
 
-  if (highlight.isError) return pdfUrl ? <SourceFrame url={pdfUrl} page={page} /> : null
+  // the page could not be drawn, or the drawing could not be fetched: the pdf's own viewer instead
+  if (highlight.isError || broken) return pdfUrl ? <SourceFrame url={pdfUrl} page={page} /> : null
   if (!highlight.data) return <Skeleton className="min-h-96 w-full flex-1 rounded-xl" />
 
   return (
@@ -39,6 +41,7 @@ export function SourcePage({ candidateId, pdfUrl, page }: Props) {
             src={highlight.data.image_url}
             alt={`Page ${page} of the strategy`}
             onLoad={() => setDrawn(true)}
+            onError={() => setBroken(true)}
             className="block w-full"
           />
           {highlight.data.boxes.map((b, i) => (

@@ -277,6 +277,14 @@ def city_pdf(monkeypatch):
     from tests.sources.pdfs import make_pdf
     pdf = make_pdf(["The city will plant 500 new trees by 2030", "and cut emissions."])
     monkeypatch.setattr(pdf_page, "download", lambda url: pdf)
+    _forget_pages()
+
+
+def _forget_pages():
+    # pages and highlights are cached per address, and every test uses the same one
+    from paper_trail.sources import pdf_page
+    pdf_page.highlight.cache_clear()
+    pdf_page.page_image.cache_clear()
 
 
 def test_a_candidates_quote_is_marked_on_its_page(client, state, city_pdf):
@@ -297,7 +305,8 @@ def test_the_page_image_is_a_cacheable_webp(client, state, city_pdf):
     r = client.get(f"/api/documents/{doc_id}/pages/1/image")
     assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
     assert "max-age" in r.headers["cache-control"]
-    assert client.get(f"/api/documents/{doc_id}/pages/9/image").status_code == 502
+    assert client.get(f"/api/documents/{doc_id}/pages/9/image").status_code == 404
+    assert client.get(f"/api/documents/{doc_id}/pages/0/image").status_code == 422
 
 
 def test_a_strategy_without_an_address_has_no_page_to_show(client, state, city_pdf):
@@ -313,6 +322,7 @@ def test_a_source_that_cannot_be_read_is_a_bad_gateway(client, state, monkeypatc
     def refuse(url):
         raise pdf_page.PdfUnavailable("source resolves to a private address")
     monkeypatch.setattr(pdf_page, "download", refuse)
+    _forget_pages()
     _, cand_id = _strategy_with_a_quote(state)
     r = client.get(f"/api/candidates/{cand_id}/highlight")
     assert r.status_code == 502 and "private address" in r.json()["detail"]

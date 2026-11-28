@@ -38,7 +38,9 @@ def highlight(candidate_id: int, state: AppState = Depends(get_state)) -> PageHi
     if doc is None or not doc.url:
         raise HTTPException(404, "this strategy has no web address to read the page from")
     try:
-        view = pdf_page.locate(pdf_page.download(doc.url), cand.source_page, cand.source_excerpt)
+        view = pdf_page.highlight(doc.url, cand.source_page, cand.source_excerpt)
+    except pdf_page.PageMissing as exc:
+        raise HTTPException(404, str(exc)) from exc
     except pdf_page.PdfUnavailable as exc:
         raise HTTPException(502, f"could not read the source page: {exc}") from exc
     return PageHighlight(

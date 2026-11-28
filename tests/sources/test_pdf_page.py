@@ -3,7 +3,7 @@
 import pytest
 
 from paper_trail.sources import pdf_page
-from paper_trail.sources.pdf_page import PdfUnavailable, locate, render
+from paper_trail.sources.pdf_page import PageMissing, PdfUnavailable, locate, render
 from tests.sources.pdfs import make_pdf
 
 PAGE = make_pdf([
@@ -33,7 +33,7 @@ def test_line_breaks_hyphens_case_and_spacing_do_not_matter():
 
 def test_a_quote_that_is_not_on_the_page_is_not_found():
     view = locate(PAGE, 1, "the council will build a new bridge")
-    assert not view.found and view.boxes == []
+    assert not view.found and view.boxes == ()
 
 
 def test_a_long_quote_that_goes_on_past_the_page_text_is_marked_up_to_what_matches():
@@ -41,11 +41,34 @@ def test_a_long_quote_that_goes_on_past_the_page_text_is_marked_up_to_what_match
     assert locate(PAGE, 1, quote).found
 
 
-def test_a_page_that_does_not_exist_is_refused():
-    with pytest.raises(PdfUnavailable):
+def test_a_page_that_does_not_exist_is_missing_not_unreadable():
+    with pytest.raises(PageMissing):
         locate(PAGE, 2, "anything")
-    with pytest.raises(PdfUnavailable):
+    with pytest.raises(PageMissing):
         render(PAGE, 0)
+
+
+def test_a_turned_page_puts_the_marks_where_the_turned_text_is():
+    upright = locate(PAGE, 1, "plant 500 new trees").boxes[0]
+    turned = locate(make_pdf(["The city will plant 500 new trees by 2030"], rotate=90), 1,
+                    "plant 500 new trees").boxes[0]
+    # turned a quarter clockwise, a line of text runs down the page: tall and narrow, on the right
+    assert turned.h > turned.w and upright.w > upright.h
+    assert turned.x > 0.5
+    image = render(make_pdf(["x"], rotate=90), 1)
+    import io
+
+    from PIL import Image
+    width, height = Image.open(io.BytesIO(image)).size
+    assert width > height  # and the page is drawn turned too
+
+
+def test_a_cropped_page_measures_from_its_crop_box():
+    # keep only the top half: the text near the top now sits at about a fifth of the way down
+    cropped = locate(make_pdf(["The city will plant 500 new trees"], crop="0 392 612 792"), 1,
+                     "plant 500 new trees").boxes[0]
+    whole = locate(PAGE, 1, "plant 500 new trees").boxes[0]
+    assert cropped.y == pytest.approx(whole.y * 2, rel=0.05)
 
 
 def test_something_that_is_not_a_pdf_is_refused():
@@ -60,8 +83,8 @@ def test_the_page_renders_as_a_small_webp():
 
 
 class _Response:
-    def __init__(self, status=200, body=b"%PDF-1.4 ok"):
-        self.status_code, self._body = status, body
+    def __init__(self, status=200, body=b"%PDF-1.4 ok", headers=None):
+        self.status_code, self._body, self.headers = status, body, headers or {}
 
     def __enter__(self):
         return self
@@ -99,6 +122,16 @@ def test_an_answer_that_is_not_a_pdf_is_refused(monkeypatch):
     monkeypatch.setattr(pdf_page, "safe_get", lambda url, domains: page)
     pdf_page.download.cache_clear()
     with pytest.raises(PdfUnavailable, match="not a pdf"):
+        pdf_page.download("https://city.example/plan.pdf")
+
+
+def test_a_file_that_says_it_is_over_the_cap_is_refused_before_reading_it(monkeypatch):
+    monkeypatch.setattr(pdf_page, "MAX_PDF_BYTES", 10)
+    page = _Response(headers={"Content-Length": "999999999"})
+    page.iter_content = None  # reading the body would fail the test
+    monkeypatch.setattr(pdf_page, "safe_get", lambda url, domains: page)
+    pdf_page.download.cache_clear()
+    with pytest.raises(PdfUnavailable, match="too large"):
         pdf_page.download("https://city.example/plan.pdf")
 
 

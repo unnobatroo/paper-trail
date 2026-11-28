@@ -143,7 +143,7 @@ export function CandidateDetail({
 
       <NoteCard note={c.note} />
 
-      <SourcePage candidateId={c.id!} pdfUrl={pdfUrl} page={c.source_page} />
+      <SourcePage key={c.id} candidateId={c.id!} pdfUrl={pdfUrl} page={c.source_page} />
     </div>
   )
 }

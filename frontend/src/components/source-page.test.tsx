@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 import { SourcePage } from "@/components/source-page"
@@ -50,6 +50,12 @@ describe("SourcePage", () => {
       "src",
       expect.stringContaining("https://city.example/plan.pdf#page=6"),
     )
+  })
+
+  it("falls back to the strategy's own viewer when the drawn page itself fails to load", async () => {
+    renderPage(() => json({ page: 6, found: true, boxes: [], image_url: "/broken" }))
+    fireEvent.error(await screen.findByRole("img", { name: "Page 6 of the strategy" }))
+    expect(await screen.findByTitle("The strategy PDF, page 6")).toBeInTheDocument()
   })
 
   it("shows nothing at all when it can't be drawn and the strategy has no address", async () => {
