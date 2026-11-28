@@ -69,6 +69,13 @@ describe("Ledger", () => {
     expect(onSelectMany).toHaveBeenLastCalledWith([1, 2], true)
   })
 
+  it("treats a click on the cell around a checkbox as a click on the box, a bigger target", async () => {
+    const { onSelectMany, onOpen } = renderLedger()
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Fák ültetése" }).closest("td")!)
+    expect(onSelectMany).toHaveBeenCalledWith([2], true)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
   it("names the stage on each row only when stages are mixed", () => {
     renderLedger({ showStage: true })
     const cells = within(screen.getByRole("button", { name: "Zöld város" }).closest("tr")!).getAllByRole("cell")

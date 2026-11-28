@@ -161,6 +161,45 @@ export function IngestDialog({ open, onOpenChange }: DialogProps) {
   )
 }
 
+const SHORTCUTS: [string, string][] = [
+  ["j  k", "Next and previous commitment"],
+  ["c", "Confirm the open commitment (To confirm)"],
+  ["r", "Reject the open commitment (To confirm)"],
+  ["x", "Select or unselect it for a bulk action"],
+  ["s", "Find evidence for it (To search)"],
+  ["/", "Go to the search box"],
+  ["?", "Show this list"],
+]
+
+/** The keyboard shortcuts, because a shortcut nobody can find saves nobody any time. */
+export function ShortcutsDialog({ open, onOpenChange }: DialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogDescription>They work when no dialog is open and you are not typing.</DialogDescription>
+        </DialogHeader>
+        <dl className="grid grid-cols-[5rem_1fr] items-center gap-x-3 gap-y-2 type-body">
+          {SHORTCUTS.map(([keys, what]) => (
+            <div key={keys} className="contents">
+              <dt className="flex gap-1">
+                {keys.split("  ").map((k) => (
+                  <kbd key={k} className="layer-raised rounded-md px-2 py-0.5 type-num">
+                    {k}
+                  </kbd>
+                ))}
+              </dt>
+              <dd>{what}</dd>
+            </div>
+          ))}
+        </dl>
+        <DialogFooter showCloseButton />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /** The terms and codes used in the source documents, in plain words. */
 export function GlossaryDialog({ open, onOpenChange }: DialogProps) {
   const meta = useMeta()
