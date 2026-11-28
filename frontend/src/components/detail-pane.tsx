@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { LockIcon } from "lucide-react"
+import { LockIcon, SearchIcon } from "lucide-react"
 
 import type { Commitment, WorkspaceRow } from "@/api/client"
 import { useMeta } from "@/api/hooks"
@@ -87,12 +87,12 @@ export function DetailPane({ row, documents, commitments, searching, onSearch, o
         <>
           {searchable && (
             <Button
-              size="sm"
               variant="outline"
               className="self-start"
               disabled={!canReview || searching}
               onClick={() => onSearch(row.commitments.map((m) => m.id!))}
             >
+              <SearchIcon data-icon="inline-start" />
               {searchedBefore ? "Search again" : "Find evidence"}
             </Button>
           )}

@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { InboxIcon, SearchIcon } from "lucide-react"
 
 import type { WorkspaceRow } from "@/api/client"
 import { Button } from "@/components/ui/button"
@@ -52,7 +53,14 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
   useEffect(() => {
     document.querySelector("tr[data-cursor]")?.scrollIntoView?.({ block: "nearest" })
   }, [cursor])
-  if (!rows.length) return <p className="type-secondary p-6">Nothing matches these filters.</p>
+  if (!rows.length) {
+    return (
+      <div className="type-secondary flex flex-col items-center gap-2 p-10 text-center">
+        <InboxIcon className="size-8 text-muted-foreground/60" aria-hidden="true" />
+        Nothing matches these filters.
+      </div>
+    )
+  }
 
   // the last column says what is left to do; it only exists when some row has something to say
   const trailing = showStage || rows.some((r) => pending(r) || (onSearch && !showStage && r.stage === "search"))
@@ -99,7 +107,14 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                 selected.has(r.id) && !isCursor && "bg-surface",
               )}
             >
-              <TableCell className="pl-5" onClick={(e) => e.stopPropagation()}>
+              <TableCell
+                className="cursor-default pl-5"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // a click on the cell around the box counts as a click on the box
+                  if (e.target === e.currentTarget) onSelectMany([r.id], !selected.has(r.id))
+                }}
+              >
                 <Checkbox
                   aria-label={`Select ${rowTitle(r, false)}`}
                   className={cn("transition-opacity", !selected.has(r.id) && !isCursor && "opacity-30 group-hover/row:opacity-100")}
@@ -124,7 +139,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                 <TableCell className="type-label hidden pr-5 text-right lg:table-cell">
                   {onSearch && r.stage === "search" && !showStage ? (
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       disabled={searchDisabled}
                       onClick={(e) => {
@@ -132,6 +147,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
                         onSearch(r)
                       }}
                     >
+                      <SearchIcon data-icon="inline-start" />
                       Find evidence
                     </Button>
                   ) : (

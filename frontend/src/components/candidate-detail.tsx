@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { CheckIcon, PencilIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { Candidate, Commitment, Schemas } from "@/api/client"
@@ -67,11 +68,11 @@ export function CandidateDetail({
       {open && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" title="Confirm (c)" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
+            <Button title="Confirm (c)" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
+              <CheckIcon data-icon="inline-start" />
               Confirm
             </Button>
             <Button
-              size="sm"
               variant="outline"
               title="Reject (r)"
               aria-keyshortcuts="r"
@@ -85,9 +86,11 @@ export function CandidateDetail({
                 })
               }
             >
+              <XIcon data-icon="inline-start" />
               Reject
             </Button>
-            <Button size="sm" variant="ghost" disabled={!canReview} aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+            <Button variant="ghost" disabled={!canReview} aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+              <PencilIcon data-icon="inline-start" />
               Edit
             </Button>
           </div>

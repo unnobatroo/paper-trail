@@ -1,12 +1,35 @@
 import type { Ref } from "react"
-import { BookOpenIcon, Loader2Icon, SearchIcon, Settings2Icon } from "lucide-react"
+import {
+  BanIcon,
+  BookOpenIcon,
+  CircleCheckIcon,
+  ClipboardCheckIcon,
+  InboxIcon,
+  KeyboardIcon,
+  ListIcon,
+  Loader2Icon,
+  SearchIcon,
+  Settings2Icon,
+  UploadIcon,
+  type LucideIcon,
+} from "lucide-react"
 
 import { useMeta } from "@/api/hooks"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCanReview } from "@/lib/can-review"
-import { STAGE_INFO, STAGES } from "@/lib/labels"
+import { STAGE_INFO, STAGES, type Stage } from "@/lib/labels"
+
+// One icon per stage, used here and nowhere else, so an icon always means the same stage.
+const STAGE_ICON: Record<Stage | "all", LucideIcon> = {
+  all: ListIcon,
+  confirm: ClipboardCheckIcon,
+  search: SearchIcon,
+  review: InboxIcon,
+  done: CircleCheckIcon,
+  rejected: BanIcon,
+}
 
 type Props = {
   stage: string
@@ -20,14 +43,27 @@ type Props = {
   ingesting: boolean
   onIngest: () => void
   onGlossary: () => void
+  onShortcuts: () => void
   onSettings: () => void
+}
+
+/** A header action: icon and word where there is room, the icon alone (with the word as its name) where there is not. */
+function Action({ icon: Icon, label, ...props }: { icon: LucideIcon; label: string } & React.ComponentProps<typeof Button>) {
+  return (
+    <Button variant="ghost" size="sm" title={label} {...props}>
+      <Icon data-icon="inline-start" />
+      <span className="max-2xl:sr-only">{label}</span>
+    </Button>
+  )
 }
 
 /**
  * The top of the page. A commitment travels confirm, search, review, done, so the stages are
  * laid out in that order as the page's own navigation, each with how many wait there.
  */
-export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress, ingesting, onIngest, onGlossary, onSettings }: Props) {
+export function AppHeader({
+  stage, counts, onStage, q, onQ, searchRef, progress, ingesting, onIngest, onGlossary, onShortcuts, onSettings,
+}: Props) {
   const meta = useMeta()
   const canReview = useCanReview()
   const all = Object.entries(counts).reduce((n, [s, c]) => n + (s === "rejected" ? 0 : c), 0)
@@ -41,12 +77,16 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
 
       <Tabs value={stage} onValueChange={(v) => onStage(String(v))}>
         <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto flex-wrap">
-          {(["all", ...STAGES] as const).map((s) => (
-            <TabsTrigger key={s} value={s} title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}>
-              {s === "all" ? "All" : STAGE_INFO[s].label}{" "}
-              <span className="type-num text-muted-foreground in-data-active:text-brand-ink">{s === "all" ? all : (counts[s] ?? 0)}</span>
-            </TabsTrigger>
-          ))}
+          {(["all", ...STAGES] as const).map((s) => {
+            const Icon = STAGE_ICON[s]
+            return (
+              <TabsTrigger key={s} value={s} title={s === "all" ? "Everything except rejected" : STAGE_INFO[s].hint}>
+                <Icon aria-hidden="true" />
+                {s === "all" ? "All" : STAGE_INFO[s].label}{" "}
+                <span className="type-num text-muted-foreground in-data-active:text-brand-ink">{s === "all" ? all : (counts[s] ?? 0)}</span>
+              </TabsTrigger>
+            )
+          })}
         </TabsList>
       </Tabs>
 
@@ -69,17 +109,10 @@ export function AppHeader({ stage, counts, onStage, q, onQ, searchRef, progress,
             onChange={(e) => onQ(e.target.value)}
           />
         </div>
-        <Button variant="ghost" size="sm" onClick={onIngest} disabled={!canReview || ingesting}>
-          {ingesting ? "Reading…" : "Ingest"}
-        </Button>
-        {!!meta.data?.glossary.length && (
-          <Button variant="ghost" size="icon-sm" aria-label="Glossary" title="Glossary" onClick={onGlossary}>
-            <BookOpenIcon />
-          </Button>
-        )}
-        <Button variant="ghost" size="icon-sm" aria-label="Settings" title="Settings" onClick={onSettings}>
-          <Settings2Icon />
-        </Button>
+        <Action icon={UploadIcon} label={ingesting ? "Reading…" : "Ingest"} onClick={onIngest} disabled={!canReview || ingesting} />
+        {!!meta.data?.glossary.length && <Action icon={BookOpenIcon} label="Glossary" onClick={onGlossary} />}
+        <Action icon={KeyboardIcon} label="Shortcuts" onClick={onShortcuts} />
+        <Action icon={Settings2Icon} label="Settings" onClick={onSettings} />
       </div>
     </header>
   )

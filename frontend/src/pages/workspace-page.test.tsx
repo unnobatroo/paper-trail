@@ -114,6 +114,14 @@ describe("WorkspacePage", () => {
     expect(calls.filter((c) => c.path === "/api/workspace").every((c) => c.query.includes("type=all"))).toBe(true)
   })
 
+  it("lists the keyboard shortcuts on ?", async () => {
+    stubApi()
+    renderPage()
+    await screen.findByRole("button", { name: "Fák ültetése" })
+    await userEvent.keyboard("?")
+    expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument()
+  })
+
   it("ignores shortcuts while typing in the search box", async () => {
     const calls = stubApi()
     renderPage()

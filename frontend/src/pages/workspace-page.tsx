@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { CheckIcon, SearchIcon, XIcon } from "lucide-react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 
@@ -6,7 +7,7 @@ import type { WorkspaceRow } from "@/api/client"
 import { useActiveJobs, useReviewActions, useWorkspace } from "@/api/hooks"
 import { AppHeader } from "@/components/app-header"
 import { DetailPane } from "@/components/detail-pane"
-import { GlossaryDialog, IngestDialog, SettingsDialog } from "@/components/dialogs"
+import { GlossaryDialog, IngestDialog, SettingsDialog, ShortcutsDialog } from "@/components/dialogs"
 import { KindFilter } from "@/components/kind-filter"
 import { Ledger } from "@/components/ledger"
 import { Button } from "@/components/ui/button"
@@ -70,7 +71,7 @@ export function WorkspacePage() {
   const searching = searchJobs.length > 0
 
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [dialog, setDialog] = useState<"settings" | "ingest" | "glossary" | null>(null)
+  const [dialog, setDialog] = useState<"settings" | "ingest" | "glossary" | "shortcuts" | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
   const canReview = useCanReview()
@@ -154,7 +155,9 @@ export function WorkspacePage() {
       if (el.closest("[role=listbox],[role=option],[role=combobox]")) return
       if (document.querySelector("[role=dialog]")) return
       const ids = rows.map((r) => r.id)
-      if ((e.key === "j" || e.key === "k") && ids.length) {
+      if (e.key === "?") {
+        setDialog("shortcuts")
+      } else if ((e.key === "j" || e.key === "k") && ids.length) {
         const i = cursor !== null ? ids.indexOf(cursor) : -1
         open(ids[e.key === "j" ? Math.min(i + 1, ids.length - 1) : Math.max(i - 1, 0)])
       } else if (e.key === "/") {
@@ -193,24 +196,29 @@ export function WorkspacePage() {
             {mentionIds.length > 0 && (
               <>
                 <Button size="sm" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: mentionIds, reject: [] }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions confirmed.`); clear() } })}>
+                  <CheckIcon data-icon="inline-start" />
                   Confirm {byStage("confirm").length}
                 </Button>
                 <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkCandidates.mutate({ accept: [], reject: mentionIds }, { onSuccess: () => { toast.success(`${mentionIds.length} source mentions rejected.`); clear() } })}>
+                  <XIcon data-icon="inline-start" />
                   Reject
                 </Button>
               </>
             )}
             {searchIds.length > 0 && (
               <Button size="sm" disabled={!canReview} onClick={async () => { if (await startSearch(searchIds)) clear() }}>
+                <SearchIcon data-icon="inline-start" />
                 Find evidence {byStage("search").length}
               </Button>
             )}
             {matchIds.length > 0 && (
               <>
                 <Button size="sm" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: matchIds, reject: [] }, { onSuccess: () => { toast.success("Matches confirmed."); clear() } })}>
+                  <CheckIcon data-icon="inline-start" />
                   Confirm matches
                 </Button>
                 <Button size="sm" variant="ghost" disabled={!canReview} onClick={() => bulkLinks.mutate({ accept: [], reject: matchIds }, { onSuccess: () => { toast.success("Matches rejected."); clear() } })}>
+                  <XIcon data-icon="inline-start" />
                   Reject
                 </Button>
               </>
@@ -275,6 +283,7 @@ export function WorkspacePage() {
         ingesting={ingestJobs.length > 0}
         onIngest={() => setDialog("ingest")}
         onGlossary={() => setDialog("glossary")}
+        onShortcuts={() => setDialog("shortcuts")}
         onSettings={() => setDialog("settings")}
       />
       {isMobile ? (
@@ -308,6 +317,7 @@ export function WorkspacePage() {
 
       <SettingsDialog open={dialog === "settings"} onOpenChange={(o) => setDialog(o ? "settings" : null)} />
       <IngestDialog open={dialog === "ingest"} onOpenChange={(o) => setDialog(o ? "ingest" : null)} />
+      <ShortcutsDialog open={dialog === "shortcuts"} onOpenChange={(o) => setDialog(o ? "shortcuts" : null)} />
       <GlossaryDialog open={dialog === "glossary"} onOpenChange={(o) => setDialog(o ? "glossary" : null)} />
     </div>
   )

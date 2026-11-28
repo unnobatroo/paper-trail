@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { CheckIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import type { LinkView, Schemas } from "@/api/client"
@@ -73,10 +74,12 @@ export function MatchCard({ linkId, preview }: { linkId: number; preview: LinkVi
       </fieldset>
 
       <div className="flex gap-2">
-        <Button size="sm" onClick={() => decide("accept")} disabled={!canReview || decideLink.isPending}>
+        <Button onClick={() => decide("accept")} disabled={!canReview || decideLink.isPending}>
+          <CheckIcon data-icon="inline-start" />
           Confirm match
         </Button>
-        <Button size="sm" variant="outline" onClick={() => decide("reject")} disabled={!canReview || decideLink.isPending}>
+        <Button variant="outline" onClick={() => decide("reject")} disabled={!canReview || decideLink.isPending}>
+          <XIcon data-icon="inline-start" />
           Reject
         </Button>
         <Button size="sm" variant="ghost" className="ml-auto" aria-expanded={showDetails} onClick={() => setShowDetails((v) => !v)}>
