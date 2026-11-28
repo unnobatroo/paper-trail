@@ -34,7 +34,7 @@ def highlight(candidate_id: int, state: AppState = Depends(get_state)) -> PageHi
     cand = state.policy.candidate(candidate_id)
     if cand is None:
         raise HTTPException(404, f"no candidate {candidate_id}")
-    doc = next((d for d in state.policy.documents() if d.id == cand.document_id), None)
+    doc = state.policy.document(cand.document_id)
     if doc is None or not doc.url:
         raise HTTPException(404, "this strategy has no web address to read the page from")
     try:

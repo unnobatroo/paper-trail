@@ -23,7 +23,7 @@ def documents(state: AppState = Depends(get_state)) -> list[SourceDocument]:
 def page_image(document_id: int, page: int = Path(ge=1),
                state: AppState = Depends(get_state)) -> Response:
     """one page of the strategy's own pdf, drawn as a small image"""
-    doc = next((d for d in state.policy.documents() if d.id == document_id), None)
+    doc = state.policy.document(document_id)
     if doc is None or not doc.url:
         raise HTTPException(404, "this strategy has no web address to read the page from")
     try:

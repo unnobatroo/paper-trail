@@ -1,9 +1,7 @@
 import { useState } from "react"
 import { CheckIcon, PencilIcon, XIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import type { Candidate, Commitment, Schemas } from "@/api/client"
-import { useReviewActions } from "@/api/hooks"
 import { NoteCard } from "@/components/bilingual"
 import { SimpleSelect } from "@/components/simple-select"
 import { Button } from "@/components/ui/button"
@@ -11,6 +9,7 @@ import { SourcePage } from "@/components/source-page"
 import { Receipt } from "@/components/receipt"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useMentionDecision } from "@/hooks/use-mention-decision"
 import { useCanReview } from "@/lib/can-review"
 import { KIND_LABEL, KIND_ORDER, displayTitle } from "@/lib/labels"
 
@@ -30,7 +29,7 @@ export function CandidateDetail({
   /** Called once a confirm or reject has gone through, so the workspace can move on to the next row. */
   onDecided?: () => void
 }) {
-  const { accept, reject } = useReviewActions()
+  const { decide, pending } = useMentionDecision()
   const canReview = useCanReview()
   const [editing, setEditing] = useState(false)
   const [kind, setKind] = useState<string>(c.suggested_type)
@@ -40,17 +39,10 @@ export function CandidateDetail({
 
   // Quick confirm takes the suggestion as it is; the edit form's values count only while it is open.
   const confirm = () =>
-    accept.mutate(
-      editing
-        ? { id: c.id!, kind: kind as Kind, title: title.trim() || undefined, parentId: Number(parent) || undefined }
-        : { id: c.id! },
-      {
-        onSuccess: () => {
-          toast.success(editing ? "Saved as a commitment." : "Confirmed as a commitment.")
-          onDecided?.()
-        },
-      },
-    )
+    decide(c.id!, "accept", {
+      edit: editing ? { kind: kind as Kind, title: title.trim() || undefined, parentId: Number(parent) || undefined } : undefined,
+      onDone: onDecided,
+    })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -68,7 +60,7 @@ export function CandidateDetail({
       {open && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <Button title="Confirm (c)" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || accept.isPending}>
+            <Button title="Confirm (c)" aria-keyshortcuts="c" onClick={confirm} disabled={!canReview || pending}>
               <CheckIcon data-icon="inline-start" />
               Confirm
             </Button>
@@ -76,15 +68,8 @@ export function CandidateDetail({
               variant="outline"
               title="Reject (r)"
               aria-keyshortcuts="r"
-              disabled={!canReview || reject.isPending}
-              onClick={() =>
-                reject.mutate(c.id!, {
-                  onSuccess: () => {
-                    toast.success("Rejected.")
-                    onDecided?.()
-                  },
-                })
-              }
+              disabled={!canReview || pending}
+              onClick={() => decide(c.id!, "reject", { onDone: onDecided })}
             >
               <XIcon data-icon="inline-start" />
               Reject
@@ -132,7 +117,7 @@ export function CandidateDetail({
                 />
               </div>
               <div>
-                <Button type="submit" size="sm" disabled={accept.isPending || !title.trim()}>
+                <Button type="submit" size="sm" disabled={pending || !title.trim()}>
                   Save as commitment
                 </Button>
               </div>

@@ -39,6 +39,7 @@ ner = ["gliner>=0.2", "torch"]
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.17",
     "pytest>=9.1.1",
     "ruff>=0.14.0",
 ]
@@ -72,3 +73,21 @@ torchvision = [{ index = "pytorch-cpu" }]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+# the layering the wiki's Project Layout page describes, checked by tests/test_architecture.py:
+# a package may import the ones below it, never above, and siblings on one line stay independent
+[tool.importlinter]
+root_package = "paper_trail"
+
+[[tool.importlinter.contracts]]
+name = "Layers only import downwards"
+type = "layers"
+layers = [
+    "paper_trail.worker | paper_trail.maintenance",
+    "paper_trail.api",
+    "paper_trail.bootstrap",
+    "paper_trail.services | paper_trail.jobs",
+    "paper_trail.repositories | paper_trail.ml",
+    "paper_trail.sources",
+    "paper_trail.domain",
+]

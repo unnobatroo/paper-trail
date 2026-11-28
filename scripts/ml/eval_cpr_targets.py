@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from binary_metrics import prf
 
 from paper_trail.domain.models import DocumentPage
 from paper_trail.ml.client import model_client
@@ -57,13 +58,8 @@ def baseline(text: str) -> bool:
 
 
 def metrics(gold: list[bool], pred: list[bool]) -> dict:
-    tp = sum(g and p for g, p in zip(gold, pred, strict=True))
-    fp = sum(p and not g for g, p in zip(gold, pred, strict=True))
-    fn = sum(g and not p for g, p in zip(gold, pred, strict=True))
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {"precision": precision, "recall": recall, "f1": f1}
+    scores = prf(gold, pred)
+    return {k: scores[k] for k in ("precision", "recall", "f1")}
 
 
 def bootstrap(gold: list[bool], pred: list[bool], n: int = 1000, seed: int = 0) -> dict:

@@ -2,6 +2,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api, unwrap, type Schemas } from "./client"
 
+/** The mutation key of confirming or rejecting a single source mention, wherever it is started. */
+export const MENTION_DECISION = ["mention-decision"] as const
+
 export type Filters = { stage: string; type: string; q: string }
 
 export const useMeta = () =>
@@ -57,7 +60,8 @@ export function useReviewActions() {
     void qc.invalidateQueries({ queryKey: ["workspace"] })
     void qc.invalidateQueries({ queryKey: ["link"] })
   }
-  const useAction = <V, R>(fn: (v: V) => Promise<R>) => useMutation({ mutationFn: fn, onSuccess: refresh })
+  const useAction = <V, R>(fn: (v: V) => Promise<R>, mutationKey?: readonly unknown[]) =>
+    useMutation({ mutationFn: fn, mutationKey, onSuccess: refresh })
 
   return {
     accept: useAction(
@@ -68,9 +72,12 @@ export function useReviewActions() {
             body: { kind: v.kind ?? null, title: v.title ?? null, parent_id: v.parentId ?? null },
           }),
         ),
+      MENTION_DECISION,
     ),
-    reject: useAction(async (id: number) =>
-      unwrap(await api.POST("/api/candidates/{candidate_id}/reject", { params: { path: { candidate_id: id } } })),
+    reject: useAction(
+      async (id: number) =>
+        unwrap(await api.POST("/api/candidates/{candidate_id}/reject", { params: { path: { candidate_id: id } } })),
+      MENTION_DECISION,
     ),
     bulkCandidates: useAction(async (v: { accept: number[]; reject: number[] }) =>
       unwrap(await api.POST("/api/candidates/bulk", { body: { ...v, reject_rest: false } })),

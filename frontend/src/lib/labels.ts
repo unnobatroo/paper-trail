@@ -22,15 +22,6 @@ export const KIND_SECTION: Record<string, string> = {
 
 export const KIND_ORDER = ["objective", "target", "measure", "indicator", "background", "unclear"]
 
-export const KIND_TONE: Record<string, Tone> = {
-  objective: "blue",
-  target: "purple",
-  measure: "teal",
-  indicator: "amber",
-  background: "grey",
-  unclear: "grey",
-}
-
 export const STAGES = ["confirm", "search", "review", "done", "rejected"] as const
 export type Stage = (typeof STAGES)[number]
 
@@ -92,14 +83,6 @@ export const REL_HELP: Record<string, string> = {
     "The source concerns related work, but its connection to this commitment is indirect.",
   probably_unrelated:
     "The source does not establish a useful relationship to this commitment.",
-}
-
-export const REL_TONE: Record<string, Tone> = {
-  direct_implementation: "green",
-  supporting: "blue",
-  budget: "purple",
-  related_but_indirect: "amber",
-  probably_unrelated: "grey",
 }
 
 /** Which trail group a relationship belongs to; anything unknown counts as supporting. */

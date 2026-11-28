@@ -13,6 +13,7 @@ import random
 from pathlib import Path
 
 import torch
+from binary_metrics import prf
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 
@@ -20,15 +21,9 @@ def load(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def prf(gold: list[int], pred: list[int]) -> dict:
-    tp = sum(g and p for g, p in zip(gold, pred, strict=True))
-    fp = sum(p and not g for g, p in zip(gold, pred, strict=True))
-    fn = sum(g and not p for g, p in zip(gold, pred, strict=True))
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {"tp": tp, "fp": fp, "fn": fn, "precision": round(precision, 3),
-            "recall": round(recall, 3), "f1": round(f1, 3)}
+def scored(gold: list[int], pred: list[int]) -> dict:
+    """counts and scores rounded for the report"""
+    return {k: round(v, 3) if isinstance(v, float) else v for k, v in prf(gold, pred).items()}
 
 
 @torch.no_grad()
@@ -91,7 +86,7 @@ def main() -> None:
         gold = [r["label"] for r in val]
         # best threshold on val for this epoch
         # the grid plus every score, so a threshold can sit exactly between two close scores
-        cand = max(((t, prf(gold, [int(s >= t) for s in vs]))
+        cand = max(((t, scored(gold, [int(s >= t) for s in vs]))
                     for t in sorted({i / 20 for i in range(2, 19)} | set(vs))),
                    key=lambda x: x[1]["f1"])
         print(f"epoch {epoch + 1} loss {loss.item():.3f} val F1 {cand[1]['f1']} @ {cand[0]}",
@@ -109,7 +104,7 @@ def main() -> None:
         for name in ("test_cpr", "test_hu", "test_hu2", "test_hu_strat"):
             rows = load(args.data / f"{name}.jsonl")
             sc = scores(model, tok, rows, args.maxlen, device)
-            report[name] = prf([r["label"] for r in rows], [int(s >= thr) for s in sc])
+            report[name] = scored([r["label"] for r in rows], [int(s >= thr) for s in sc])
             (args.out / f"{name}_scores.json").write_text(json.dumps(sc))
             print(name, report[name], flush=True)
     (args.out / "report.json").write_text(json.dumps(report, indent=2))
