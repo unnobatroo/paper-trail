@@ -100,6 +100,11 @@ class PolicyRepository(Repo):
         return [SourceDocument(id=r["id"], title=r["title"], publisher=r["publisher"], url=r["url"])
                 for r in self._all("SELECT * FROM documents ORDER BY id")]
 
+    def document(self, document_id: int) -> SourceDocument | None:
+        row = self._one("SELECT * FROM documents WHERE id=:id", id=document_id)
+        return SourceDocument(id=row["id"], title=row["title"], publisher=row["publisher"],
+                              url=row["url"]) if row else None
+
     def add_candidate(self, cand: PolicyCandidate) -> int:
         with self._engine.begin() as conn:
             return self._insert_candidate(conn, cand)
