@@ -68,8 +68,10 @@ def create_app() -> FastAPI:
     async def cache_reads(request, call_next):
         """let a cdn cache successful GET /api responses, when the deployment is read-only"""
         response = await call_next(request)
+        # a route that set its own caching (the page images) knows better than this default
         if (settings.api_cache_seconds and request.method == "GET"
-                and request.url.path.startswith("/api/") and response.status_code == 200):
+                and request.url.path.startswith("/api/") and response.status_code == 200
+                and "cache-control" not in response.headers):
             ttl = settings.api_cache_seconds
             response.headers["cache-control"] = (
                 f"public, s-maxage={ttl}, stale-while-revalidate={ttl * 10}")

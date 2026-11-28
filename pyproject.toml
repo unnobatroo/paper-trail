@@ -26,6 +26,8 @@ dependencies = [
     "tenacity>=9",
     "typer>=0.16",
     "model2vec>=0.10",
+    "pypdfium2>=5.14.0",
+    "pillow>=12.3.0",
 ]
 
 [project.optional-dependencies]

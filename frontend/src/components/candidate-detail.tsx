@@ -7,7 +7,7 @@ import { useReviewActions } from "@/api/hooks"
 import { NoteCard } from "@/components/bilingual"
 import { SimpleSelect } from "@/components/simple-select"
 import { Button } from "@/components/ui/button"
-import { SourceFrame } from "@/components/source-frame"
+import { SourcePage } from "@/components/source-page"
 import { Receipt } from "@/components/receipt"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -143,7 +143,7 @@ export function CandidateDetail({
 
       <NoteCard note={c.note} />
 
-      {pdfUrl && <SourceFrame url={pdfUrl} page={c.source_page} />}
+      <SourcePage key={c.id} candidateId={c.id!} pdfUrl={pdfUrl} page={c.source_page} />
     </div>
   )
 }

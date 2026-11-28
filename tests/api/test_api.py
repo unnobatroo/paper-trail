@@ -255,3 +255,74 @@ def test_api_responses_are_cacheable_only_when_the_deployment_asks(state, monkey
     assert "cache-control" not in cached.get("/api/nope").headers  # errors aren't cached
     assert "cache-control" not in cached.post("/api/meta").headers  # nor are non-GETs
 
+
+
+# --- the strategy's own page, drawn, with the quote marked -------------------------------------
+
+def _strategy_with_a_quote(state, url="https://city.example/plan.pdf", page=1,
+                           excerpt="plant 500 new trees"):
+    from paper_trail.domain.enums import CandidateType
+    from paper_trail.domain.models import PolicyCandidate, SourceDocument
+    doc_id = state.policy.add_document(SourceDocument(title="t", publisher="p", url=url))
+    cand_id = state.policy.add_candidate(PolicyCandidate(
+        document_id=doc_id, suggested_type=CandidateType.TARGET, text="500 trees",
+        normalized_title="Trees", source_page=page, source_excerpt=excerpt,
+        excerpt_on_page=True))
+    return doc_id, cand_id
+
+
+@pytest.fixture
+def city_pdf(monkeypatch):
+    from paper_trail.sources import pdf_page
+    from tests.sources.pdfs import make_pdf
+    pdf = make_pdf(["The city will plant 500 new trees by 2030", "and cut emissions."])
+    monkeypatch.setattr(pdf_page, "download", lambda url: pdf)
+    _forget_pages()
+
+
+def _forget_pages():
+    # pages and highlights are cached per address, and every test uses the same one
+    from paper_trail.sources import pdf_page
+    pdf_page.highlight.cache_clear()
+    pdf_page.page_image.cache_clear()
+
+
+def test_a_candidates_quote_is_marked_on_its_page(client, state, city_pdf):
+    doc_id, cand_id = _strategy_with_a_quote(state)
+    body = client.get(f"/api/candidates/{cand_id}/highlight").json()
+    assert body["found"] and body["page"] == 1 and len(body["boxes"]) == 1
+    assert body["image_url"] == f"/api/documents/{doc_id}/pages/1/image"
+
+
+def test_a_quote_the_page_does_not_contain_is_reported_not_guessed(client, state, city_pdf):
+    _, cand_id = _strategy_with_a_quote(state, excerpt="build a bridge over the river")
+    body = client.get(f"/api/candidates/{cand_id}/highlight").json()
+    assert body["found"] is False and body["boxes"] == []
+
+
+def test_the_page_image_is_a_cacheable_webp(client, state, city_pdf):
+    doc_id, _ = _strategy_with_a_quote(state)
+    r = client.get(f"/api/documents/{doc_id}/pages/1/image")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
+    assert "max-age" in r.headers["cache-control"]
+    assert client.get(f"/api/documents/{doc_id}/pages/9/image").status_code == 404
+    assert client.get(f"/api/documents/{doc_id}/pages/0/image").status_code == 422
+
+
+def test_a_strategy_without_an_address_has_no_page_to_show(client, state, city_pdf):
+    doc_id, cand_id = _strategy_with_a_quote(state, url="")
+    assert client.get(f"/api/candidates/{cand_id}/highlight").status_code == 404
+    assert client.get(f"/api/documents/{doc_id}/pages/1/image").status_code == 404
+    assert client.get("/api/candidates/99999/highlight").status_code == 404
+
+
+def test_a_source_that_cannot_be_read_is_a_bad_gateway(client, state, monkeypatch):
+    from paper_trail.sources import pdf_page
+
+    def refuse(url):
+        raise pdf_page.PdfUnavailable("source resolves to a private address")
+    monkeypatch.setattr(pdf_page, "download", refuse)
+    _forget_pages()
+    _, cand_id = _strategy_with_a_quote(state)
+    r = client.get(f"/api/candidates/{cand_id}/highlight")
+    assert r.status_code == 502 and "private address" in r.json()["detail"]
