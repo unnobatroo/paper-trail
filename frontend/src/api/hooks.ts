@@ -19,6 +19,16 @@ export const useWorkspace = (f: Filters) =>
     placeholderData: keepPreviousData,
   })
 
+/** Where a candidate's quote sits on its source page. The page never changes, so it is fetched once. */
+export const useCandidateHighlight = (candidateId: number) =>
+  useQuery({
+    queryKey: ["highlight", candidateId],
+    queryFn: async () =>
+      unwrap(await api.GET("/api/candidates/{candidate_id}/highlight", { params: { path: { candidate_id: candidateId } } })),
+    staleTime: Infinity,
+    retry: false,
+  })
+
 export const useLinkDetail = (linkId: number) =>
   useQuery({
     queryKey: ["link", linkId],

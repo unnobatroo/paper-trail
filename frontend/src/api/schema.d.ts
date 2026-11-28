@@ -72,6 +72,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{document_id}/pages/{page}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Page Image
+         * @description one page of the strategy's own pdf, drawn as a small image
+         */
+        get: operations["page_image_api_documents__document_id__pages__page__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/available": {
         parameters: {
             query?: never;
@@ -118,6 +138,26 @@ export interface paths {
         };
         /** Candidates */
         get: operations["candidates_api_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/candidates/{candidate_id}/highlight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Highlight
+         * @description the quote's rectangles on its source page, read from the strategy's own pdf
+         */
+        get: operations["highlight_api_candidates__candidate_id__highlight_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -642,6 +682,20 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * HighlightBox
+         * @description a rectangle on the page, as fractions of its width and height from the top left
+         */
+        HighlightBox: {
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** W */
+            w: number;
+            /** H */
+            h: number;
+        };
         /** IngestRequest */
         IngestRequest: {
             /**
@@ -782,6 +836,20 @@ export interface components {
             reason_en: string;
             /** Author */
             author: string;
+        };
+        /**
+         * PageHighlight
+         * @description where a candidate's quote sits on its source page, and where to get the page as an image
+         */
+        PageHighlight: {
+            /** Page */
+            page: number;
+            /** Found */
+            found: boolean;
+            /** Boxes */
+            boxes: components["schemas"]["HighlightBox"][];
+            /** Image Url */
+            image_url: string;
         };
         /**
          * RelationshipType
@@ -1003,6 +1071,36 @@ export interface operations {
             };
         };
     };
+    page_image_api_documents__document_id__pages__page__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+                page: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     available_api_documents_available_get: {
         parameters: {
             query?: never;
@@ -1074,6 +1172,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    highlight_api_candidates__candidate_id__highlight_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidate_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageHighlight"];
                 };
             };
             /** @description Validation Error */

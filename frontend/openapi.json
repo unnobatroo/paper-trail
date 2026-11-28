@@ -89,6 +89,51 @@
         }
       }
     },
+    "/api/documents/{document_id}/pages/{page}/image": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Page Image",
+        "description": "one page of the strategy's own pdf, drawn as a small image",
+        "operationId": "page_image_api_documents__document_id__pages__page__image_get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documents/available": {
       "get": {
         "tags": [
@@ -192,6 +237,49 @@
                     "$ref": "#/components/schemas/CandidateView"
                   },
                   "title": "Response Candidates Api Candidates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candidates/{candidate_id}/highlight": {
+      "get": {
+        "tags": [
+          "candidates"
+        ],
+        "summary": "Highlight",
+        "description": "the quote's rectangles on its source page, read from the strategy's own pdf",
+        "operationId": "highlight_api_candidates__candidate_id__highlight_get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageHighlight"
                 }
               }
             }
@@ -1678,6 +1766,35 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HighlightBox": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          },
+          "w": {
+            "type": "number",
+            "title": "W"
+          },
+          "h": {
+            "type": "number",
+            "title": "H"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "HighlightBox",
+        "description": "a rectangle on the page, as fractions of its width and height from the top left"
+      },
       "IngestRequest": {
         "properties": {
           "name": {
@@ -2014,6 +2131,38 @@
         ],
         "title": "Note",
         "description": "plain-english take on a queue item + what the ai would decide. never decides itself"
+      },
+      "PageHighlight": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "found": {
+            "type": "boolean",
+            "title": "Found"
+          },
+          "boxes": {
+            "items": {
+              "$ref": "#/components/schemas/HighlightBox"
+            },
+            "type": "array",
+            "title": "Boxes"
+          },
+          "image_url": {
+            "type": "string",
+            "title": "Image Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "found",
+          "boxes",
+          "image_url"
+        ],
+        "title": "PageHighlight",
+        "description": "where a candidate's quote sits on its source page, and where to get the page as an image"
       },
       "RelationshipType": {
         "type": "string",

@@ -66,6 +66,22 @@ class CandidateView(PolicyCandidate):
     note: Note | None = None
 
 
+class HighlightBox(DomainModel):
+    """a rectangle on the page, as fractions of its width and height from the top left"""
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+class PageHighlight(DomainModel):
+    """where a candidate's quote sits on its source page, and where to get the page as an image"""
+    page: int
+    found: bool  # false when the page's own text doesn't contain the quote
+    boxes: list[HighlightBox]
+    image_url: str
+
+
 class GlossaryTerm(DomainModel):
     term: str
     meaning: str

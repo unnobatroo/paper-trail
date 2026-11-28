@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from ...bootstrap import AppState
 from ...domain.models import SourceDocument
 from ...jobs.local import JobRunner
+from ...sources import pdf_page
 from ..deps import get_jobs, get_state, require_review_key
 from ..schemas import IngestRequest, JobOut
 
@@ -16,6 +17,21 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 @router.get("")
 def documents(state: AppState = Depends(get_state)) -> list[SourceDocument]:
     return state.policy.documents()
+
+
+@router.get("/{document_id}/pages/{page}/image", response_class=Response)
+def page_image(document_id: int, page: int, state: AppState = Depends(get_state)) -> Response:
+    """one page of the strategy's own pdf, drawn as a small image"""
+    doc = next((d for d in state.policy.documents() if d.id == document_id), None)
+    if doc is None or not doc.url:
+        raise HTTPException(404, "this strategy has no web address to read the page from")
+    try:
+        image = pdf_page.render(pdf_page.download(doc.url), page)
+    except pdf_page.PdfUnavailable as exc:
+        raise HTTPException(502, f"could not read the source page: {exc}") from exc
+    # the same page of the same file never changes, so browsers and the cdn may keep it
+    return Response(image, media_type="image/webp",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/available")
