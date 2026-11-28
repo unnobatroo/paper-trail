@@ -26,7 +26,7 @@ export function KindFilter({ counts, kind, onKind, children }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 pt-3 pb-2">
       {choosable && <Tabs value={kind} onValueChange={(v) => onKind(String(v))} className="min-w-0 max-w-full">
-        <TabsList variant="line" aria-label="Filter by type" className="max-w-full justify-start gap-4 overflow-x-auto p-0 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_85%,transparent)]">
+        <TabsList variant="line" aria-label="Filter by type" className="max-w-full justify-start gap-4 overflow-x-auto p-0 [scrollbar-width:none] max-md:pe-8 max-md:[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]">
           {facets.map((f) => (
             <TabsTrigger key={f.value} value={f.value} className="type-label flex-none px-0 data-active:text-foreground group-data-horizontal/tabs:after:bottom-0">
               {f.label}{" "}
