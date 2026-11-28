@@ -13,6 +13,7 @@ import { Ledger } from "@/components/ledger"
 import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useMentionDecision } from "@/hooks/use-mention-decision"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCanReview } from "@/lib/can-review"
 import { displayTitle, type Stage } from "@/lib/labels"
@@ -65,7 +66,8 @@ export function WorkspacePage() {
   const counts = ws.data?.stage_counts ?? {}
   const current = rows.find((r) => r.id === cursor) ?? null
 
-  const { accept, reject, bulkCandidates, bulkLinks, findEvidence } = useReviewActions()
+  const { bulkCandidates, bulkLinks, findEvidence } = useReviewActions()
+  const { decide } = useMentionDecision()
   const ingestJobs = useActiveJobs("ingest").data ?? []
   const searchJobs = useActiveJobs("find_evidence").data ?? []
   const searching = searchJobs.length > 0
@@ -108,37 +110,14 @@ export function WorkspacePage() {
     [findEvidence],
   )
 
-  const confirmRow = useCallback(
-    (row: WorkspaceRow) => {
+  /** A keyboard decision on a row: only an open mention in To confirm, then on to the next row. */
+  const decideRow = useCallback(
+    (row: WorkspaceRow, decision: "accept" | "reject") => {
       const c = shown(row)
-      // a second press while the first is still on its way would decide the same row twice
-      if (accept.isPending || reject.isPending) return
       if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
-        accept.mutate(
-          { id: c.id! },
-          {
-            onSuccess: () => {
-              toast.success("Confirmed as a commitment.")
-              moveOnFrom(row.id)
-            },
-          },
-        )
+        decide(c.id!, decision, { onDone: () => moveOnFrom(row.id) })
     },
-    [accept, reject.isPending, canReview, moveOnFrom],
-  )
-  const rejectRow = useCallback(
-    (row: WorkspaceRow) => {
-      const c = shown(row)
-      if (accept.isPending || reject.isPending) return
-      if (canReview && row.stage === "confirm" && c.review_status === "unreviewed")
-        reject.mutate(c.id!, {
-          onSuccess: () => {
-            toast.success("Rejected.")
-            moveOnFrom(row.id)
-          },
-        })
-    },
-    [reject, accept.isPending, canReview, moveOnFrom],
+    [decide, canReview, moveOnFrom],
   )
 
   // A wide screen always has something in the detail pane: the first row, until one is picked.
@@ -165,8 +144,8 @@ export function WorkspacePage() {
         searchRef.current?.focus()
       } else if (current) {
         if (e.key === "x") selectMany([current.id], !selected.has(current.id))
-        else if (e.key === "c") confirmRow(current)
-        else if (e.key === "r") rejectRow(current)
+        else if (e.key === "c") decideRow(current, "accept")
+        else if (e.key === "r") decideRow(current, "reject")
         else if (e.key === "s" && canReview && current.stage === "search" && !searching) void startSearch(current.commitments.map((m) => m.id!))
       }
     }

@@ -9,7 +9,6 @@ export type Candidate = Schemas["CandidateView"]
 export type Commitment = Schemas["Commitment"]
 export type LinkView = Schemas["LinkView"]
 export type TrailRow = Schemas["TrailRow"]
-export type Meta = Schemas["MetaOut"]
 export type Job = Schemas["JobOut"]
 
 export const REVIEW_KEY = "paper-trail.review-key"
