@@ -76,7 +76,7 @@ export function AppHeader({
       </div>
 
       <Tabs value={stage} onValueChange={(v) => onStage(String(v))} className="max-md:w-full">
-        <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto md:flex-wrap max-md:w-full max-md:justify-start max-md:overflow-x-auto max-md:[scrollbar-width:none]">
+        <TabsList aria-label="Review stages" className="group-data-horizontal/tabs:h-auto md:flex-wrap max-md:w-full max-md:justify-start max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_85%,transparent)]">
           {(["all", ...STAGES] as const).map((s) => {
             const Icon = STAGE_ICON[s]
             return (
