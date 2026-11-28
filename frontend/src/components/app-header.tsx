@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCanReview } from "@/lib/can-review"
 import { STAGE_INFO, STAGES, type Stage } from "@/lib/labels"
 
-// One icon per stage, used here and nowhere else, so an icon always means the same stage.
+// One icon per stage, so the same word always comes with the same picture.
 const STAGE_ICON: Record<Stage | "all", LucideIcon> = {
   all: ListIcon,
   confirm: ClipboardCheckIcon,
@@ -111,7 +111,7 @@ export function AppHeader({
         </div>
         <Action icon={UploadIcon} label={ingesting ? "Reading…" : "Ingest"} onClick={onIngest} disabled={!canReview || ingesting} />
         {!!meta.data?.glossary.length && <Action icon={BookOpenIcon} label="Glossary" onClick={onGlossary} />}
-        <Action icon={KeyboardIcon} label="Shortcuts" onClick={onShortcuts} />
+        <Action icon={KeyboardIcon} label="Shortcuts" onClick={onShortcuts} className="max-md:hidden" />
         <Action icon={Settings2Icon} label="Settings" onClick={onSettings} />
       </div>
     </header>

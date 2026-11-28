@@ -82,7 +82,7 @@ export function MatchCard({ linkId, preview }: { linkId: number; preview: LinkVi
           <XIcon data-icon="inline-start" />
           Reject
         </Button>
-        <Button size="sm" variant="ghost" className="ml-auto" aria-expanded={showDetails} onClick={() => setShowDetails((v) => !v)}>
+        <Button variant="ghost" className="ml-auto" aria-expanded={showDetails} onClick={() => setShowDetails((v) => !v)}>
           Why matched
         </Button>
       </div>

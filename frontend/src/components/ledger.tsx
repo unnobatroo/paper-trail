@@ -108,7 +108,7 @@ export function Ledger({ rows, showStage, cursor, selected, onOpen, onSelectMany
               )}
             >
               <TableCell
-                className="cursor-default pl-5"
+                className="cursor-pointer pl-5"
                 onClick={(e) => {
                   e.stopPropagation()
                   // a click on the cell around the box counts as a click on the box

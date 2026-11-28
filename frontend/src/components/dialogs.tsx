@@ -161,11 +161,10 @@ export function IngestDialog({ open, onOpenChange }: DialogProps) {
   )
 }
 
-/** The terms and codes used in the source documents, in plain words. */
 const SHORTCUTS: [string, string][] = [
   ["j  k", "Next and previous commitment"],
-  ["c", "Confirm the open commitment"],
-  ["r", "Reject the open commitment"],
+  ["c", "Confirm the open commitment (To confirm)"],
+  ["r", "Reject the open commitment (To confirm)"],
   ["x", "Select or unselect it for a bulk action"],
   ["s", "Find evidence for it (To search)"],
   ["/", "Go to the search box"],
@@ -179,7 +178,7 @@ export function ShortcutsDialog({ open, onOpenChange }: DialogProps) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
-          <DialogDescription>They work anywhere except while you are typing.</DialogDescription>
+          <DialogDescription>They work when no dialog is open and you are not typing.</DialogDescription>
         </DialogHeader>
         <dl className="grid grid-cols-[5rem_1fr] items-center gap-x-3 gap-y-2 type-body">
           {SHORTCUTS.map(([keys, what]) => (
@@ -201,6 +200,7 @@ export function ShortcutsDialog({ open, onOpenChange }: DialogProps) {
   )
 }
 
+/** The terms and codes used in the source documents, in plain words. */
 export function GlossaryDialog({ open, onOpenChange }: DialogProps) {
   const meta = useMeta()
   return (
